@@ -102,11 +102,12 @@
 **Files:**
 - Create: `src/engine/clearance.ts`, `src/engine/clearance.test.ts`
 
-- [ ] look up holding-instruction phraseology in the current FAA JO 7110.65 (and AIM 5-3-8 examples); record the exact citation in the code's `source` fields
-- [ ] write tests first: generated text matches real controller phraseology and AIM 5-3-8 i element order; turn direction stated only for left turns; "as published" form; leg length in miles only for DME/RNAV; radial (FROM) vs bearing/course (TO) wording explicit and consistent with the derived `HoldSpec`
-- [ ] implement `generateClearance(seed): { clearance, holdSpec, expectedFields }` — seeded random scenarios across fix types, standard/nonstandard, timed/DME legs
-- [ ] implement `gradeCopiedClearance(userFields, expected)` with per-field results; omitted turn direction = right turns (the trap), flagged distinctly
-- [ ] run tests - must pass before task 5
+- [x] look up holding-instruction phraseology in the current FAA JO 7110.65 (and AIM 5-3-8 examples); record the exact citation in the code's `source` fields
+- [x] write tests first: generated text matches real controller phraseology and AIM 5-3-8 i element order; turn direction stated only for left turns; "as published" form; leg length in miles only for DME/RNAV; radial (FROM) vs bearing/course (TO) wording explicit and consistent with the derived `HoldSpec`
+- [x] implement `generateClearance(seed): { clearance, holdSpec, expectedFields }` — seeded random scenarios across fix types, standard/nonstandard, timed/DME legs
+- [x] implement `gradeCopiedClearance(userFields, expected)` with per-field results; omitted turn direction = right turns (the trap), flagged distinctly
+- [x] run tests - must pass before task 5
+- ➕ phraseology re-verified against JO 7110.65BB (current, Chg 1+2 dtd 1-22-26) 4-6-4 and 4-6-1 fetched from faa.gov: element order; leg length in miles only for DME/RNAV; turns stated only if left; charted holds abbreviate to direction + "as published". Generator fix names are practice fixtures — Task 8 brings chart-derived holds.
 
 ### Task 5: Progress store [P0]
 
