@@ -207,7 +207,7 @@ const FIX_KINDS: readonly FixKind[] = ['VOR', 'VOR/DME', 'NDB', 'charted']
 const DME_LEG_MILES = [4, 5, 8, 10] as const
 
 /** mulberry32 — tiny deterministic PRNG so every seed replays exactly. */
-function mulberry32(seed: number): () => number {
+export function mulberry32(seed: number): () => number {
   let a = seed >>> 0
   return () => {
     a = (a + 0x6d2b79f5) | 0

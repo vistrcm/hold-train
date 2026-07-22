@@ -137,11 +137,12 @@
 - Create: `src/modules/entry-drill.ts`, `src/modules/entry-drill.test.ts`
 - Modify: `src/app/router.ts`
 
-- [ ] write tests first: seeded scenarios (standard/nonstandard, fix types; prompt = realistic clearance text + current heading on HSI); grading accepts primary + boundary alternates; timer per answer; miss recorded with scenario; explanation payload includes sector overlay + FAA citation
-- [ ] implement drill screen: clearance text + HSI; three-button answer (direct/teardrop/parallel), touch-sized; instant feedback with sector overlay and citation
-- [ ] two modes: untimed learn mode (thumb/sector aids visible — legitimate for the written per FAA Order 8080.6H) and timed cockpit mode (no aids, 15 s target)
-- [ ] session + stored stats vs benchmarks (18/20 <10 s; 95% <15 s)
-- [ ] run tests - must pass before task 8
+- [x] write tests first: seeded scenarios (standard/nonstandard, fix types; prompt = realistic clearance text + current heading on HSI); grading accepts primary + boundary alternates; timer per answer; miss recorded with scenario; explanation payload includes sector overlay + FAA citation
+- [x] implement drill screen: clearance text + HSI; three-button answer (direct/teardrop/parallel), touch-sized; instant feedback with sector overlay and citation
+- [x] two modes: untimed learn mode (thumb/sector aids visible — legitimate for the written per FAA Order 8080.6H) and timed cockpit mode (no aids, 15 s target)
+- [x] session + stored stats vs benchmarks (18/20 <10 s; 95% <15 s)
+- [x] run tests - must pass before task 8
+- ➕ pure controller (`createEntryDrill`, injectable clock/store) split from DOM renderer; cockpit results stored under `entry` (the benchmarked drill), learn results under `entry-learn` so the timed window stays clean; `mulberry32` exported from `clearance.ts` for the heading stream; screen registered in `main.ts` (the route registry lives there, not in `router.ts`)
 
 ### Task 8: Written-test question bank + exam module [P0]
 

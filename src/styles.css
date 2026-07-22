@@ -98,3 +98,48 @@ button {
   max-width: 420px;
   margin-inline: auto;
 }
+
+/* Entry drill */
+.entry-modes {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.entry-mode[aria-pressed='true'] {
+  outline: 2px solid var(--accent);
+}
+
+.entry-clearance {
+  font-style: italic;
+  color: var(--text);
+}
+
+.entry-answers {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.entry-answer {
+  flex: 1;
+}
+
+.entry-feedback p {
+  margin: 0.35rem 0;
+}
+
+.entry-feedback.is-correct .entry-verdict {
+  color: #3fbf6f;
+}
+
+.entry-feedback.is-wrong .entry-verdict {
+  color: #e05c5c;
+}
+
+.entry-next {
+  width: 100%;
+  margin-top: 0.5rem;
+}
+
+.entry-stats {
+  font-size: var(--fs-sm);
+}
