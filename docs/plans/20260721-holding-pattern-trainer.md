@@ -124,11 +124,12 @@
 **Files:**
 - Create: `src/ui/hsi.ts`, `src/ui/hsi.test.ts`
 
-- [ ] load the `frontend-design` skill and study how the real instrument (HSI / G1000 PFD compass rose) is depicted; aim for a close, clean approximation — not a toy diagram
-- [ ] write tests first (jsdom): rose rotates so heading is up; course pointer at correct rose position; thumb overlay on 3 o'clock side for standard / 9 o'clock for nonstandard, 20° wide starting at the 70° line; sector overlay angles match engine output
-- [ ] implement `renderHSI(el, { heading, course, thumbOverlay, sectorOverlay })` as pure SVG rendering (state in, SVG out)
-- [ ] scales to container width, usable at 320 px
-- [ ] run tests - must pass before task 7
+- [x] load the `frontend-design` skill and study how the real instrument (HSI / G1000 PFD compass rose) is depicted; aim for a close, clean approximation — not a toy diagram
+- [x] write tests first (jsdom): rose rotates so heading is up; course pointer at correct rose position; thumb overlay on 3 o'clock side for standard / 9 o'clock for nonstandard, 20° wide starting at the 70° line; sector overlay angles match engine output
+- [x] implement `renderHSI(el, { heading, course, thumbOverlay, sectorOverlay })` as pure SVG rendering (state in, SVG out)
+- [x] scales to container width, usable at 320 px (viewBox-only SVG + `.hsi` CSS, width 100%)
+- [x] run tests - must pass before task 7
+- ➕ G1000 conventions encoded: 5° ticks, labels every 30° (cardinal letters + numbers sans trailing zero), magenta course pointer, heading-0 readout shown as 360°; sector-overlay tests feed `determineEntry` output verbatim (engine is the oracle)
 
 ### Task 7: Entry drill module [P0]
 

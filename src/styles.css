@@ -90,3 +90,11 @@ button {
   background: var(--surface);
   text-decoration: none;
 }
+
+/* HSI instrument: viewBox-only SVG, scales to its container (320 px and up) */
+.hsi {
+  display: block;
+  width: 100%;
+  max-width: 420px;
+  margin-inline: auto;
+}
