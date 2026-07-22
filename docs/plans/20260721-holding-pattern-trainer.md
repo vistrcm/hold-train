@@ -114,10 +114,10 @@
 **Files:**
 - Create: `src/app/store.ts`, `src/app/store.test.ts`
 
-- [ ] write tests first: versioned round-trip; per-drill stats (attempts, correct, avg time); miss recording with scenario snapshot; corrupt/missing localStorage → empty state without throwing
-- [ ] implement `loadState`/`saveState`/`recordDrillResult`/`recordMiss`; benchmark helpers (last-20 entry accuracy + median time vs 18/20 <10 s, 95% <15 s)
-- [ ] write error tests (quota exceeded → in-memory fallback)
-- [ ] run tests - must pass before task 6
+- [x] write tests first: versioned round-trip; per-drill stats (attempts, correct, avg time); miss recording with scenario snapshot; corrupt/missing localStorage → empty state without throwing
+- [x] implement `loadState`/`saveState`/`recordDrillResult`/`recordMiss`; benchmark helpers (last-20 entry accuracy + median time vs 18/20 <10 s, 95% <15 s)
+- [x] write error tests (quota exceeded → in-memory fallback)
+- [x] run tests - must pass before task 6
 
 ### Task 6: HSI SVG component [P0]
 
