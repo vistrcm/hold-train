@@ -80,10 +80,10 @@
 **Files:**
 - Create: `src/engine/geometry.ts`, `src/engine/geometry.test.ts`
 
-- [ ] write tests first: normalize (0/360 wrap, negatives), signed angular difference, reciprocal, cardinal ↔ course (8-point), radial↔inbound-course conversion (radial 160 FROM = course 340 TO)
-- [ ] implement `normalizeDeg`, `angleDiff`, `reciprocal`, `cardinalFromCourse`/`courseFromCardinal`, `radialToInboundCourse`
-- [ ] add error-case tests (NaN, out-of-range rejected)
-- [ ] run tests - must pass before task 3
+- [x] write tests first: normalize (0/360 wrap, negatives), signed angular difference, reciprocal, cardinal ↔ course (8-point), radial↔inbound-course conversion (radial 160 FROM = course 340 TO)
+- [x] implement `normalizeDeg`, `angleDiff`, `reciprocal`, `cardinalFromCourse`/`courseFromCardinal`, `radialToInboundCourse`
+- [x] add error-case tests (NaN, out-of-range rejected)
+- [x] run tests - must pass before task 3
 
 ### Task 3: Entry determination engine [P0]
 
