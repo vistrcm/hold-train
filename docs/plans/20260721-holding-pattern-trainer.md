@@ -1,346 +1,281 @@
 # Holding Pattern Trainer
 
 ## Overview
-- A web application that trains an FAA instrument-rating student (G1000 C182, KHAF, Jeppesen) on everything holding-pattern related: entry determination, clearance copying, wind correction and timing, written-test question formats, oral-exam knowledge, and G1000 procedures.
+- A web application that trains an FAA instrument-rating student (C172 around KTCY; G1000 avionics assumed — confirm on the actual club aircraft) on holding patterns: entry determination, realistic clearances, wind correction and timing, written-test question formats, and oral-exam knowledge.
+- Chart data source: **free public FAA dTPP charts** (KTCY/KLVK procedures). The user flies with Jeppesen plates — no Jeppesen data is used or available; where chart depiction is taught, note Jeppesen-vs-FAA styling differences (e.g., bold HILPT racetrack, 45/45 PT barb) so the FAA-styled figures transfer to the Jepp plates in the cockpit.
 - Problem it solves: existing trainers are native-app-only (PilotsCafe, FlyGo, Holding Pattern Computer), calculator-only, or rote-lookup (Sheppard Air). Nothing browser-based teaches concepts, drills wind correction, maps drills to ACS elements, or exports to Anki (`docs/research-web.md`).
-- Primary goal: **teach the user**. Secondary goal: **simplicity and correctness** — no wrong facts, no wrong geometry; an app that teaches a wrong entry sector is worse than no app (negative training before an exam).
-- Integrates with nothing external: static single-page app, Vanilla TypeScript + SVG, Vite build, Vitest tests, localStorage persistence, phone/tablet-friendly responsive layout. No backend, no PWA, no deploy pipeline in this plan.
+- Primary goal: **teach the user, efficiently** — checkride is ~1 month out with limited daily study time. Secondary goal: **simplicity and correctness** — no wrong facts, no wrong geometry; an app that teaches a wrong entry sector is negative training.
+- **Priority principle (hard rule):** tasks are tiered P0 → P1 → P2. Each tier ends with a working, useful app. Build P0 completely before touching P1; P2 is cut unless time clearly remains. Do not gold-plate; do not implement things that don't move exam readiness, even if listed here.
+- Static single-page app: Vanilla TypeScript + SVG, Vite build, Vitest tests, localStorage persistence, phone/tablet-friendly. No backend, no PWA, no deploy pipeline in this plan.
 
 ## Context (from discovery)
-- Repo is empty except research: `docs/research-claude.md` (FAA-verified holding rules: AIM 5-3-8 verbatim geometry, ACS-8C Task III.B elements, speeds/timing/entries, G1000 SUSP/OBS, KHAF-local holds at OSI/SEEMS/GOBBS) and `docs/research-web.md` (verified pedagogy, competitor, and exam-format findings — see its "Design implications distilled").
-- All app content (facts, question explanations, oral answers, Anki cards) must trace to these two documents; both cite primary FAA sources.
-- Key reference cases for TDD live in the research: entry sectors (180° direct / 70° teardrop / 110° parallel around the 70° line, ±5° boundary tolerance, nonstandard mirroring per AIM 5-3-8 j3(e)), DME leg worked examples (fix 10 DME + 5 NM legs → turn at 15 DME; fix 28 DME inbound-away + 8 NM legs → turn at 20 DME), the classic 160-radial → 230-radial divider example, triple-drift 8°→24° example, timing rules, max speeds 200/230/265.
+- Repo contains research only: `docs/research-claude.md` and `docs/research-web.md`. These are convenient, cited compilations — **the source of truth is always the FAA primary sources they point to** (AIM 5-3-8/5-3-3, 14 CFR 91.185/91.167, FAA-S-ACS-8C Task III.B, FAA JO 7110.65 for controller phraseology). **ACS is the exam standard** — drills and content map to ACS element codes.
+- ⚠️ Locale correction: the research docs assumed a G1000 C182 based at KHAF (OSI/SEEMS/GOBBS scenarios). Actual training context: **C172 around KTCY** — local scenarios must be built from **current FAA charts** for **KTCY RNAV (GPS) RWY 12** (its missed-approach hold; circle-to-land RWY 30 is the usual arrival) and **KLVK** procedures. Do not reuse the KHAF examples.
+- Key TDD reference cases (verify against AIM before locking): entry sectors 180° direct / 70° teardrop / 110° parallel around the 70° line, ±5° boundary tolerance, nonstandard mirroring (AIM 5-3-8 j3(e)); DME worked examples (fix 10 DME + 5 NM legs → turn at 15 DME; fix 28 DME inbound-away + 8 NM → 20 DME); 160-radial → 230-divider classic; triple drift 8°→24°; timing rules; max speeds 200/230/265.
 
 ## Development Approach
-- **testing approach**: TDD — reference-case tests written first for every engine and content module, then implementation until green.
-- complete each task fully before moving to the next
-- make small, focused changes
+- **testing approach**: TDD — reference-case tests first for engine and content modules, then implement until green.
+- complete each task fully before moving to the next; make small, focused changes
 - **CRITICAL: every task MUST include new/updated tests** for code changes in that task
-  - tests are not optional - they are a required part of the checklist
-  - write unit tests for new functions/methods
-  - write unit tests for modified functions/methods
-  - add new test cases for new code paths
-  - update existing test cases if behavior changes
-  - tests cover both success and error scenarios
+  - unit tests for new/modified functions; new cases for new code paths; success and error scenarios
 - **CRITICAL: all tests must pass before starting next task** - no exceptions
 - **CRITICAL: update this plan file when scope changes during implementation**
-- run tests after each change
 - maintain backward compatibility (localStorage schema carries a version field from day one)
 - **Correctness rules specific to this project:**
-  - every user-visible aviation fact carries a `source` field (e.g., `"AIM 5-3-8 j2"`) rendered in the UI next to the fact
-  - geometry/engine code is validated by golden cases hand-derivable from `docs/research-claude.md` §5–§10 plus property tests (sectors sum to 360°, nonstandard is an exact mirror of standard, entry at the inbound course heading is always direct)
-  - the ±5° AIM boundary tolerance is modeled explicitly: near-boundary headings return a primary entry plus acceptable alternates, and drill grading accepts any of them (mirrors real test answers keyed "parallel or teardrop")
-  - clearance phrasing always disambiguates radial (FROM) vs bearing/course (TO) — the documented trap from `research-web.md` finding 7
-  - a dedicated content-verification task (Task 19) cross-checks every content string against the research docs before acceptance
+  - every user-visible aviation fact carries a `source` field citing the **FAA primary source** (e.g., `"AIM 5-3-8 j2"`), rendered in the UI
+  - content is verified **against FAA publications directly (plus reputable internet cross-checks)** — the research docs are an index into sources, not the authority
+  - geometry/engine code validated by golden cases hand-derived by drawing + property tests (sectors sum to 360°; nonstandard mirrors standard; heading = inbound course → direct)
+  - ±5° AIM boundary tolerance modeled explicitly: near-boundary headings return primary entry + acceptable alternates; grading accepts any (mirrors real test answers keyed "parallel or teardrop")
+  - **clearance phraseology must sound like a real controller** — generated exactly as heard on the checkride and from NorCal: format per AIM 5-3-8 i element order and FAA JO 7110.65 holding-instruction phraseology (verify exact paragraph in the current order during implementation); always disambiguates radial (FROM) vs bearing (TO)
+  - dedicated content-verification task cross-checks every content string against FAA sources before acceptance
 
 ## Testing Strategy
-- **unit tests**: Vitest, required for every task. Engine modules (pure TS, no DOM) get exhaustive golden + property tests. UI modules get jsdom-based tests for logic (grading, state transitions, rendering of key values) — not pixel testing.
-- **e2e tests**: none initially — no e2e framework is added, to honor the simplicity goal. UI behavior is covered by jsdom unit tests; a manual smoke-test checklist on a phone-width viewport is part of Task 20 and Post-Completion.
+- **unit tests**: Vitest, required for every task. Engine modules (pure TS, no DOM) get exhaustive golden + property tests. UI modules get jsdom-based tests for logic (grading, state transitions) — not pixel testing.
+- **e2e tests**: none — no e2e framework, honoring the simplicity/time budget. Manual smoke-test checklist at phone width in the acceptance task.
 - test command: `npm test` (vitest run)
 
 ## Progress Tracking
 - mark completed items with `[x]` immediately when done
-- add newly discovered tasks with ➕ prefix
-- document issues/blockers with ⚠️ prefix
+- add newly discovered tasks with ➕ prefix; blockers with ⚠️ prefix
 - update plan if implementation deviates from original scope
-- keep plan in sync with actual work done
 
 ## Solution Overview
-- **One geometry engine, many thin drill modules.** A pure-TypeScript `engine/` package (no DOM imports) is the single source of truth for headings, sectors, clearances, wind, and the decision sim. Every module — drills, quizzes, sim, debrief — consumes it. This maximizes the power/complexity ratio: the hard, correctness-critical math is written and tested once.
-- **Content as typed data.** Questions, oral answers, lessons, G1000 sequences, and Anki cards are plain typed arrays in `src/content/`, each entry tagged with `source` (FAA citation) and `acs` (ACS element code). No CMS, no markdown pipeline.
-- **Decision sim, not flight sim.** In the Wind & Timing Lab the user makes pilot decisions (entry, outbound heading, crab, timing); the engine flies a fixed-TAS aircraft through the wind field and draws the actual ground track over the racetrack and protected-airspace outline for debrief. Trains the decisions the checkride tests without flight-model complexity.
-- **Modules follow the proven instructional sequence** (`research-claude.md` §16): Learn (concept → geometry → entries → timing/wind → radio → G1000) → drills → exam prep, with the app's home screen presenting them in that order and a dashboard tracking the research-doc benchmarks (e.g., 18/20 entries in <10 s).
-- **UI: hash-based router, one screen per module, two shared SVG components** (HSI with thumb overlay; top-down map). Vanilla TS DOM code, mobile-first CSS, large touch targets.
+- **One geometry engine, many thin drill modules.** A pure-TypeScript `engine/` package (no DOM) is the single source of truth for headings, sectors, clearances, wind. Every module consumes it; quiz answer keys are engine-generated (the engine is the oracle — no hand-keyed entry answers).
+- **Content as typed data.** Questions, oral answers, Anki cards are plain typed arrays in `src/content/`, each tagged `source` (FAA citation) and `acs` (ACS element code).
+- **Decision sim, not flight sim** (P1). User makes pilot decisions (entry, outbound heading, crab, timing); the engine flies fixed-TAS through wind and draws the actual ground track for debrief. Trains checkride decisions without flight-model complexity.
+- **Realistic instrument look.** The HSI component approximates the real aircraft instrument, clean and uncluttered — load the `frontend-design` skill and study real HSI/G1000 depictions before drawing it.
+- **UI**: hash router, one screen per module, shared SVG HSI (+ map view in P1). Vanilla TS DOM, mobile-first CSS, large touch targets.
 
 ## Technical Details
-- **Stack**: TypeScript (strict), Vite, Vitest (+ jsdom for UI tests), no runtime dependencies. Target: evergreen mobile + desktop browsers.
-- **Core types** (`src/engine/types.ts`):
-  - `HoldSpec` — fix name, inbound course (course TO the fix), turn direction, leg spec ({ minutes } | { nm }), fix type (VOR | intersection | GPS waypoint), charted/uncharted, EFC, max-speed restriction
-  - `Clearance` — structured fields matching AIM 5-3-8 i element order (direction, fix, radial/course/bearing, leg length, turns, EFC) plus generated phraseology text
-  - `Wind` — direction-from (°true treated as magnetic for training purposes), speed kt
-  - `EntryResult` — primary entry + acceptable alternates (±5° boundary), sector boundaries for visualization
-- **Entry math** (`src/engine/entry.ts`): sectors computed from heading-relative geometry per AIM 5-3-8 j3 — direct 180°, teardrop 70° (holding side, adjacent to outbound), parallel 110° (non-holding side); nonstandard mirrors per j3(e). Formula derived by drawing first (research caveat: sign conventions are easy to invert), then locked with golden tests.
-- **Wind math** (`src/engine/wind.ts`): inbound crab from wind triangle at C182 speeds (~90–100 KTAS holding); outbound heading = triple drift (AIM reference answer; UI notes the double-drift field technique as an alternative, flagged as such); outbound timing adjusted ~1 s per kt of wind component toward a 60 s inbound leg; DME legs end on distance not time.
-- **Sim** (`src/engine/sim.ts`): fixed-timestep integrator (1 s steps); state = position, heading; turns at standard rate; wind vector added each step; outputs ground-track polyline + inbound leg time + max lateral excursion vs a simplified protected-area outline (teaching approximation, labeled as such in the UI).
-- **Persistence** (`src/app/store.ts`): localStorage, versioned JSON `{ v: 1, drills: {...}, misses: [...] }`; misses feed the Anki "my misses" export.
-- **Anki export**: TSV (tab-separated, `front\tback\ttags`) downloaded as a Blob — imports directly into Anki. Two decks: the fixed ROTE/TRAP/SAFETY deck from `research-claude.md` call-outs, and a personalized deck generated from the user's missed drill items.
-- **Processing flow**: home → module screen → engine generates scenario → user answers → engine grades (dual-correct aware) → explanation with sector overlay + FAA citation → stats stored → dashboard aggregates vs benchmarks.
+- **Stack**: TypeScript (strict), Vite, Vitest (+ jsdom), no runtime dependencies.
+- **Core types** (`src/engine/types.ts`): `HoldSpec` (fix, inbound course TO fix, turn direction, leg spec {minutes}|{nm}, fix type, EFC, max-speed restriction), `Clearance` (structured AIM 5-3-8 i fields + phraseology text), `Wind` (direction-from, kt), `EntryResult` (primary entry + acceptable alternates + sector boundaries for visualization).
+- **Entry math** (`src/engine/entry.ts`): sectors per AIM 5-3-8 j3; formula derived by drawing first (sign conventions are easy to invert), then locked with golden tests.
+- **Wind math** (`src/engine/wind.ts`, P1): wind triangle at C172 holding speed (~90 KTAS); triple drift outbound (FAA reference answer; double-drift noted as field technique); outbound timing ~1 s/kt toward 60 s inbound; DME legs end on distance.
+- **Persistence** (`src/app/store.ts`): localStorage, versioned `{ v: 1, drills, misses }`; misses feed the Anki "my misses" export.
+- **Anki export**: TSV (`front\tback\ttags`) Blob download — imports directly into Anki. Fixed core deck + personalized misses deck.
 
 ## What Goes Where
-- **Implementation Steps** (`[ ]` checkboxes): tasks achievable within this codebase - code changes, tests, documentation updates
-- **Post-Completion** (no checkboxes): items requiring external action - manual testing, changes in consuming projects, deployment configs, third-party verifications
+- **Implementation Steps** (`[ ]` checkboxes): code, tests, docs in this repo — tiered P0/P1/P2.
+- **Post-Completion** (no checkboxes): manual verification and external actions.
 
 ## Implementation Steps
 
-### Task 1: Project scaffold
+### P0 — exam-critical core (build first; app is useful after Task 8)
+
+### Task 1: Project scaffold [P0]
 
 **Files:**
 - Create: `package.json`, `tsconfig.json`, `vite.config.ts`, `index.html`
-- Create: `src/main.ts`, `src/app/router.ts`, `src/styles.css`
-- Create: `src/app/router.test.ts`
+- Create: `src/main.ts`, `src/app/router.ts`, `src/styles.css`, `src/app/router.test.ts`
 - Create: `.gitignore`
 
 - [ ] init Vite + TypeScript (strict) + Vitest with jsdom; `npm test` and `npm run dev` work
-- [ ] hash-based router: registry of module screens, renders active screen into `#app`, default route = home
-- [ ] mobile-first base styles: readable type scale, ≥44 px touch targets, single-column layout that widens on desktop
-- [ ] home screen listing the planned modules in instructional order (placeholders)
+- [ ] hash-based router: registry of module screens, default route = home listing modules
+- [ ] mobile-first base styles: readable type scale, ≥44 px touch targets
 - [ ] write tests for router (route match, default route, unknown-route fallback)
 - [ ] run tests - must pass before task 2
 
-### Task 2: Course math utilities
+### Task 2: Course math utilities [P0]
 
 **Files:**
-- Create: `src/engine/geometry.ts`
-- Create: `src/engine/geometry.test.ts`
+- Create: `src/engine/geometry.ts`, `src/engine/geometry.test.ts`
 
-- [ ] write tests first: normalize (0/360 wrap, negatives), signed angular difference, reciprocal, cardinal direction ↔ course (8-point, e.g., "east of" ↔ hold on the 090 side), radial↔course-to-fix conversion (radial 160 FROM = course 340 TO)
-- [ ] implement `normalizeDeg`, `angleDiff`, `reciprocal`, `cardinalFromCourse` / `courseFromCardinal`, `radialToInboundCourse`
-- [ ] add error-case tests (NaN, out-of-range inputs rejected)
+- [ ] write tests first: normalize (0/360 wrap, negatives), signed angular difference, reciprocal, cardinal ↔ course (8-point), radial↔inbound-course conversion (radial 160 FROM = course 340 TO)
+- [ ] implement `normalizeDeg`, `angleDiff`, `reciprocal`, `cardinalFromCourse`/`courseFromCardinal`, `radialToInboundCourse`
+- [ ] add error-case tests (NaN, out-of-range rejected)
 - [ ] run tests - must pass before task 3
 
-### Task 3: Entry determination engine
+### Task 3: Entry determination engine [P0]
 
 **Files:**
-- Create: `src/engine/entry.ts`
-- Create: `src/engine/entry.test.ts`
+- Create: `src/engine/entry.ts`, `src/engine/entry.test.ts`
 
-- [ ] write golden tests first, hand-derived by drawing (per research caveat on sign conventions): standard-pattern cases in all three sectors, exact sector boundaries, the 160-radial → 230-divider classic, nonstandard mirror cases from `research-claude.md` §5
-- [ ] write property tests: sectors sum to 360°; heading equal to inbound course → direct; nonstandard result is exact mirror of standard; boundary ±5° always yields ≥2 acceptable entries
-- [ ] implement `determineEntry(heading, holdSpec): EntryResult` returning primary entry, acceptable alternates within ±5° of a boundary, and sector boundary angles for visualization
-- [ ] implement teardrop/parallel guidance data (teardrop offset = 30° toward holding side; parallel reintercept turns opposite the pattern) with tests
+- [ ] write golden tests first, hand-derived by drawing and checked against AIM 5-3-8 j3: all three sectors standard, exact boundaries, 160-radial → 230-divider classic, nonstandard mirrors
+- [ ] write property tests: sectors sum to 360°; heading = inbound course → direct; nonstandard = exact mirror; ±5° boundary always yields ≥2 acceptable entries
+- [ ] implement `determineEntry(heading, holdSpec): EntryResult` (primary + alternates + sector boundaries)
+- [ ] implement teardrop/parallel guidance data (teardrop offset 30° toward holding side; parallel reintercept opposite the pattern) with tests
 - [ ] run tests - must pass before task 4
 
-### Task 4: Clearance model — generator and answer key
+### Task 4: Clearance model — realistic phraseology + answer key [P0]
 
 **Files:**
-- Create: `src/engine/clearance.ts`
-- Create: `src/engine/clearance.test.ts`
+- Create: `src/engine/clearance.ts`, `src/engine/clearance.test.ts`
 
-- [ ] write tests first: generated phraseology follows AIM 5-3-8 i element order; turn direction stated only for left turns; "as published" form emits only direction + AS PUBLISHED + EFC; leg length in miles only when DME/RNAV; radial (FROM, VOR holds) vs course/bearing (TO, intersection/GPS holds) wording is explicit and internally consistent with the derived `HoldSpec`
-- [ ] implement `generateClearance(seedParams): { clearance, holdSpec, expectedFields }` — random but reproducible (seeded) scenario generation across fix types, standard/nonstandard, timed/DME legs
-- [ ] implement `gradeCopiedClearance(userFields, expectedFields)` with per-field results, treating omitted turn direction as right turns (the trap)
-- [ ] write error/edge tests: contradictory field combinations rejected; grading flags the standard-turns trap distinctly
+- [ ] look up holding-instruction phraseology in the current FAA JO 7110.65 (and AIM 5-3-8 examples); record the exact citation in the code's `source` fields
+- [ ] write tests first: generated text matches real controller phraseology and AIM 5-3-8 i element order; turn direction stated only for left turns; "as published" form; leg length in miles only for DME/RNAV; radial (FROM) vs bearing/course (TO) wording explicit and consistent with the derived `HoldSpec`
+- [ ] implement `generateClearance(seed): { clearance, holdSpec, expectedFields }` — seeded random scenarios across fix types, standard/nonstandard, timed/DME legs
+- [ ] implement `gradeCopiedClearance(userFields, expected)` with per-field results; omitted turn direction = right turns (the trap), flagged distinctly
 - [ ] run tests - must pass before task 5
 
-### Task 5: Wind and timing engine
+### Task 5: Progress store [P0]
 
 **Files:**
-- Create: `src/engine/wind.ts`
-- Create: `src/engine/wind.test.ts`
+- Create: `src/app/store.ts`, `src/app/store.test.ts`
 
-- [ ] write tests first from research worked examples: 8° left inbound crab → 24° right outbound (AIM verbatim example); zero wind → zero crab and 60 s legs; DME-leg endpoints (fix 10 DME + 5 NM → 15 DME; fix 28 DME inbound-away + 8 NM → 20 DME); timing adjustment direction for head/tailwind outbound (~1 s per kt)
-- [ ] implement wind triangle: `inboundCrab(wind, tas, course)`, `outboundHeading(inboundCrab)` (triple drift), `outboundTimeSeconds(wind, course, targetInbound=60)`
-- [ ] implement DME/ATD leg endpoint calculator for toward/away NAVAID geometries
-- [ ] write edge tests: direct crosswind, wind aligned with course, wind speed near TAS rejected with clear error
+- [ ] write tests first: versioned round-trip; per-drill stats (attempts, correct, avg time); miss recording with scenario snapshot; corrupt/missing localStorage → empty state without throwing
+- [ ] implement `loadState`/`saveState`/`recordDrillResult`/`recordMiss`; benchmark helpers (last-20 entry accuracy + median time vs 18/20 <10 s, 95% <15 s)
+- [ ] write error tests (quota exceeded → in-memory fallback)
 - [ ] run tests - must pass before task 6
 
-### Task 6: Decision-sim integrator
+### Task 6: HSI SVG component [P0]
 
 **Files:**
-- Create: `src/engine/sim.ts`
-- Create: `src/engine/sim.test.ts`
+- Create: `src/ui/hsi.ts`, `src/ui/hsi.test.ts`
 
-- [ ] write tests first: no-wind sim of a correctly-flown standard hold produces ~60 s inbound leg and closed racetrack (within tolerance); known-wind sim with textbook triple-drift decisions yields inbound leg within a few seconds of 60; deliberately wrong decisions (no crab) show measurable drift
-- [ ] implement fixed-timestep integrator: standard-rate turns, fixed TAS (C182 holding ≈ 95 KTAS), wind vector per step; pilot decisions as input script (entry type, outbound heading, crab, outbound seconds)
-- [ ] implement ground-track output (polyline) + measured inbound-leg time + turn anticipation at the fix
-- [ ] implement simplified protected-area outline (holding side vs non-holding side extents, labeled as a teaching approximation per `research-claude.md` §2) and excursion detection, with tests
+- [ ] load the `frontend-design` skill and study how the real instrument (HSI / G1000 PFD compass rose) is depicted; aim for a close, clean approximation — not a toy diagram
+- [ ] write tests first (jsdom): rose rotates so heading is up; course pointer at correct rose position; thumb overlay on 3 o'clock side for standard / 9 o'clock for nonstandard, 20° wide starting at the 70° line; sector overlay angles match engine output
+- [ ] implement `renderHSI(el, { heading, course, thumbOverlay, sectorOverlay })` as pure SVG rendering (state in, SVG out)
+- [ ] scales to container width, usable at 320 px
 - [ ] run tests - must pass before task 7
 
-### Task 7: Progress store
+### Task 7: Entry drill module [P0]
 
 **Files:**
-- Create: `src/app/store.ts`
-- Create: `src/app/store.test.ts`
+- Create: `src/modules/entry-drill.ts`, `src/modules/entry-drill.test.ts`
+- Modify: `src/app/router.ts`
 
-- [ ] write tests first: versioned schema round-trip; per-drill stats accumulation (attempts, correct, avg answer time); miss recording with scenario snapshot; corrupt/missing localStorage falls back to empty state without throwing
-- [ ] implement `loadState` / `saveState` / `recordDrillResult` / `recordMiss` over localStorage with schema `{ v: 1, ... }`
-- [ ] implement benchmark evaluation helpers (e.g., last-20 entry accuracy and median time vs the §16 benchmarks: 18/20 under 10 s, 95% under 15 s)
-- [ ] write error tests (quota exceeded → in-memory fallback, version mismatch → migration stub)
+- [ ] write tests first: seeded scenarios (standard/nonstandard, fix types; prompt = realistic clearance text + current heading on HSI); grading accepts primary + boundary alternates; timer per answer; miss recorded with scenario; explanation payload includes sector overlay + FAA citation
+- [ ] implement drill screen: clearance text + HSI; three-button answer (direct/teardrop/parallel), touch-sized; instant feedback with sector overlay and citation
+- [ ] two modes: untimed learn mode (thumb/sector aids visible — legitimate for the written per FAA Order 8080.6H) and timed cockpit mode (no aids, 15 s target)
+- [ ] session + stored stats vs benchmarks (18/20 <10 s; 95% <15 s)
 - [ ] run tests - must pass before task 8
 
-### Task 8: HSI SVG component
+### Task 8: Written-test question bank + exam module [P0]
 
 **Files:**
-- Create: `src/ui/hsi.ts`
-- Create: `src/ui/hsi.test.ts`
-
-- [ ] write tests first (jsdom): compass rose rotates so heading is up; course pointer at correct rose position for given course; lubber line fixed; thumb overlay renders on the 3 o'clock side for standard and 9 o'clock for nonstandard, spanning 20° starting at the 70° line
-- [ ] implement `renderHSI(el, { heading, course, thumbOverlay, sectorOverlay })` as pure-function SVG rendering (state in, SVG out; no internal state)
-- [ ] implement sector overlay (direct/teardrop/parallel wedges colored, boundaries from `EntryResult`) used by drill explanations
-- [ ] touch-friendly sizing: scales to container width, works at 320 px viewport
-- [ ] write tests for sector overlay angles matching engine output for standard and nonstandard cases
-- [ ] run tests - must pass before task 9
-
-### Task 9: Map-view SVG component
-
-**Files:**
-- Create: `src/ui/mapview.ts`
-- Create: `src/ui/mapview.test.ts`
-
-- [ ] write tests first (jsdom): racetrack drawn on the holding side of the inbound course; fix at expected position; standard vs nonstandard mirror; ownship arrow at given position/heading; polyline ground track rendered from sim output; protected-area outline on correct sides
-- [ ] implement `renderMap(el, { holdSpec, ownship?, track?, ghostTrack?, protectedArea? })` — north-up top-down view with scale suited to 1-minute legs at 95 KTAS
-- [ ] implement entry-path illustration mode (draws the direct/teardrop/parallel path for a given arrival heading) for Learn and drill explanations
-- [ ] write tests for entry-path geometry (teardrop offset 30° toward holding side; parallel on non-holding side with opposite-direction reintercept)
-- [ ] run tests - must pass before task 10
-
-### Task 10: Entry drill module
-
-**Files:**
-- Create: `src/modules/entry-drill.ts`
-- Create: `src/modules/entry-drill.test.ts`
-- Modify: `src/app/router.ts`
-
-- [ ] write tests first: seeded scenario generation (mix of standard/nonstandard, fix types, diagram-style and heading+clearance-style prompts); grading accepts primary and boundary-alternate entries; timer captured per answer; miss recorded with full scenario; explanation payload includes sector overlay + citation
-- [ ] implement drill screen: clearance text + HSI (heading set) + optional map toggle; three-button answer (direct/teardrop/parallel) sized for touch; instant feedback with sector overlay on the HSI and correct-path drawing on the map
-- [ ] implement two practice modes: untimed learn mode (aid overlays available — thumb/sectors, legitimate for written-test practice per Order 8080.6H) and timed cockpit mode (no aids, 15 s target)
-- [ ] wire per-session and stored stats vs benchmarks (18/20 <10 s; 95% <15 s)
-- [ ] write error/edge tests (answering after timeout, repeated scenario seeds, nonstandard grading mirror)
-- [ ] run tests - must pass before task 11
-
-### Task 11: Clearance copy module
-
-**Files:**
-- Create: `src/modules/clearance-copy.ts`
-- Create: `src/modules/clearance-copy.test.ts`
-- Modify: `src/app/router.ts`
-
-- [ ] write tests first: field-by-field grading display; standard-turns trap surfaced when user marks "left" for a clearance that omitted turn direction; "as published" clearances grade only the fields they contain; TO/FROM micro-drill grading (given a bearing TO or radial FROM, place the aircraft's side of the fix)
-- [ ] implement copy screen: clearance shown briefly (then hidden, like real radio) → structured input form (direction, fix, radial/course, legs, turns, EFC) → graded review with AIM element-order explanation and citations
-- [ ] implement the radial-vs-bearing micro-drill mode (the documented CFII trap from `research-web.md` finding 7)
-- [ ] record misses to the store for Anki export
-- [ ] write edge tests (partial answers, re-show clearance counts as an assist in stats)
-- [ ] run tests - must pass before task 12
-
-### Task 12: Wind & Timing Lab (decision sim)
-
-**Files:**
-- Create: `src/modules/wind-lab.ts`
-- Create: `src/modules/wind-lab.test.ts`
-- Modify: `src/app/router.ts`
-
-- [ ] write tests first: scenario generation (hold + wind); decision inputs validated; sim invoked with user decisions; debrief computes inbound-leg time delta, drift assessment, protected-area excursions; ACS-tolerance framing in the grade (headings ±10°); next-circuit suggestion (adjust outbound time toward 60 s inbound) matches engine math
-- [ ] implement the predict step: user states expected inbound crab, outbound heading (triple drift), and outbound time before flying (mirrors the CFI Notebook "predict wind effect" exercise)
-- [ ] implement the fly step: engine runs the circuit; map view animates ownship along the track with a ghost ideal track
-- [ ] implement the debrief: measured vs target numbers, wind-triangle explanation, triple-vs-double drift note (FAA reference answer = triple, field technique = double, labeled per research), iterate button for next circuit carrying corrections forward
-- [ ] record results/misses; write edge tests (extreme winds capped, DME-leg scenarios end on distance)
-- [ ] run tests - must pass before task 13
-
-### Task 13: Written-test question bank and exam module
-
-**Files:**
-- Create: `src/content/questions.ts`
-- Create: `src/modules/written-test.ts`
+- Create: `src/content/questions.ts`, `src/modules/written-test.ts`
 - Create: `src/content/questions.test.ts`, `src/modules/written-test.test.ts`
 - Modify: `src/app/router.ts`
 
-- [ ] write content-validation tests first: every question has ≥3 options, exactly one keyed answer (or dual-keyed like "parallel or teardrop" where the geometry is near-boundary — validated against the engine), an explanation, and a `source` citation; entry questions' keyed answers MUST match `determineEntry` output (engine is the answer oracle — no hand-keyed entry answers)
-- [ ] author ~40 original questions in FAA IRA style across the researched formats: diagram-based entry determination (generated figures, standalone-hold style), missed-approach-hold entries on simplified chart excerpts (incl. KHAF RNAV 30 → SEEMS, OSI climb-in-hold from `research-claude.md` §16), max speeds (200/230/265, the (175) icon), timing (1 vs 1½ min, outbound-start rule), required reports, EFC/lost-comm (91.185(c)(3) scenarios), standard-vs-nonstandard identification
-- [ ] implement exam-sim mode: fixed-length quiz, literal option formats (including "parallel or teardrop" options), no aids, score report mapped to weak areas
-- [ ] implement practice mode: immediate explanation + citation per question; misses recorded
-- [ ] run tests - must pass before task 14
+- [ ] fetch current FAA charts (dTPP) for **KTCY RNAV (GPS) RWY 12** (missed-approach hold) and a **KLVK** procedure with a hold; derive hold parameters from the real charts — checkbox blocked until verified current
+- [ ] write content-validation tests first: every question has options, keyed answer, explanation, FAA `source`, `acs` tag; entry-question answers MUST come from `determineEntry` (engine is the oracle; dual-keyed "parallel or teardrop" allowed only when engine says near-boundary)
+- [ ] author ~40 original FAA-IRA-style questions: diagram-based entry determination, missed-approach-hold entries on the KTCY/KLVK chart scenarios, max speeds (200/230/265, (175) icon), timing (1 vs 1½ min; outbound-start rule), required reports, EFC/lost-comm 91.185(c)(3), standard-vs-nonstandard
+- [ ] implement practice mode (immediate explanation + citation; misses recorded) and exam-sim mode (fixed-length, literal option formats incl. "parallel or teardrop", no aids, weak-area score report)
+- [ ] run tests - must pass before task 9
 
-### Task 14: Oral-exam prep module
+### Task 9: Oral-exam prep module [P0]
 
 **Files:**
-- Create: `src/content/oral.ts`
-- Create: `src/modules/oral-prep.ts`
+- Create: `src/content/oral.ts`, `src/modules/oral-prep.ts`
 - Create: `src/content/oral.test.ts`, `src/modules/oral-prep.test.ts`
 - Modify: `src/app/router.ts`
 
-- [ ] write content-validation tests first: every item has an ACS element tag (IR.III.B.K1, R1–R4, S1–S8), a model answer, and a `source`; coverage test asserts every ACS Task III.B element has ≥1 item
-- [ ] author oral Q&A content from `research-claude.md` §15 model answers + §3/§12/§14 (clearance elements, reports, lost comm, fuel/EFC ADM incl. Avianca 052 framing, protected-airspace explanation, G1000 will/won't and when to intervene)
-- [ ] implement self-test flow: question shown → user reveals model answer → self-grades (got it / partially / missed); missed items recorded for Anki export
-- [ ] implement browse-by-ACS-element view (the "explain" side of Task III.B)
-- [ ] run tests - must pass before task 15
+- [ ] write content-validation tests first: every item has ACS element tag (IR.III.B.K1, R1–R4, S1–S8), model answer, FAA `source`; coverage test: every Task III.B element has ≥1 item
+- [ ] author oral Q&A: clearance elements, reports, lost comm, protected airspace/holding side, max speeds and why, fuel/EFC ADM (Avianca 052 framing), **G1000 hold behavior (SUSP, OBS holds, when to intervene) as Q&A content** (replaces the cut G1000 module; flag software-version-dependent features)
+- [ ] implement self-test flow: question → reveal answer → self-grade (got it / partial / missed); missed → Anki export; browse-by-ACS-element view
+- [ ] run tests - must pass before task 10
 
-### Task 15: G1000 chair-fly module
+### Task 10: Anki export [P0]
 
 **Files:**
-- Create: `src/content/g1000.ts`
-- Create: `src/modules/g1000-drill.ts`
-- Create: `src/content/g1000.test.ts`, `src/modules/g1000-drill.test.ts`
+- Create: `src/content/anki-deck.ts`, `src/app/anki-export.ts`
+- Create: `src/content/anki-deck.test.ts`, `src/app/anki-export.test.ts`
 - Modify: `src/app/router.ts`
 
-- [ ] write content-validation tests first: each procedure is an ordered step sequence with per-step explanation and `source`; distractor steps defined per step; software-version-dependent features (Hold at Waypoint / Present Position) carry the verify-your-unit caveat flag
-- [ ] author the two checkride-critical sequences from `research-claude.md` §13: published hold/HILPT with SUSP behavior (auto-suspend, extra circuits, exit), and ATC-assigned uncharted hold via OBS + course knob (GOBBS-style), plus the fly-by/ground-track/outbound-long GPS caveats as quiz items
-- [ ] implement step-sequencing drill: "what do you do next?" multiple choice through each sequence, wrong choices explained
-- [ ] record misses; write edge tests (sequence restart, caveat flags rendered)
-- [ ] run tests - must pass before task 16
+- [ ] write tests first: TSV escaping (tabs/newlines); every fixed-deck card has front/back/tags (topic + ACS element); misses deck converts stored misses (entry scenarios, oral items, question misses) into cards
+- [ ] author fixed deck from the ROTE/TRAP/SAFETY call-outs (`research-claude.md` §Anki, each verified against its FAA source; citations on card backs)
+- [ ] implement TSV Blob downloads (`hold-train-core.tsv`, `hold-train-misses.tsv`) + Anki import instructions; empty miss list → informative empty state
+- [ ] run tests - must pass before task 11
+- [ ] **P0 checkpoint: app is exam-useful now. Reassess remaining time before starting P1.**
 
-### Task 16: Learn module (guided lessons)
+### P1 — high value if time allows
+
+### Task 11: Wind and timing engine [P1]
 
 **Files:**
-- Create: `src/content/lessons.ts`
-- Create: `src/modules/learn.ts`
-- Create: `src/content/lessons.test.ts`, `src/modules/learn.test.ts`
+- Create: `src/engine/wind.ts`, `src/engine/wind.test.ts`
+
+- [ ] write tests first from AIM worked examples: 8° inbound crab → 24° outbound (triple drift); zero wind → 60 s legs; DME endpoints (10+5→15; 28 away +8→20); timing adjustment direction ~1 s/kt
+- [ ] implement `inboundCrab`, `outboundHeading` (triple drift), `outboundTimeSeconds`, DME/ATD endpoint calculator
+- [ ] edge tests: direct crosswind, wind aligned with course, wind ≥ TAS rejected
+- [ ] run tests - must pass before next task
+
+### Task 12: Map view SVG component [P1]
+
+**Files:**
+- Create: `src/ui/mapview.ts`, `src/ui/mapview.test.ts`
+
+- [ ] write tests first (jsdom): racetrack on holding side; standard/nonstandard mirror; ownship position/heading; ground-track polyline; entry-path illustration (teardrop 30° offset; parallel on non-holding side, opposite reintercept)
+- [ ] implement `renderMap(el, { holdSpec, ownship?, track?, ghostTrack? })` — north-up, scaled for 1-min legs at ~90 KTAS; same clean instrument-chart aesthetic as the HSI (frontend-design skill)
+- [ ] run tests - must pass before next task
+
+### Task 13: Wind & Timing Lab — decision sim [P1]
+
+**Files:**
+- Create: `src/engine/sim.ts`, `src/modules/wind-lab.ts`
+- Create: `src/engine/sim.test.ts`, `src/modules/wind-lab.test.ts`
 - Modify: `src/app/router.ts`
 
-- [ ] write content-validation tests first: lessons ordered per the instructional sequence (`research-claude.md` §16: why → anatomy → entries → timing/wind → radio → G1000); every factual paragraph carries a `source`; every lesson ends with a mini-drill reference to an existing module
-- [ ] author lesson content: purpose/safety framing (Avianca, protected side over entry aesthetics), anatomy/terminology with interactive map figure, entry determination teaching all methods with the thumb-method HSI overlay as flagship (+ draw-it map exercise, CDI-twist note for G1000 workflow), timing/wind, reports/phraseology, 5 Ts flow
-- [ ] implement lesson screens using the HSI and map components interactively (rotate heading → watch sector highlight change; drag wind → watch racetrack distort)
-- [ ] link each lesson's mini-drill into the corresponding drill module with a preset scenario
-- [ ] run tests - must pass before task 17
+- [ ] write sim tests first: no-wind correctly-flown hold → ~60 s inbound, closed racetrack; textbook triple-drift decisions in known wind → inbound within seconds of 60; no-crab decisions → measurable drift
+- [ ] implement fixed-timestep integrator (standard-rate turns, ~90 KTAS, wind per step; decisions as input: entry, outbound heading, crab, outbound seconds) + ground-track output
+- [ ] implement predict → fly → debrief flow: user states expected crab/outbound heading/time first (CFI Notebook exercise), engine flies it, debrief shows measured vs target (ACS ±10° framing), next-circuit timing suggestion; misses recorded
+- [ ] run tests - must pass before next task
 
-### Task 17: Anki export
-
-**Files:**
-- Create: `src/content/anki-deck.ts`
-- Create: `src/app/anki-export.ts`
-- Create: `src/app/anki-export.test.ts`, `src/content/anki-deck.test.ts`
-- Modify: `src/app/router.ts` (export screen/home entry)
-
-- [ ] write tests first: TSV output escapes tabs/newlines in fields; every fixed-deck card has front/back/tags (tags = topic + ACS element); miss-deck generation converts stored misses (entry scenarios, clearance fields, oral items, G1000 steps) into cards with the scenario embedded in the front
-- [ ] author the fixed deck from `research-claude.md` Anki-ready call-outs (ROTE verbatim numbers, TRAPS, SAFETY-CRITICAL) with citations on card backs
-- [ ] implement TSV Blob download (one file per deck: `hold-train-core.tsv`, `hold-train-misses.tsv`) with in-app import instructions for Anki
-- [ ] write edge tests (empty miss list → informative empty state, not an empty file)
-- [ ] run tests - must pass before task 18
-
-### Task 18: Progress dashboard and home screen
+### Task 14: Clearance copy drill [P1]
 
 **Files:**
-- Create: `src/modules/dashboard.ts`
-- Create: `src/modules/dashboard.test.ts`
-- Modify: `src/app/router.ts`, `src/main.ts` (home = dashboard)
+- Create: `src/modules/clearance-copy.ts`, `src/modules/clearance-copy.test.ts`
+- Modify: `src/app/router.ts`
 
-- [ ] write tests first: benchmark computation per module from stored stats (entry: last-20 accuracy + median time vs 18/20 <10 s and 95% <15 s targets; written: last exam-sim score; oral: ACS-element coverage of "got it" self-grades); stage-gate display mirrors `research-claude.md` Recommendations stages 1–5
-- [ ] implement dashboard: per-module readiness cards with the specific benchmark numbers and what to drill next
-- [ ] implement "exam readiness" summary view (written / oral / flight columns mapping modules to ACS Task III.B elements)
-- [ ] make dashboard the home screen with the instructional-order module list
-- [ ] run tests - must pass before task 19
+- [ ] write tests first: field-by-field grading; standard-turns trap surfaced; "as published" grades only present fields; TO/FROM micro-drill grading (bearing TO vs radial FROM → which side of the fix)
+- [ ] implement: clearance shown briefly then hidden (like real radio) → structured field form → graded review with citations; TO/FROM micro-drill mode; misses recorded
+- [ ] run tests - must pass before next task
 
-### Task 19: Content verification pass
+### P2 — cut unless time clearly remains
+
+### Task 15: Learn pages (concise) [P2]
+
+**Files:**
+- Create: `src/content/lessons.ts`, `src/modules/learn.ts`, tests for both
+- Modify: `src/app/router.ts`
+
+- [ ] short lesson pages in instructional order (why → anatomy → entries/thumb method → timing/wind → reports); every factual paragraph carries FAA `source`; each links to the relevant drill
+- [ ] content-validation tests (ordering, sources present, drill links resolve)
+- [ ] run tests - must pass before next task
+
+### Task 16: Progress dashboard [P2]
+
+**Files:**
+- Create: `src/modules/dashboard.ts`, `src/modules/dashboard.test.ts`
+- Modify: `src/app/router.ts`, `src/main.ts`
+
+- [ ] per-module readiness vs benchmarks (entry accuracy/time, exam-sim score, oral ACS coverage); written/oral/flight mapping to ACS Task III.B; tests for benchmark computation
+- [ ] run tests - must pass before next task
+
+### Required closing tasks (always run, after whatever tier you stop at)
+
+### Task 17: Content verification pass
 
 **Files:**
 - Modify: `src/content/*.ts` (fixes only)
 - Create: `docs/content-audit.md`
 
-- [ ] cross-check every string in `src/content/` against `docs/research-claude.md` / `docs/research-web.md`: numbers (speeds, times, sectors, tolerances), rule statements, phraseology examples, citations — record each check in `docs/content-audit.md` with pass/fixed status
-- [ ] verify every entry-question keyed answer is engine-generated (grep for hand-keyed entry answers; none allowed)
-- [ ] verify all caveat-flagged content renders its caveat (double-vs-triple drift, G1000 software-version features, protected-area approximation, ±5° vs 10° buffer)
-- [ ] fix any discrepancies found; add regression tests for each fix
-- [ ] run tests - must pass before task 20
+- [ ] cross-check every content string **against the FAA primary sources directly (AIM, ACS, 14 CFR, JO 7110.65) plus reputable internet cross-checks** — numbers, rule statements, phraseology; record each check pass/fixed in `docs/content-audit.md`
+- [ ] verify every entry answer is engine-generated (no hand-keyed entry answers anywhere)
+- [ ] verify caveat-flagged content renders its caveat (triple-vs-double drift, G1000 software-version features, ±5° boundary)
+- [ ] fix discrepancies; add regression tests for each fix
+- [ ] run tests - must pass before task 18
 
-### Task 20: Verify acceptance criteria
-- [ ] verify all requirements from Overview are implemented (all modules, Anki export replaces in-app flashcards, phone/tablet layout)
-- [ ] verify edge cases are handled (nonstandard mirrors everywhere, boundary dual-correct grading, standard-turns trap, TO/FROM)
+### Task 18: Verify acceptance criteria
+- [ ] all implemented-tier requirements from Overview verified (nonstandard mirrors, boundary dual-correct grading, standard-turns trap, TO/FROM, realistic phraseology)
 - [ ] run full test suite: `npm test`
-- [ ] manual smoke test at 320/768/1280 px widths: every module usable, touch targets adequate
-- [ ] verify test coverage of `src/engine/` is comprehensive (every exported function has golden + edge tests)
+- [ ] manual smoke test at 320/768/1280 px: implemented modules usable, touch targets adequate
+- [ ] engine test coverage: every exported function has golden + edge tests
 
-### Task 21: [Final] Update documentation
-- [ ] write README.md: what the app trains, module map to exam phases, how to run (`npm run dev`), how to import the Anki decks, correctness/source policy
-- [ ] create CLAUDE.md: engine-is-the-oracle rule, content `source` field convention, TDD policy, no-new-dependencies bias
+### Task 19: [Final] Update documentation
+- [ ] README.md: what it trains, module → exam-phase map, how to run, Anki import, source policy
+- [ ] CLAUDE.md: engine-is-the-oracle rule, FAA-source citation convention, TDD policy, priority tiers, no-new-dependencies bias
 - [ ] move this plan to `docs/plans/completed/`
 
 ## Post-Completion
-*Items requiring manual intervention or external systems - no checkboxes, informational only*
+*No checkboxes — manual/external items*
 
 **Manual verification:**
-- User drills each module and reports anything that contradicts their CFII's teaching or current Jeppesen charts (local procedures amend frequently — verify OSI/SEEMS/GOBBS holds against current charts before relying on those scenarios)
-- Cross-check a sample of app-generated entry answers against the Holding Pattern Computer (holdingpattern.com) as an independent oracle, per `research-claude.md` §16
-- Import both Anki decks into the user's actual Anki setup and confirm formatting
-- Phone/tablet ergonomics check on the user's real devices
+- Drill each module; report anything contradicting your CFII's teaching or current Jeppesen charts
+- Verify KTCY RNAV (GPS) RWY 12 and KLVK hold details against current charts before relying on those scenarios (procedures amend frequently)
+- Cross-check a sample of app entry answers against holdingpattern.com's Holding Pattern Computer as an independent oracle
+- Import both Anki decks into your Anki; confirm formatting
+- Phone/tablet ergonomics on your real devices; confirm the club C172's avionics (G1000 or not) and adjust G1000-related oral content if needed
 
-**External system updates:**
-- Hosting/deployment (GitHub Pages or similar) deliberately out of scope — decide after the app proves useful locally
-- Optional future plan: PWA/offline support if airport-use demand materializes
+**External:**
+- Hosting/deploy deliberately out of scope; decide after the app proves useful locally
