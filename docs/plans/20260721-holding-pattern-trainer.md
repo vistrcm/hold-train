@@ -69,11 +69,11 @@
 - Create: `src/main.ts`, `src/app/router.ts`, `src/styles.css`, `src/app/router.test.ts`
 - Create: `.gitignore`
 
-- [ ] init Vite + TypeScript (strict) + Vitest with jsdom; `npm test` and `npm run dev` work
-- [ ] hash-based router: registry of module screens, default route = home listing modules
-- [ ] mobile-first base styles: readable type scale, ≥44 px touch targets
-- [ ] write tests for router (route match, default route, unknown-route fallback)
-- [ ] run tests - must pass before task 2
+- [x] init Vite + TypeScript (strict) + Vitest with jsdom; `npm test` and `npm run dev` work
+- [x] hash-based router: registry of module screens, default route = home listing modules
+- [x] mobile-first base styles: readable type scale, ≥44 px touch targets
+- [x] write tests for router (route match, default route, unknown-route fallback)
+- [x] run tests - must pass before task 2
 
 ### Task 2: Course math utilities [P0]
 

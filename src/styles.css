@@ -1,0 +1,92 @@
+/* Mobile-first base styles. Modules add their own screen-specific styles. */
+
+:root {
+  --bg: #101418;
+  --surface: #1a2027;
+  --text: #e8edf2;
+  --text-dim: #9aa7b2;
+  --accent: #4fa3ff;
+  --touch: 44px; /* minimum touch-target size */
+
+  /* type scale (minor third, mobile-first) */
+  --fs-sm: 0.875rem;
+  --fs-base: 1rem;
+  --fs-lg: 1.2rem;
+  --fs-xl: 1.44rem;
+  --fs-2xl: 1.73rem;
+
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-size: var(--fs-base);
+  line-height: 1.5;
+  background: var(--bg);
+  color: var(--text);
+  -webkit-text-size-adjust: 100%;
+}
+
+#app {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 1rem;
+}
+
+h1 {
+  font-size: var(--fs-2xl);
+  line-height: 1.2;
+  margin: 0.5rem 0;
+}
+
+h2 {
+  font-size: var(--fs-xl);
+  line-height: 1.25;
+}
+
+p {
+  color: var(--text-dim);
+}
+
+a {
+  color: var(--accent);
+}
+
+button,
+.module-link {
+  min-height: var(--touch);
+  min-width: var(--touch);
+  font-size: var(--fs-lg);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+button {
+  padding: 0.6rem 1.2rem;
+  border: none;
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+}
+
+.module-list {
+  list-style: none;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.module-link {
+  display: flex;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  background: var(--surface);
+  text-decoration: none;
+}
