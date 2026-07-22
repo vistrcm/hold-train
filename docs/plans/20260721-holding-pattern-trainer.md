@@ -90,11 +90,12 @@
 **Files:**
 - Create: `src/engine/entry.ts`, `src/engine/entry.test.ts`
 
-- [ ] write golden tests first, hand-derived by drawing and checked against AIM 5-3-8 j3: all three sectors standard, exact boundaries, 160-radial → 230-divider classic, nonstandard mirrors
-- [ ] write property tests: sectors sum to 360°; heading = inbound course → direct; nonstandard = exact mirror; ±5° boundary always yields ≥2 acceptable entries
-- [ ] implement `determineEntry(heading, holdSpec): EntryResult` (primary + alternates + sector boundaries)
-- [ ] implement teardrop/parallel guidance data (teardrop offset 30° toward holding side; parallel reintercept opposite the pattern) with tests
-- [ ] run tests - must pass before task 4
+- [x] write golden tests first, hand-derived by drawing and checked against AIM 5-3-8 j3: all three sectors standard, exact boundaries, 160-radial → 230-divider classic, nonstandard mirrors
+- [x] write property tests: sectors sum to 360°; heading = inbound course → direct; nonstandard = exact mirror; ±5° boundary always yields ≥2 acceptable entries
+- [x] implement `determineEntry(heading, holdSpec): EntryResult` (primary + alternates + sector boundaries)
+- [x] implement teardrop/parallel guidance data (teardrop offset 30° toward holding side; parallel reintercept opposite the pattern) with tests
+- [x] run tests - must pass before task 4
+- ➕ verified against AIM 5-3-8 text and FIG 5-3-4 image fetched from faa.gov during implementation; the ±5° tolerance is verbatim in AIM 5-3-8 (recommended pilot actions, j8). Note: the "160-radial → 230-divider" classic holds for the LEFT-turn variant (160+70=230); a standard-turn hold on the 160 radial has dividers at 090/270/160 — golden tests encode both.
 
 ### Task 4: Clearance model — realistic phraseology + answer key [P0]
 
