@@ -278,9 +278,9 @@
 - ➕ requirement→test audit: nonstandard mirroring (entry.test.ts mirror properties), ±5° dual-correct grading (entry.test.ts j8 block + entry-drill "accepts boundary alternates"), standard-turns trap (clearance.test.ts "THE TRAP" + clearance-copy trap surfacing), TO/FROM (holdSide radial-FROM/bearing-TO goldens), phraseology (JO 7110.65BB 4-6-4 golden texts). Coverage audit found one untested export — `mulberry32` (seeds every drill's scenario stream) — added determinism/range/divergence/seed-0 tests (419 total). Smoke test found one real defect: clearance-copy overflowed 58 px at 320 px (number inputs keep ~270 px intrinsic width in flex rows); fixed with `width:100%; min-width:0` on non-radio inputs, re-verified clean.
 
 ### Task 19: [Final] Update documentation
-- [ ] README.md: what it trains, module → exam-phase map, how to run, Anki import, source policy
-- [ ] CLAUDE.md: engine-is-the-oracle rule, FAA-source citation convention, TDD policy, priority tiers, no-new-dependencies bias
-- [ ] move this plan to `docs/plans/completed/`
+- [x] README.md: what it trains, module → exam-phase map, how to run, Anki import, source policy
+- [x] CLAUDE.md: engine-is-the-oracle rule, FAA-source citation convention, TDD policy, priority tiers, no-new-dependencies bias
+- [x] move this plan to `docs/plans/completed/`
 
 ## Post-Completion
 *No checkboxes — manual/external items*
