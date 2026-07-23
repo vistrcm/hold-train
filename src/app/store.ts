@@ -8,8 +8,12 @@ export const STATE_VERSION = 1
 /** Recent results kept per drill, sized to the entry benchmark window. */
 export const RECENT_WINDOW = 20
 
-/** Newest misses kept for the Anki export; older ones are dropped. */
-export const MAX_MISSES = 200
+/**
+ * Newest misses kept per drill for the Anki export; older ones are dropped.
+ * Per drill, not overall: a long clearance-copy session must not evict the
+ * entry and written misses that the "my misses" deck is actually built from.
+ */
+export const MAX_MISSES_PER_DRILL = 200
 
 /**
  * Entry-drill proficiency target: of the last 20 timed answers, 18 correct in
@@ -182,7 +186,17 @@ export function createStore(options: StoreOptions = {}): Store {
     state.misses.push({ drill, at: now(), scenario: structuredClone(scenario) })
     // Bounded so a long study history cannot grow past the storage quota, which
     // fails silently into the memory fallback and loses every stat on reload.
-    state.misses = state.misses.slice(-MAX_MISSES)
+    // Walk newest-first, keeping each drill's own quota, then restore order.
+    const kept = new Map<string, number>()
+    const trimmed: Miss[] = []
+    for (let i = state.misses.length - 1; i >= 0; i--) {
+      const miss = state.misses[i]!
+      const seen = kept.get(miss.drill) ?? 0
+      if (seen >= MAX_MISSES_PER_DRILL) continue
+      kept.set(miss.drill, seen + 1)
+      trimmed.push(miss)
+    }
+    state.misses = trimmed.reverse()
     saveState(state)
     return state
   }

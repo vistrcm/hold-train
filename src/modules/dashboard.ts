@@ -47,8 +47,12 @@ export function examReadiness(state: AppState): ExamReadiness {
 export interface OralReadiness {
   attempts: number
   bankSize: number
-  /** At least one full self-test pass through the bank. */
-  fullPass: boolean
+  /**
+   * At least as many self-test answers recorded as the bank has items. This is
+   * NOT item coverage — the store counts answers, not which items were seen, so
+   * five items answered four times each also clears the bar.
+   */
+  bankWorthAnswered: boolean
   totalElements: number
   /** ACS codes tagged on recorded oral misses, in ACS order — weak areas. */
   missedElements: string[]
@@ -68,7 +72,7 @@ export function oralReadiness(state: AppState): OralReadiness {
   return {
     attempts,
     bankSize: ORAL_ITEMS.length,
-    fullPass: attempts >= ORAL_ITEMS.length,
+    bankWorthAnswered: attempts >= ORAL_ITEMS.length,
     totalElements: ACS_ELEMENTS.length,
     missedElements: ACS_ELEMENTS.filter((e) => missed.has(e.code)).map((e) => e.code),
   }
@@ -180,10 +184,11 @@ export function renderDashboard(el: HTMLElement, options: DashboardOptions = {})
   const oralCard = card(
     'oral',
     'Oral prep',
-    oral.fullPass,
+    oral.bankWorthAnswered,
     [
       `${oral.attempts} self-test answers (bank: ${oral.bankSize} items, ${oral.totalElements} ACS elements)`,
-      `full pass through the bank: ${oral.fullPass ? 'yes' : 'not yet'}`,
+      `a bank’s worth of answers: ${oral.bankWorthAnswered ? 'yes' : 'not yet'}` +
+        ' — which items you saw is not tracked, so work the weak elements below',
     ],
     oral.missedElements.length > 0
       ? `Weak elements to re-drill: ${oral.missedElements.join(', ')}`

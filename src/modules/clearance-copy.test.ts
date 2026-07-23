@@ -327,6 +327,23 @@ describe('renderClearanceCopy', () => {
     expect(el.querySelector<HTMLElement>('.copy-form')!.hidden).toBe(false)
   })
 
+  it('a second grade click after review cannot throw', () => {
+    // The form is hidden after grading, but hiding is a styling concern and had
+    // already failed once (an author `display` rule outranks `[hidden]`). The
+    // handler itself must never re-enter drill.submit().
+    renderClearanceCopy(el, { seed: SEED_STATED_COURSE, store: testStore() })
+    const scenario = generateCopyScenario(SEED_STATED_COURSE)
+    el.querySelector<HTMLButtonElement>('.copy-gotit')!.click()
+    fillForm(perfectCopy(scenario.expected))
+    const submit = el.querySelector<HTMLButtonElement>('.copy-submit')!
+    submit.click()
+    expect(submit.disabled).toBe(true)
+    expect(() => submit.click()).not.toThrow()
+
+    el.querySelector<HTMLButtonElement>('.copy-next')!.click()
+    expect(submit.disabled).toBe(false)
+  })
+
   it('grades the submitted form and shows the full clearance with citations', () => {
     renderClearanceCopy(el, { seed: SEED_STATED_COURSE, store: testStore() })
     const scenario = generateCopyScenario(SEED_STATED_COURSE)

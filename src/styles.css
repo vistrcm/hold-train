@@ -6,6 +6,8 @@
   --text: #e8edf2;
   --text-dim: #9aa7b2;
   --accent: #4fa3ff;
+  --ok: #3fbf6f;
+  --border: #2a323b;
   --touch: 44px; /* minimum touch-target size */
 
   /* type scale (minor third, mobile-first) */
@@ -20,6 +22,14 @@
 
 * {
   box-sizing: border-box;
+}
+
+/* The `hidden` attribute is only honoured by a UA-stylesheet rule, and any
+   author `display` declaration outranks it by cascade origin. Modules toggle
+   `.hidden` on elements that also carry a `display` (e.g. `.copy-form`), so
+   this rule has to win outright or those elements never hide. */
+[hidden] {
+  display: none !important;
 }
 
 body {
@@ -433,13 +443,13 @@ button {
 }
 
 .dash-card {
-  border: 1px solid var(--border, #ccc);
+  border: 1px solid var(--border);
   border-radius: 8px;
   padding: 0.75rem 1rem;
 }
 
 .dash-card[data-ready='true'] .dash-status {
-  color: var(--ok, #2e7d32);
+  color: var(--ok);
   font-weight: 600;
 }
 
@@ -463,7 +473,7 @@ button {
 .dash-activity td {
   text-align: left;
   padding: 0.4rem 0.5rem;
-  border-bottom: 1px solid var(--border, #ccc);
+  border-bottom: 1px solid var(--border);
 }
 
 .dash-phase {

@@ -394,6 +394,7 @@ function renderCopyMode(pane: HTMLElement, options: CopyDrillOptions): void {
   const reviewEl = pane.querySelector<HTMLElement>('.copy-review')!
   const nextBtn = pane.querySelector<HTMLButtonElement>('.copy-next')!
   const statsEl = pane.querySelector<HTMLElement>('.copy-stats')!
+  const submitBtn = pane.querySelector<HTMLButtonElement>('.copy-submit')!
   let hideTimer: ReturnType<typeof setTimeout> | undefined
 
   function updateStats(): void {
@@ -418,6 +419,7 @@ function renderCopyMode(pane: HTMLElement, options: CopyDrillOptions): void {
     errorEl.textContent = ''
     reviewEl.innerHTML = ''
     nextBtn.hidden = true
+    submitBtn.disabled = false
     updateStats()
     clearTimeout(hideTimer)
     hideTimer = setTimeout(hideClearance, listenMillis(drill.scenario.clearanceText))
@@ -425,6 +427,9 @@ function renderCopyMode(pane: HTMLElement, options: CopyDrillOptions): void {
 
   function showReview(fb: CopyFeedback): void {
     form.hidden = true
+    // The scenario is graded once; a second submit would throw out of the click
+    // handler and wedge the drill.
+    submitBtn.disabled = true
     const rows = fb.grade.fields
       .map((f) => {
         const cls = ['copy-row', f.correct ? 'is-correct' : 'is-wrong', f.trap ? 'is-trap' : '']
@@ -452,7 +457,7 @@ function renderCopyMode(pane: HTMLElement, options: CopyDrillOptions): void {
   }
 
   gotitBtn.addEventListener('click', hideClearance)
-  pane.querySelector<HTMLButtonElement>('.copy-submit')!.addEventListener('click', () => {
+  submitBtn.addEventListener('click', () => {
     const user = readCopiedClearance(form)
     if (user === null) {
       errorEl.textContent = 'Pick a turn direction — silence from ATC still means one of them.'

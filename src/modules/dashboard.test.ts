@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it } from 'vitest'
+import README from '../../README.md?raw'
 import {
   createStore,
   emptyState,
@@ -17,6 +18,7 @@ import {
   PHASE_PREP,
   phaseElements,
   renderDashboard,
+  type ExamPhase,
 } from './dashboard'
 import { EXAM_LENGTH, WEAK_TOPIC_THRESHOLD } from './written-test'
 
@@ -75,20 +77,20 @@ describe('examReadiness', () => {
 })
 
 describe('oralReadiness', () => {
-  it('empty state → no attempts, no full pass, no weak elements', () => {
+  it('empty state → no attempts, no bank-worth of answers, no weak elements', () => {
     const r = oralReadiness(emptyState())
     expect(r.attempts).toBe(0)
-    expect(r.fullPass).toBe(false)
+    expect(r.bankWorthAnswered).toBe(false)
     expect(r.bankSize).toBe(ORAL_ITEMS.length)
     expect(r.totalElements).toBe(ACS_ELEMENTS.length)
     expect(r.missedElements).toEqual([])
   })
 
-  it('full pass once attempts reach the bank size', () => {
+  it('a bank’s worth of answers once attempts reach the bank size', () => {
     const state = emptyState()
     state.drills['oral'] = stats(results(1, 1))
     state.drills['oral']!.attempts = ORAL_ITEMS.length
-    expect(oralReadiness(state).fullPass).toBe(true)
+    expect(oralReadiness(state).bankWorthAnswered).toBe(true)
   })
 
   it('collects missed ACS codes deduplicated and in ACS order', () => {
@@ -145,6 +147,39 @@ describe('PHASE_PREP — checkride map to ACS Task III.B', () => {
   })
 })
 
+describe('README module → exam-phase table', () => {
+  // The README table and PHASE_PREP are two hand-written copies of the same
+  // study plan, and they had already drifted apart on four of eight rows.
+  it('matches PHASE_PREP row for row', () => {
+    const phases: ExamPhase[] = ['written', 'oral', 'flight']
+    const documented = new Map<string, string[]>()
+    for (const [, route, marks] of README.matchAll(
+      /^\| `#\/([\w-]+)` \| [^|]+ \|([^|]*\|[^|]*\|[^|]*)\|\s*$/gm,
+    )) {
+      // The Progress screen reports on the phases rather than prepping one, so
+      // it has no PHASE_PREP entry and its README row spans the columns.
+      if (route === 'dashboard') continue
+      const cells = marks!.split('|').map((c: string) => c.trim())
+      documented.set(
+        route!,
+        phases.filter((_, i) => cells[i] === '✓'),
+      )
+    }
+    expect(documented.size).toBeGreaterThan(0)
+
+    const actual = new Map<string, string[]>()
+    for (const prep of PHASE_PREP) {
+      for (const screen of prep.screens) {
+        actual.set(screen.path, [...(actual.get(screen.path) ?? []), prep.phase])
+      }
+    }
+    for (const [route, phasesForRoute] of actual) {
+      expect(documented.get(route), `README row for #/${route}`).toEqual(phasesForRoute)
+    }
+    expect([...documented.keys()].filter((r) => !actual.has(r))).toEqual([])
+  })
+})
+
 describe('renderDashboard', () => {
   let root: HTMLElement
 
@@ -178,6 +213,19 @@ describe('renderDashboard', () => {
     const card = root.querySelector('.dash-card[data-drill="entry"]')!
     expect(card.textContent).toContain(`12/${ENTRY_BENCHMARK.window}`)
     expect(card.textContent).toContain(`${ENTRY_BENCHMARK.minCorrectUnderTarget}`)
+  })
+
+  it('never claims bank coverage it cannot measure', () => {
+    // The store counts oral attempts, not which items were answered, so
+    // answering one item 21 times clears the bar. The card must not read as
+    // "you have seen the whole bank" — false readiness on a checkride app.
+    const state = emptyState()
+    state.drills['oral'] = stats(results(1, 1))
+    state.drills['oral']!.attempts = ORAL_ITEMS.length
+    renderDashboard(root, { store: storeWith(state) })
+    const card = root.querySelector('.dash-card[data-drill="oral"]')!
+    expect(card.textContent).not.toContain('full pass')
+    expect(card.textContent).toContain('not tracked')
   })
 
   it('lists weak ACS elements from oral misses', () => {

@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import {
   ENTRY_BENCHMARK,
-  MAX_MISSES,
+  MAX_MISSES_PER_DRILL,
   RECENT_WINDOW,
   type AppState,
   type DrillResult,
@@ -302,16 +302,35 @@ describe('averageTimeSeconds', () => {
 })
 
 describe('miss retention', () => {
-  it(`keeps the newest ${MAX_MISSES} misses so storage cannot grow without bound`, () => {
+  it(`keeps the newest ${MAX_MISSES_PER_DRILL} misses so storage cannot grow without bound`, () => {
     // An overflowing quota fails into the in-memory fallback, which silently
     // loses every drill stat on the next reload.
     const store = createStore({ storage: memStorage(), now: () => 0 })
-    for (let i = 0; i < MAX_MISSES + 25; i++) {
+    for (let i = 0; i < MAX_MISSES_PER_DRILL + 25; i++) {
       store.recordMiss('entry', { n: i })
     }
     const misses = store.loadState().misses
-    expect(misses).toHaveLength(MAX_MISSES)
+    expect(misses).toHaveLength(MAX_MISSES_PER_DRILL)
     expect((misses[0]!.scenario as { n: number }).n).toBe(25)
-    expect((misses.at(-1)!.scenario as { n: number }).n).toBe(MAX_MISSES + 24)
+    expect((misses.at(-1)!.scenario as { n: number }).n).toBe(MAX_MISSES_PER_DRILL + 24)
+  })
+
+  it('does not let one drill evict another drill’s misses', () => {
+    // clearance-copy, to-from and wind-lab misses are recorded but produce no
+    // Anki cards. Under a shared cap a long session on those silently emptied
+    // the personalized deck of exactly the entry/written cards it exists for.
+    const store = createStore({ storage: memStorage(), now: () => 0 })
+    store.recordMiss('entry', { n: 'first entry miss' })
+    for (let i = 0; i < MAX_MISSES_PER_DRILL + 50; i++) {
+      store.recordMiss('clearance-copy', { n: i })
+    }
+    const misses = store.loadState().misses
+    expect(misses.filter((m) => m.drill === 'entry')).toHaveLength(1)
+    expect(misses.filter((m) => m.drill === 'clearance-copy')).toHaveLength(
+      MAX_MISSES_PER_DRILL,
+    )
+    // Chronological order survives the per-drill trim.
+    expect(misses[0]!.drill).toBe('entry')
+    expect(misses.map((m) => m.at)).toEqual([...misses.map((m) => m.at)].sort((a, b) => a - b))
   })
 })

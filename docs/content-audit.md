@@ -204,3 +204,43 @@ geometry; timing-wind: j4, j8(c), j5; reports: 5-3-3 a1(f)/(g), i6 + P/CG + 91.1
   3 o'clock point", covering the 20° toward the nose, leading edge on the 70° line.
   Sector-reading instructions in the paragraph were already correct and unchanged.
   Covered by the lesson-content tests in `src/content/lessons.test.ts`.
+
+## Post-completion review fix — 2026-07-22 (code review iteration 2)
+
+- **Fixed: `hidden` never hid the clearance-copy form** (`src/styles.css`).
+  `.copy-form { display: flex }` is an author declaration, and author origin beats
+  the UA stylesheet's `[hidden] { display: none }` regardless of specificity — so in
+  a real browser the copy form rendered *while the clearance was still on screen*,
+  defeating the drill's premise (copy from memory, as off a radio). jsdom models a
+  simplified cascade and reported `display: none`, and the tests asserted the
+  `hidden` property, so 450 tests passed over it. Added an explicit
+  `[hidden] { display: none !important }`. Regression tests: "forces [hidden] to win
+  over author display declarations" in `src/styles.test.ts`, plus "a second grade
+  click after review cannot throw" in `src/modules/clearance-copy.test.ts` (the
+  visible form left the graded scenario re-submittable, throwing out of the click
+  handler and wedging the drill).
+- **Fixed: dashboard claimed bank coverage it cannot measure**
+  (`src/modules/dashboard.ts`). `fullPass` compared cumulative oral *attempts* to the
+  bank size, so answering one item 21 times displayed "full pass through the bank:
+  yes". Renamed to `bankWorthAnswered` and the card now states that which items were
+  seen is not tracked. A readiness signal that overstates preparation is the same
+  negative-training failure mode as a wrong sector. Regression test: "never claims
+  bank coverage it cannot measure" in `src/modules/dashboard.test.ts`.
+- **Fixed: one drill's misses evicted another's** (`src/app/store.ts`). `MAX_MISSES`
+  was a single 200-entry FIFO across all drills, but only `entry`, `entry-learn`,
+  `written`, `written-exam` and `oral` misses become Anki cards. A long
+  clearance-copy or wind-lab session silently pushed out exactly the misses the
+  personalized deck exists for. Now `MAX_MISSES_PER_DRILL`, capped per drill id.
+  Regression test: "does not let one drill evict another drill's misses" in
+  `src/app/store.test.ts`.
+- **Fixed: README exam-phase table contradicted the in-app map** (`README.md`).
+  Four of eight rows disagreed with `PHASE_PREP` (Learn, Entry Drill, Wind Lab, Anki
+  Export), giving the doc and the dashboard two different study plans. README now
+  matches the app. Regression test: "matches PHASE_PREP row for row" in
+  `src/modules/dashboard.test.ts` parses the table and diffs it against `PHASE_PREP`.
+- **Fixed: undefined CSS custom properties** (`src/styles.css`). `var(--border, #ccc)`
+  and `var(--ok, #2e7d32)` always resolved to their fallbacks; `#2e7d32` on `--bg`
+  is ~3.6:1, below WCAG AA 4.5:1, making the dashboard "Ready ✓" the least legible
+  text on the screen while every other module signals correct with `#3fbf6f`. Added
+  `--ok` and `--border` to `:root`. Regression test: "defines every custom property
+  it references" in `src/styles.test.ts` (catches the whole class, not these two).

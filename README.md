@@ -15,13 +15,13 @@ Browser-based holding-pattern trainer for the FAA instrument rating (C172 around
 
 | Route | Module | Written | Oral | Flight |
 |---|---|:-:|:-:|:-:|
-| `#/learn` | Learn | ✓ | ✓ | |
-| `#/entry-drill` | Entry Drill | ✓ | ✓ | ✓ |
+| `#/learn` | Learn | ✓ | | |
+| `#/entry-drill` | Entry Drill | ✓ | | ✓ |
 | `#/written-test` | Written Test | ✓ | | |
 | `#/oral-prep` | Oral Prep | | ✓ | |
-| `#/wind-lab` | Wind & Timing Lab | | ✓ | ✓ |
+| `#/wind-lab` | Wind & Timing Lab | | | ✓ |
 | `#/clearance-copy` | Clearance Copy | | ✓ | ✓ |
-| `#/anki` | Anki Export | ✓ | ✓ | |
+| `#/anki` | Anki Export | | ✓ | |
 | `#/dashboard` | Progress | — readiness vs benchmarks across all three — | | |
 
 Suggested order: Learn → Entry Drill (learn mode, then timed cockpit mode) → Written Test → Clearance Copy → Wind & Timing Lab → Oral Prep, with the dashboard showing readiness against benchmarks (entry: 18/20 correct under 10 s, 95% under 15 s).
