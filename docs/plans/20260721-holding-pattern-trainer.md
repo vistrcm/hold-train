@@ -240,9 +240,10 @@
 - Create: `src/content/lessons.ts`, `src/modules/learn.ts`, tests for both
 - Modify: `src/app/router.ts`
 
-- [ ] short lesson pages in instructional order (why → anatomy → entries/thumb method → timing/wind → reports); every factual paragraph carries FAA `source`; each links to the relevant drill
-- [ ] content-validation tests (ordering, sources present, drill links resolve)
-- [ ] run tests - must pass before next task
+- [x] short lesson pages in instructional order (why → anatomy → entries/thumb method → timing/wind → reports); every factual paragraph carries FAA `source`; each links to the relevant drill
+- [x] content-validation tests (ordering, sources present, drill links resolve)
+- [x] run tests - must pass before next task
+- ➕ 5 lessons, wording reuses statements already source-verified in Tasks 3/4/8/9/11 (Task 17 re-audits). No entry answers in lessons (engine stays the oracle); thumb-method paragraph explicitly labeled field technique with AIM cited only for the sector geometry, edges derived to match the Task 6 HSI overlay (+70°..+90°). Drill-link test imports the real Screen objects, so a renamed route fails tests. Screen registered first in `main.ts` at `#learn` (instructional entry point).
 
 ### Task 16: Progress dashboard [P2]
 

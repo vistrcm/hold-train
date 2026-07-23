@@ -370,3 +370,43 @@ button {
 .tofrom-feedback.is-wrong .tofrom-verdict {
   color: #e05c5c;
 }
+
+/* Learn: lesson list and lesson pages */
+.lesson-list {
+  list-style: none;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.lesson-list .lesson-link {
+  width: 100%;
+  text-align: left;
+}
+
+.lesson-paragraph p:first-child {
+  color: var(--text);
+}
+
+.lesson-source {
+  font-size: var(--fs-sm);
+  margin-top: -0.5rem;
+}
+
+.lesson-drill {
+  display: inline-block;
+  min-height: var(--touch);
+  padding: 0.6rem 0;
+  font-size: var(--fs-lg);
+}
+
+.lesson-back,
+.lesson-next {
+  font-size: var(--fs-base);
+}
+
+.lesson-next {
+  display: block;
+  margin-top: 0.5rem;
+}
