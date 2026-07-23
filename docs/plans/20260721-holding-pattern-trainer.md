@@ -215,10 +215,11 @@
 - Create: `src/engine/sim.test.ts`, `src/modules/wind-lab.test.ts`
 - Modify: `src/app/router.ts`
 
-- [ ] write sim tests first: no-wind correctly-flown hold → ~60 s inbound, closed racetrack; textbook triple-drift decisions in known wind → inbound within seconds of 60; no-crab decisions → measurable drift
-- [ ] implement fixed-timestep integrator (standard-rate turns, ~90 KTAS, wind per step; decisions as input: entry, outbound heading, crab, outbound seconds) + ground-track output
-- [ ] implement predict → fly → debrief flow: user states expected crab/outbound heading/time first (CFI Notebook exercise), engine flies it, debrief shows measured vs target (ACS ±10° framing), next-circuit timing suggestion; misses recorded
-- [ ] run tests - must pass before next task
+- [x] write sim tests first: no-wind correctly-flown hold → ~60 s inbound, closed racetrack; textbook triple-drift decisions in known wind → inbound within seconds of 60; no-crab decisions → measurable drift
+- [x] implement fixed-timestep integrator (standard-rate turns, ~90 KTAS, wind per step; decisions as input: entry, outbound heading, crab, outbound seconds) + ground-track output
+- [x] implement predict → fly → debrief flow: user states expected crab/outbound heading/time first (CFI Notebook exercise), engine flies it, debrief shows measured vs target (ACS ±10° framing), next-circuit timing suggestion; misses recorded
+- [x] run tests - must pass before next task
+- ➕ physics finding encoded in tests: the AIM ratio-timing rule models only the straight legs — wind keeps drifting the pattern during the two 1-minute turns, so textbook decisions leave the first inbound ~10 s off in a 15 kt crosswind and ~+34 s with a 20 kt inbound headwind. Since inbound time is affine in outbound time, one adjustment of (60 − measured)·GSin/GSout seconds closes it to ≤3 s (that IS AIM 5-3-8 j4's "adjust subsequent outbound legs"); `groundSpeeds` added to `wind.ts` for it. Lab therefore grades the *decisions* (outbound heading + crab vs engine within ACS ±10° — verified verbatim in FAA-S-ACS-8C Task III.B "selected headings ±10°"; planned time within 10 s of the rule), while measured inbound drives the next-circuit suggestion; only the first circuit per scenario is scored (re-fly = practice loop). Entry decision sets sim turn directions (parallel opposite); teardrop honestly crosses ~0.75 NM holding-side without an intercept (no intercept logic — decisions, not autopilot). Screen registered in `main.ts` at `#wind-lab`; ghost track = sim flying the textbook numbers.
 
 ### Task 14: Clearance copy drill [P1]
 

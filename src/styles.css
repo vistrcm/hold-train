@@ -197,3 +197,53 @@ button {
   width: 100%;
   margin-top: 0.5rem;
 }
+
+/* Wind & Timing Lab */
+.lab-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.lab-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: var(--fs-sm);
+  color: var(--text-dim);
+}
+
+.lab-form input {
+  min-height: var(--touch);
+  font-size: var(--fs-lg);
+  padding: 0.4rem 0.8rem;
+  border: 1px solid var(--surface);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+}
+
+.lab-fly,
+.lab-next {
+  width: 100%;
+  margin: 0.5rem 0;
+}
+
+.lab-debrief p,
+.lab-debrief li {
+  margin: 0.35rem 0;
+}
+
+.lab-rows {
+  padding-left: 1.2rem;
+}
+
+.lab-debrief.is-correct .lab-verdict {
+  color: #3fbf6f;
+}
+
+.lab-debrief.is-wrong .lab-verdict,
+.lab-debrief.is-error {
+  color: #e05c5c;
+}

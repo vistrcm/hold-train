@@ -71,6 +71,22 @@ export function outboundHeading(inboundCourse: number, wind: Wind, tasKt: number
 }
 
 /**
+ * Crab-corrected ground speeds along the holding course on each leg. The same
+ * crosswind magnitude applies both ways, so the airspeed component along the
+ * course (alongKt) is shared; headwind subtracts inbound and adds outbound.
+ */
+export function groundSpeeds(
+  inboundCourse: number,
+  wind: Wind,
+  tasKt: number,
+): { inboundKt: number; outboundKt: number } {
+  assertWind(wind, tasKt)
+  const { headwindKt, crosswindKt } = components(inboundCourse, wind)
+  const alongKt = Math.sqrt(tasKt * tasKt - crosswindKt * crosswindKt)
+  return { inboundKt: alongKt - headwindKt, outboundKt: alongKt + headwindKt }
+}
+
+/**
  * Outbound leg time that yields the target inbound time (default 60 s,
  * AIM 5-3-8 j4 at/below 14,000 ft MSL), from the wind-triangle ground
  * speeds on each leg: t_out = target · GS_inbound / GS_outbound.
@@ -81,17 +97,11 @@ export function outboundTimeSeconds(
   tasKt: number,
   targetInboundSeconds = 60,
 ): number {
-  assertWind(wind, tasKt)
   if (!Number.isFinite(targetInboundSeconds) || targetInboundSeconds <= 0) {
     throw new RangeError(`target inbound seconds must be positive, got ${targetInboundSeconds}`)
   }
-  const { headwindKt, crosswindKt } = components(inboundCourse, wind)
-  // Ground speed along the course with the crab already applied; the same
-  // crosswind magnitude applies on both legs, so alongKt is shared.
-  const alongKt = Math.sqrt(tasKt * tasKt - crosswindKt * crosswindKt)
-  const inboundGs = alongKt - headwindKt
-  const outboundGs = alongKt + headwindKt
-  return (targetInboundSeconds * inboundGs) / outboundGs
+  const { inboundKt, outboundKt } = groundSpeeds(inboundCourse, wind, tasKt)
+  return (targetInboundSeconds * inboundKt) / outboundKt
 }
 
 /**

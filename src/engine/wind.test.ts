@@ -20,6 +20,7 @@ import {
   TIMING_SOURCE,
   WIND_SOURCE,
   dmeOutboundEnd,
+  groundSpeeds,
   inboundCrab,
   outboundHeading,
   outboundTimeSeconds,
@@ -184,5 +185,36 @@ describe('FAA source citations', () => {
     for (const source of [WIND_SOURCE, TIMING_SOURCE, DME_SOURCE]) {
       expect(source).toMatch(/AIM 5-3-8/)
     }
+  })
+})
+
+describe('groundSpeeds', () => {
+  it('zero wind → TAS on both legs', () => {
+    const gs = groundSpeeds(0, { directionFrom: 0, speedKt: 0 }, TAS)
+    expect(gs.inboundKt).toBeCloseTo(TAS, 6)
+    expect(gs.outboundKt).toBeCloseTo(TAS, 6)
+  })
+
+  it('20 kt inbound headwind → 70 inbound, 110 outbound', () => {
+    const gs = groundSpeeds(0, { directionFrom: 0, speedKt: 20 }, TAS)
+    expect(gs.inboundKt).toBeCloseTo(70, 6)
+    expect(gs.outboundKt).toBeCloseTo(110, 6)
+  })
+
+  it('direct crosswind → both legs at the crab-reduced along-course speed', () => {
+    const gs = groundSpeeds(0, { directionFrom: 90, speedKt: 15 }, TAS)
+    const along = Math.sqrt(TAS * TAS - 15 * 15)
+    expect(gs.inboundKt).toBeCloseTo(along, 6)
+    expect(gs.outboundKt).toBeCloseTo(along, 6)
+  })
+
+  it('is consistent with outboundTimeSeconds (t_out = 60·GSin/GSout)', () => {
+    const wind = { directionFrom: 30, speedKt: 18 }
+    const gs = groundSpeeds(0, wind, TAS)
+    expect(outboundTimeSeconds(0, wind, TAS)).toBeCloseTo((60 * gs.inboundKt) / gs.outboundKt, 10)
+  })
+
+  it('rejects wind at or above TAS', () => {
+    expect(() => groundSpeeds(0, { directionFrom: 0, speedKt: TAS }, TAS)).toThrow(RangeError)
   })
 })
