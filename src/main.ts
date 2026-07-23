@@ -1,5 +1,6 @@
 import { ankiExportScreen } from './app/anki-export'
 import { createRouter, type Screen } from './app/router'
+import { clearanceCopyScreen } from './modules/clearance-copy'
 import { entryDrillScreen } from './modules/entry-drill'
 import { oralPrepScreen } from './modules/oral-prep'
 import { windLabScreen } from './modules/wind-lab'
@@ -11,6 +12,7 @@ const screens: Screen[] = [
   writtenTestScreen,
   oralPrepScreen,
   windLabScreen,
+  clearanceCopyScreen,
   ankiExportScreen,
 ]
 

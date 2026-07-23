@@ -227,9 +227,10 @@
 - Create: `src/modules/clearance-copy.ts`, `src/modules/clearance-copy.test.ts`
 - Modify: `src/app/router.ts`
 
-- [ ] write tests first: field-by-field grading; standard-turns trap surfaced; "as published" grades only present fields; TO/FROM micro-drill grading (bearing TO vs radial FROM → which side of the fix)
-- [ ] implement: clearance shown briefly then hidden (like real radio) → structured field form → graded review with citations; TO/FROM micro-drill mode; misses recorded
-- [ ] run tests - must pass before next task
+- [x] write tests first: field-by-field grading; standard-turns trap surfaced; "as published" grades only present fields; TO/FROM micro-drill grading (bearing TO vs radial FROM → which side of the fix)
+- [x] implement: clearance shown briefly then hidden (like real radio) → structured field form → graded review with citations; TO/FROM micro-drill mode; misses recorded
+- [x] run tests - must pass before next task
+- ➕ engine already held all the grading (`gradeCopiedClearance` from Task 4 is the oracle); the module adds only presentation + the pure `holdSide(kind, degrees)` (radial FROM → hold on the radial side; bearing TO → reciprocal side, P/CG). Clearance auto-hides after ~spoken duration (450 ms/word, 4 s floor) with a "got it" skip; empty degrees input is treated as not-copied (Number('') is 0, which would falsely match a spoken 360). Trap review row gets a distinct `.is-trap` accent. Misses stored under `clearance-copy` / `to-from`; Anki export skips unknown drill ids by design, so exporting these misses is deferred (would extend Task 10's converters). Screen registered in `main.ts` at `#clearance-copy`.
 
 ### P2 — cut unless time clearly remains
 

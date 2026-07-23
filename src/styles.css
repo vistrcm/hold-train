@@ -247,3 +247,126 @@ button {
 .lab-debrief.is-error {
   color: #e05c5c;
 }
+
+/* Clearance copy drill */
+.copy-modes {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.copy-mode[aria-pressed='true'] {
+  outline: 2px solid var(--accent);
+}
+
+.copy-clearance {
+  font-style: italic;
+  min-height: 3rem;
+}
+
+.copy-gotit,
+.copy-submit,
+.copy-next,
+.tofrom-next {
+  width: 100%;
+  margin: 0.5rem 0;
+}
+
+.copy-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.copy-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: var(--fs-sm);
+  color: var(--text-dim);
+}
+
+.copy-form fieldset {
+  border: 1px solid var(--surface);
+  border-radius: 8px;
+}
+
+.copy-form fieldset label {
+  flex-direction: row;
+  align-items: center;
+  min-height: var(--touch);
+}
+
+.copy-form input,
+.copy-form select {
+  min-height: var(--touch);
+  font-size: var(--fs-lg);
+  padding: 0.4rem 0.8rem;
+  border: 1px solid var(--surface);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+}
+
+.copy-error {
+  color: #e05c5c;
+  font-size: var(--fs-sm);
+}
+
+.copy-rows {
+  list-style: none;
+  padding-left: 0;
+}
+
+.copy-row {
+  margin: 0.35rem 0;
+}
+
+.copy-row.is-correct {
+  color: #3fbf6f;
+}
+
+.copy-row.is-wrong {
+  color: #e05c5c;
+}
+
+.copy-row.is-trap {
+  border-left: 3px solid var(--accent);
+  padding-left: 0.5rem;
+}
+
+.copy-verdict.is-correct {
+  color: #3fbf6f;
+}
+
+.copy-verdict.is-wrong {
+  color: #e05c5c;
+}
+
+.copy-spoken {
+  font-style: italic;
+  color: var(--text-dim);
+}
+
+.copy-stats,
+.tofrom-stats {
+  font-size: var(--fs-sm);
+}
+
+/* TO/FROM micro-drill: 8 cardinal buttons on a compass-like grid */
+.tofrom-answers {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.5rem;
+}
+
+.tofrom-feedback p {
+  margin: 0.35rem 0;
+}
+
+.tofrom-feedback.is-correct .tofrom-verdict {
+  color: #3fbf6f;
+}
+
+.tofrom-feedback.is-wrong .tofrom-verdict {
+  color: #e05c5c;
+}
