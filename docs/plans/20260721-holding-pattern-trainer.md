@@ -178,11 +178,12 @@
 - Create: `src/content/anki-deck.test.ts`, `src/app/anki-export.test.ts`
 - Modify: `src/app/router.ts`
 
-- [ ] write tests first: TSV escaping (tabs/newlines); every fixed-deck card has front/back/tags (topic + ACS element); misses deck converts stored misses (entry scenarios, oral items, question misses) into cards
-- [ ] author fixed deck from the ROTE/TRAP/SAFETY call-outs (`research-claude.md` §Anki, each verified against its FAA source; citations on card backs)
-- [ ] implement TSV Blob downloads (`hold-train-core.tsv`, `hold-train-misses.tsv`) + Anki import instructions; empty miss list → informative empty state
-- [ ] run tests - must pass before task 11
-- [ ] **P0 checkpoint: app is exam-useful now. Reassess remaining time before starting P1.**
+- [x] write tests first: TSV escaping (tabs/newlines); every fixed-deck card has front/back/tags (topic + ACS element); misses deck converts stored misses (entry scenarios, oral items, question misses) into cards
+- [x] author fixed deck from the ROTE/TRAP/SAFETY call-outs (`research-claude.md` §Anki, each verified against its FAA source; citations on card backs)
+- [x] implement TSV Blob downloads (`hold-train-core.tsv`, `hold-train-misses.tsv`) + Anki import instructions; empty miss list → informative empty state
+- [x] run tests - must pass before task 11
+- [x] **P0 checkpoint: app is exam-useful now. Reassess remaining time before starting P1.** (checkpoint noted: P0 complete, all 6 modules working; ~1 month to exam — proceeding to P1 wind/timing work, which maps directly to ACS S5/R4)
+- ➕ 24-card core deck (11 rote / 7 trap / 6 safety), each tagged with a group + ACS element code, tags whitespace-free (Anki splits tags on spaces); newlines escape to `<br>` (Anki renders HTML); miss cards rebuilt from store snapshots per drill type, malformed snapshots skipped; screen registered in `main.ts` at `#anki`
 
 ### P1 — high value if time allows
 
