@@ -29,7 +29,6 @@ import {
 import { TIMING_SOURCE, WIND_SOURCE, groundSpeeds, type Wind } from '../engine/wind'
 import { renderMap } from '../ui/mapview'
 
-export { HOLD_TAS_KT } from '../engine/sim'
 
 export const ACS_SOURCE = 'FAA-S-ACS-8C Task III.B (maintain selected headings ±10°)'
 
@@ -324,18 +323,27 @@ export function renderWindLab(el: HTMLElement, options: WindLabOptions = {}): vo
   }
 
   el.querySelector<HTMLButtonElement>('.lab-fly')!.addEventListener('click', () => {
+    const heading = parseFloat(headingInput.value)
+    const crab = parseFloat(crabInput.value)
+    const seconds = parseFloat(timeInput.value)
+    // Blank fields parse to NaN; catch them here so the pilot gets a prompt,
+    // not the engine's RangeError (which is reserved for out-of-range values).
+    if (!Number.isFinite(heading) || !Number.isFinite(crab) || !Number.isFinite(seconds)) {
+      debriefEl.className = 'lab-debrief is-error'
+      debriefEl.textContent = 'Enter all three numbers before flying.'
+      return
+    }
     try {
       showDebrief(
         lab.fly({
-          outboundHeading: normalizeDeg(parseFloat(headingInput.value)),
-          crab: parseFloat(crabInput.value),
-          outboundSeconds: parseFloat(timeInput.value),
+          outboundHeading: normalizeDeg(heading),
+          crab,
+          outboundSeconds: seconds,
         }),
       )
     } catch (err) {
       debriefEl.className = 'lab-debrief is-error'
-      debriefEl.textContent =
-        err instanceof RangeError ? err.message : 'Enter all three numbers before flying.'
+      debriefEl.textContent = err instanceof RangeError ? err.message : String(err)
     }
   })
 

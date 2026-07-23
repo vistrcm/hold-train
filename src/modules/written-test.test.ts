@@ -53,7 +53,7 @@ describe('practice mode', () => {
   it('gives immediate feedback with explanation and citation', () => {
     const test = createWrittenTest({ mode: 'practice', seed: 7, store: testStore() })
     const q = test.question
-    const fb = test.answer(q.answerIndex)
+    const fb = test.answer(q.answerIndex)!
     expect(fb.correct).toBe(true)
     expect(fb.answerIndex).toBe(q.answerIndex)
     expect(fb.explanation).toBe(q.explanation)
@@ -97,10 +97,7 @@ describe('exam mode', () => {
   it('is fixed-length and never leaks the key or explanation while running', () => {
     const test = createWrittenTest({ mode: 'exam', seed: 9, store: testStore() })
     expect(test.length).toBe(EXAM_LENGTH)
-    const ack = test.answer(0)
-    expect(ack.correct).toBeUndefined()
-    expect(ack.answerIndex).toBeUndefined()
-    expect(ack.explanation).toBeUndefined()
+    expect(test.answer(0)).toBeNull()
   })
 
   it('report throws until the exam is finished', () => {
@@ -151,6 +148,42 @@ describe('exam mode', () => {
   })
 })
 
+describe('option shuffling (no answer-position signal)', () => {
+  function walk(test: ReturnType<typeof createWrittenTest>): WrittenQuestion[] {
+    const seen: WrittenQuestion[] = []
+    while (!test.finished) {
+      seen.push(test.question)
+      test.answer(0)
+      test.next()
+    }
+    return seen
+  }
+
+  it('shuffles options per run but keeps the keyed option text correct', () => {
+    const byId = new Map(QUESTIONS.map((q) => [q.id, q]))
+    const run = walk(createWrittenTest({ mode: 'practice', seed: 5, store: testStore() }))
+    let reordered = 0
+    for (const q of run) {
+      const bankQ = byId.get(q.id)!
+      // same options as the bank (as a set), key still points at the same text
+      expect([...q.options].sort()).toEqual([...bankQ.options].sort())
+      expect(q.options[q.answerIndex]).toBe(bankQ.options[bankQ.answerIndex])
+      if (q.options.join('|') !== bankQ.options.join('|')) {
+        reordered += 1
+      }
+    }
+    // The bank keys 23/32 static questions at index 0; the shuffle must
+    // actually move options, not just be a no-op permutation.
+    expect(reordered).toBeGreaterThan(QUESTIONS.length / 4)
+  })
+
+  it('is deterministic for a given seed', () => {
+    const a = walk(createWrittenTest({ mode: 'practice', seed: 8, store: testStore() }))
+    const b = walk(createWrittenTest({ mode: 'practice', seed: 8, store: testStore() }))
+    expect(a.map((q) => q.options)).toEqual(b.map((q) => q.options))
+  })
+})
+
 describe('controller guards', () => {
   it('rejects answering twice, out-of-range choices, and next() before answering', () => {
     const test = createWrittenTest({ mode: 'practice', seed: 3, store: testStore() })
@@ -197,6 +230,20 @@ describe('renderWrittenTest (jsdom)', () => {
     const report = el.querySelector('.written-report')!
     expect(report.textContent).toMatch(/%/)
     expect(report.textContent).toMatch(/weak|Weak|strong|Strong|all topics/i)
+  })
+
+  it('shows an HSI figure for entry questions and none otherwise', () => {
+    const entryBank = QUESTIONS.filter((q) => q.entry !== undefined)
+    const el = document.createElement('div')
+    renderWrittenTest(el, { mode: 'practice', seed: 1, store: testStore(), bank: entryBank })
+    const figure = el.querySelector<HTMLElement>('.written-figure')!
+    expect(figure.hidden).toBe(false)
+    expect(figure.querySelector('svg.hsi')).not.toBeNull()
+
+    const plainBank = QUESTIONS.filter((q) => q.entry === undefined)
+    const el2 = document.createElement('div')
+    renderWrittenTest(el2, { mode: 'practice', seed: 1, store: testStore(), bank: plainBank })
+    expect(el2.querySelector<HTMLElement>('.written-figure')!.hidden).toBe(true)
   })
 
   it('registers as a screen', () => {

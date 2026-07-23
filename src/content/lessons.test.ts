@@ -1,21 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ankiExportScreen } from '../app/anki-export'
-import { clearanceCopyScreen } from '../modules/clearance-copy'
-import { entryDrillScreen } from '../modules/entry-drill'
-import { oralPrepScreen } from '../modules/oral-prep'
-import { windLabScreen } from '../modules/wind-lab'
-import { writtenTestScreen } from '../modules/written-test'
 import { LESSONS } from './lessons'
-
-/** Route paths actually registered in main.ts (the registry lives there). */
-const REGISTERED_PATHS = [
-  entryDrillScreen,
-  writtenTestScreen,
-  oralPrepScreen,
-  windLabScreen,
-  clearanceCopyScreen,
-  ankiExportScreen,
-].map((s) => s.path)
 
 describe('lesson ordering', () => {
   it('follows the instructional order: why → anatomy → entries → timing/wind → reports', () => {
@@ -57,11 +41,8 @@ describe('lesson shape and sources', () => {
     }
   })
 
-  it('every drill link resolves to a registered screen route', () => {
-    for (const lesson of LESSONS) {
-      expect(REGISTERED_PATHS, `${lesson.id}: ${lesson.drillPath}`).toContain(lesson.drillPath)
-    }
-  })
+  // Drill links are validated against the REAL route registry in
+  // src/main.test.ts — a hand-copied path list here would go stale silently.
 })
 
 describe('required lesson content', () => {

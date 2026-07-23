@@ -157,6 +157,32 @@ describe('entry shapes', () => {
     }
     expect(Math.abs(r.inboundCrossTrackNm)).toBeLessThan(0.05)
   })
+
+  // Left-turn mirrors: the turnSign inversion is exactly the sign-convention
+  // bug class the project rules flag, so both shapes get mirrored coverage.
+
+  it('left-turn teardrop mirrors: bulges west onto the holding side', () => {
+    const g = entryGuidance('teardrop', LEFT_NORTH)
+    const r = flyCircuit(
+      LEFT_NORTH,
+      decisions({ entry: 'teardrop', outboundHeading: g.outboundHeading }),
+      CALM,
+    )
+    expect(r.completed).toBe(true)
+    expect(Math.min(...r.track.map((p) => p.e))).toBeLessThan(-1)
+    // cross-track is signed toward the holding side, so the sign matches
+    // the right-turn case even though the geometry is mirrored
+    expect(r.inboundCrossTrackNm).toBeGreaterThan(0.5)
+  })
+
+  it('left-turn parallel mirrors: flies the east (non-holding) side and returns', () => {
+    const r = flyCircuit(LEFT_NORTH, decisions({ entry: 'parallel' }), CALM)
+    expect(r.completed).toBe(true)
+    for (const p of r.track) {
+      expect(p.e).toBeGreaterThan(-0.01)
+    }
+    expect(Math.abs(r.inboundCrossTrackNm)).toBeLessThan(0.05)
+  })
 })
 
 describe('limits and validation', () => {

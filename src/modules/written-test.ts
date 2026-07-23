@@ -7,6 +7,9 @@
 //              option formats (incl. "Parallel or teardrop"), then a score
 //              report with weak topics
 //
+// Option order is shuffled per run (seeded) — the bank's key positions are
+// skewed toward index 0, and a fixed order would leak the answer.
+//
 // Entry-question keys are engine-generated in the bank itself — this module
 // never re-derives or hand-keys an answer.
 
@@ -14,6 +17,7 @@ import type { Screen } from '../app/router'
 import { store as appStore, type Store } from '../app/store'
 import { mulberry32 } from '../engine/clearance'
 import { QUESTIONS, type Topic, type WrittenQuestion } from '../content/questions'
+import { renderHSI } from '../ui/hsi'
 
 export type TestMode = 'practice' | 'exam'
 
@@ -26,14 +30,14 @@ export const WEAK_TOPIC_THRESHOLD = 0.7
 const DRILL_IDS: Record<TestMode, string> = { practice: 'written', exam: 'written-exam' }
 
 /**
- * Practice mode returns every field; exam mode returns an empty ack so the
- * key, explanation, and citation cannot leak into the UI mid-exam.
+ * Practice-mode feedback. Exam mode gets null instead, so the key,
+ * explanation, and citation cannot leak into the UI mid-exam.
  */
 export interface AnswerFeedback {
-  correct?: boolean
-  answerIndex?: number
-  explanation?: string
-  source?: string
+  correct: boolean
+  answerIndex: number
+  explanation: string
+  source: string
 }
 
 export interface ExamReport {
@@ -59,7 +63,8 @@ export interface WrittenTestController {
   readonly index: number
   readonly finished: boolean
   readonly question: WrittenQuestion
-  answer(choice: number): AnswerFeedback
+  /** Practice: graded feedback. Exam: null (no leak until the report). */
+  answer(choice: number): AnswerFeedback | null
   /** Advances; returns the next question or null when the run is finished. */
   next(): WrittenQuestion | null
   /** Scores a finished run; throws while questions remain. */
@@ -86,13 +91,37 @@ export function selectExamQuestions(
   return pool.slice(0, Math.min(length, pool.length))
 }
 
+/**
+ * Seeded per-run shuffle of a question's options (key position remapped).
+ * The bank keys most static questions at index 0; without this, "always
+ * pick A" would score far above chance in exam mode.
+ */
+function shuffleOptions(q: WrittenQuestion, rng: () => number): WrittenQuestion {
+  const order = q.options.map((_, i) => i)
+  for (let i = order.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1))
+    const tmp = order[i]!
+    order[i] = order[j]!
+    order[j] = tmp
+  }
+  return {
+    ...q,
+    options: order.map((i) => q.options[i]!),
+    answerIndex: order.indexOf(q.answerIndex),
+  }
+}
+
 export function createWrittenTest(options: WrittenTestOptions = {}): WrittenTestController {
   const mode = options.mode ?? 'practice'
   const store = options.store ?? appStore
   const now = options.now ?? (() => Date.now())
   const bank = options.bank ?? QUESTIONS
   const seed = options.seed ?? Math.floor(Math.random() * 2 ** 31)
-  const run = selectExamQuestions(bank, seed, mode === 'exam' ? EXAM_LENGTH : bank.length)
+  // +1 keeps the option stream independent of the selection stream.
+  const optionRng = mulberry32(Math.trunc(seed) + 1)
+  const run = selectExamQuestions(bank, seed, mode === 'exam' ? EXAM_LENGTH : bank.length).map(
+    (q) => shuffleOptions(q, optionRng),
+  )
   const drill = DRILL_IDS[mode]
 
   let index = 0
@@ -123,7 +152,7 @@ export function createWrittenTest(options: WrittenTestOptions = {}): WrittenTest
       return current()
     },
 
-    answer(choice: number): AnswerFeedback {
+    answer(choice: number): AnswerFeedback | null {
       const q = current()
       if (answered) {
         throw new Error('question already answered; call next()')
@@ -148,7 +177,7 @@ export function createWrittenTest(options: WrittenTestOptions = {}): WrittenTest
         })
       }
       if (mode === 'exam') {
-        return {}
+        return null
       }
       return {
         correct,
@@ -222,6 +251,7 @@ export function renderWrittenTest(el: HTMLElement, options: WrittenTestOptions =
       </div>
       <p class="written-progress"></p>
       <p class="written-question"></p>
+      <div class="written-figure" hidden></div>
       <div class="written-options"></div>
       <div class="written-panel" aria-live="polite"></div>
       <button class="written-next" hidden>Next</button>
@@ -230,6 +260,7 @@ export function renderWrittenTest(el: HTMLElement, options: WrittenTestOptions =
 
   const progressEl = el.querySelector<HTMLElement>('.written-progress')!
   const questionEl = el.querySelector<HTMLElement>('.written-question')!
+  const figureEl = el.querySelector<HTMLElement>('.written-figure')!
   const optionsEl = el.querySelector<HTMLElement>('.written-options')!
   const panelEl = el.querySelector<HTMLElement>('.written-panel')!
   const nextBtn = el.querySelector<HTMLButtonElement>('.written-next')!
@@ -238,6 +269,13 @@ export function renderWrittenTest(el: HTMLElement, options: WrittenTestOptions =
     const q = test.question
     progressEl.textContent = `Question ${test.index + 1} of ${test.length}`
     questionEl.textContent = q.question
+    // Entry questions show the cockpit picture (heading-up HSI, course pointer
+    // on the inbound course) — no overlays, so no answer leaks.
+    figureEl.hidden = q.entry === undefined
+    figureEl.innerHTML = ''
+    if (q.entry !== undefined) {
+      renderHSI(figureEl, { heading: q.entry.heading, course: q.entry.inboundCourse })
+    }
     optionsEl.innerHTML = q.options
       .map((o, i) => `<button class="written-option" data-index="${i}">${o}</button>`)
       .join('')
@@ -256,11 +294,11 @@ export function renderWrittenTest(el: HTMLElement, options: WrittenTestOptions =
       btn.disabled = true
     }
     chosenBtn.classList.add('is-chosen')
-    // Exam mode: an empty ack — no verdict, key, or citation until the report.
-    if (fb.correct !== undefined) {
+    // Exam mode: null — no verdict, key, or citation until the report.
+    if (fb !== null) {
       const verdict = fb.correct
         ? 'Correct.'
-        : `Not quite — correct answer: ${test.question.options[fb.answerIndex!]}.`
+        : `Not quite — correct answer: ${test.question.options[fb.answerIndex]}.`
       panelEl.innerHTML = `
         <div class="written-feedback ${fb.correct ? 'is-correct' : 'is-wrong'}">
           <p class="written-verdict">${verdict}</p>

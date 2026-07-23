@@ -86,7 +86,7 @@ export const LESSONS: readonly Lesson[] = [
         source: 'AIM 5-3-8 j8(d) (±5° heading tolerance), j3 (nonstandard mirroring)',
       },
       {
-        text: 'The thumb method visualizes the sectors on the heading indicator. With heading up, set the course pointer to the inbound holding course and lay a thumb just behind the 3 o\'clock point of the rose for a standard hold (9 o\'clock for nonstandard) — its leading edge marks the 70° line. Read where the head of the course pointer sits: in the 180° arc from that line up over the nose, enter direct; behind the line on the thumb side, back to the tail, parallel; in the remaining 70° wedge behind the tail on the far side, teardrop. This is a field technique, not FAA doctrine — the sectors it shows are the AIM\'s.',
+        text: 'The thumb method visualizes the sectors on the heading indicator. With heading up, set the course pointer to the inbound holding course and lay a thumb on the rose just ahead of the 3 o\'clock point for a standard hold (9 o\'clock for nonstandard), covering the 20° between there and the nose side — the thumb\'s leading (nose-side) edge marks the 70° line. Read where the head of the course pointer sits: in the 180° arc from that line up over the nose, enter direct; behind the line on the thumb side, back to the tail, parallel; in the remaining 70° wedge behind the tail on the far side, teardrop. This is a field technique, not FAA doctrine — the sectors it shows are the AIM\'s.',
         source: 'Technique (not an FAA procedure); sector geometry per AIM 5-3-8 j3',
       },
     ],

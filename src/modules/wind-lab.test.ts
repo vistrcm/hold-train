@@ -1,11 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { createStore, type Store } from '../app/store'
 import { angleDiff } from '../engine/geometry'
-import { flyCircuit, textbookDecisions } from '../engine/sim'
+import { HOLD_TAS_KT, flyCircuit, textbookDecisions } from '../engine/sim'
 import { groundSpeeds, inboundCrab, outboundHeading, outboundTimeSeconds } from '../engine/wind'
 import {
   ACS_SOURCE,
-  HOLD_TAS_KT,
   createWindLab,
   generateWindScenario,
   renderWindLab,
@@ -242,6 +241,16 @@ describe('renderWindLab (screen)', () => {
     expect(debrief).toContain('next circuit')
     expect(debrief).toContain('AIM 5-3-8')
     expect(store.loadState().drills['wind-lab']?.attempts).toBe(1)
+  })
+
+  it('blank inputs get the fill-in prompt, not a raw engine error', () => {
+    const { el, store } = setup(5)
+    // leave all three fields empty
+    el.querySelector<HTMLButtonElement>('.lab-fly')!.click()
+    const debrief = el.querySelector('.lab-debrief')!
+    expect(debrief.textContent).toBe('Enter all three numbers before flying.')
+    expect(debrief.classList.contains('is-error')).toBe(true)
+    expect(store.loadState().drills['wind-lab']).toBeUndefined()
   })
 
   it('invalid input shows an error instead of throwing', () => {

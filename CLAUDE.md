@@ -25,5 +25,5 @@ Holding-pattern trainer for the FAA instrument rating. Correctness beats feature
 
 ## Conventions
 - Courses/headings live in [0, 360) inside the engine (360 rejected); display formatting (e.g., 0 shown as 360°) is the UI's job.
-- Screens register in `src/main.ts` (the route registry lives there, not `router.ts`); routes are `#<path>`.
+- Screens register in `src/main.ts` (the route registry lives there, not `router.ts`); routes are `#/<path>` (the home screen links use the leading slash; the router accepts both forms).
 - localStorage schema is versioned (`{ v: 1, ... }` in `src/app/store.ts`); keep it backward compatible.

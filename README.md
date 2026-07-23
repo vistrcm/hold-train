@@ -7,22 +7,22 @@ Browser-based holding-pattern trainer for the FAA instrument rating (C172 around
 - **Entry determination** — direct / teardrop / parallel from a realistic clearance and your current heading on an HSI, per AIM 5-3-8 j3, including the ±5° boundary tolerance (near-boundary headings accept either adjacent entry).
 - **Clearance copying** — radio-style clearances generated in FAA JO 7110.65 4-6-4 phraseology, field-by-field grading, including the standard-turns trap (turn direction omitted ⇒ right turns) and radial-FROM vs bearing-TO.
 - **Wind correction and timing** — triple-drift outbound correction, outbound-timing adjustment, DME/ATD leg endpoints; a decision sim flies your numbers through wind and debriefs the ground track against ACS ±10° standards.
-- **Written-test questions** — 43 original FAA-IRA-style questions (max speeds, timing, reports, lost comm 91.185, chart scenarios from the real KTCY/KLVK procedures), practice and exam-sim modes.
+- **Written-test questions** — 43 original FAA-IRA-style questions (max speeds, timing, reports, lost comm 91.185, chart scenarios from the real KTCY/KLVK procedures), practice and exam-sim modes; entry questions show the heading-up HSI picture, and option order is shuffled per run.
 - **Oral-exam prep** — Q&A covering every FAA-S-ACS-8C Task III.B element, including G1000 hold behavior (SUSP, OBS holds).
-- **Anki export** — a fixed core deck plus a personalized deck built from your misses, as TSV downloads.
+- **Anki export** — a fixed core deck plus a personalized deck built from your entry-drill, written-test, and oral-prep misses, as TSV downloads (clearance-copy and wind-lab misses are tracked in Progress but not yet exported).
 
 ## Module → exam-phase map
 
 | Route | Module | Written | Oral | Flight |
 |---|---|:-:|:-:|:-:|
-| `#learn` | Learn | ✓ | ✓ | |
-| `#entry-drill` | Entry Drill | ✓ | ✓ | ✓ |
-| `#written-test` | Written Test | ✓ | | |
-| `#oral-prep` | Oral Prep | | ✓ | |
-| `#wind-lab` | Wind & Timing Lab | | ✓ | ✓ |
-| `#clearance-copy` | Clearance Copy | | ✓ | ✓ |
-| `#anki` | Anki Export | ✓ | ✓ | |
-| `#dashboard` | Progress | — readiness vs benchmarks across all three — | | |
+| `#/learn` | Learn | ✓ | ✓ | |
+| `#/entry-drill` | Entry Drill | ✓ | ✓ | ✓ |
+| `#/written-test` | Written Test | ✓ | | |
+| `#/oral-prep` | Oral Prep | | ✓ | |
+| `#/wind-lab` | Wind & Timing Lab | | ✓ | ✓ |
+| `#/clearance-copy` | Clearance Copy | | ✓ | ✓ |
+| `#/anki` | Anki Export | ✓ | ✓ | |
+| `#/dashboard` | Progress | — readiness vs benchmarks across all three — | | |
 
 Suggested order: Learn → Entry Drill (learn mode, then timed cockpit mode) → Written Test → Clearance Copy → Wind & Timing Lab → Oral Prep, with the dashboard showing readiness against benchmarks (entry: 18/20 correct under 10 s, 95% under 15 s).
 
@@ -30,17 +30,18 @@ Suggested order: Learn → Entry Drill (learn mode, then timed cockpit mode) →
 
 ```sh
 npm install
-npm run dev      # local dev server
-npm test         # vitest run (419 tests)
-npm run build    # typecheck + production build to dist/
-npm run preview  # serve the production build
+npm run dev        # local dev server
+npm test           # vitest run
+npm run typecheck  # tsc --noEmit only
+npm run build      # typecheck + production build to dist/
+npm run preview    # serve the production build
 ```
 
-Requires Node.js ≥ 20. Phone/tablet friendly down to 320 px.
+Requires Node.js 20.19+ or 22.12+ (Vite 8's engines requirement). Phone/tablet friendly down to 320 px.
 
 ## Anki import
 
-1. Open the **Anki Export** module (`#anki`) and download `hold-train-core.tsv` (fixed deck) and/or `hold-train-misses.tsv` (built from your recorded misses).
+1. Open the **Anki Export** module (`#/anki`) and download `hold-train-core.tsv` (fixed deck) and/or `hold-train-misses.tsv` (built from your recorded entry-drill, written-test, and oral-prep misses).
 2. In Anki: File → Import, pick the TSV. Fields are tab-separated: front, back, tags. Enable "Allow HTML in fields" (newlines are exported as `<br>`).
 3. Tags carry topic + ACS element code, so you can filter (e.g., `IR.III.B.K1`).
 

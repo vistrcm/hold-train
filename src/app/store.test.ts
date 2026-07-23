@@ -243,6 +243,22 @@ describe('benchmarkReport', () => {
     expect(report).toMatchObject({ accuracyMet: false, speedMet: true, met: false })
   })
 
+  it('boundary: a correct answer at exactly 10 s is not under the target', () => {
+    // "under 10 s" is strict — an answer AT the target does not count
+    const report = benchmarkReport(
+      statsFrom(fullWindow((i) => result(true, i < 17 ? 5 : ENTRY_BENCHMARK.targetSeconds))),
+    )
+    expect(report.correctUnderTarget).toBe(17)
+    expect(report.accuracyMet).toBe(false)
+  })
+
+  it('boundary: answers at exactly 15 s are not under the max', () => {
+    const report = benchmarkReport(
+      statsFrom(fullWindow(() => result(true, ENTRY_BENCHMARK.maxSeconds))),
+    )
+    expect(report.speedMet).toBe(false)
+  })
+
   it('a correct answer slower than 10 s does not count toward accuracy', () => {
     const report = benchmarkReport(
       statsFrom(fullWindow((i) => (i < 3 ? result(true, 11) : result(true, 5)))),

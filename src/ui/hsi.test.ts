@@ -91,16 +91,18 @@ describe('course pointer', () => {
 })
 
 describe('thumb overlay (entry shortcut aid)', () => {
-  it('standard hold: 20° band from the 3 o’clock index to the 70° line', () => {
+  it('standard hold: 20° band from the 70° line to the 3 o’clock index', () => {
+    // The direct/parallel boundary (d = −70) appears at course − heading =
+    // +70° on a heading-up card, so the band's nose-side edge must sit there.
     const thumb = render({ heading: 123, thumbOverlay: 'right' }).querySelector('.hsi-thumb')!
-    expect(thumb.getAttribute('data-from')).toBe('90')
-    expect(thumb.getAttribute('data-to')).toBe('110')
+    expect(thumb.getAttribute('data-from')).toBe('70')
+    expect(thumb.getAttribute('data-to')).toBe('90')
   })
 
   it('nonstandard hold: mirrored to the 9 o’clock side', () => {
     const thumb = render({ heading: 123, thumbOverlay: 'left' }).querySelector('.hsi-thumb')!
-    expect(thumb.getAttribute('data-from')).toBe('250')
-    expect(thumb.getAttribute('data-to')).toBe('270')
+    expect(thumb.getAttribute('data-from')).toBe('270')
+    expect(thumb.getAttribute('data-to')).toBe('290')
   })
 
   it('is fixed to the airframe, not the rotating card', () => {

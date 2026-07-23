@@ -37,10 +37,17 @@ function str(x: unknown): string | null {
   return typeof x === 'string' && x.trim() !== '' ? x : null
 }
 
+/** Aviation heading readout: 0 shown as 360 (app-wide display convention). */
+function headingText(heading: number): string {
+  const h = Math.round(heading)
+  return `${h === 0 ? 360 : h}°`
+}
+
 function entryMissCard(drill: string, s: Record<string, unknown>): AnkiCard | null {
   const clearanceText = str(s['clearanceText'])
   const expected = str(s['expected'])
-  if (clearanceText === null || expected === null || !Number.isFinite(s['heading'])) {
+  const heading = s['heading']
+  if (clearanceText === null || expected === null || typeof heading !== 'number' || !Number.isFinite(heading)) {
     return null
   }
   const alternates = Array.isArray(s['alternates']) ? s['alternates'].filter(Boolean) : []
@@ -48,7 +55,7 @@ function entryMissCard(drill: string, s: Record<string, unknown>): AnkiCard | nu
   const chosen = str(s['chosen'])
   const missed = chosen === null ? '' : `\nYou answered: ${chosen}.`
   return {
-    front: `${clearanceText}\nYour heading: ${s['heading']}° — which entry?`,
+    front: `${clearanceText}\nYour heading: ${headingText(heading)} — which entry?`,
     back: `Correct entry: ${expected}${also}.${missed}`,
     source: ENTRY_MISS_SOURCE,
     tags: ['miss', drill],
@@ -79,12 +86,15 @@ function oralMissCard(s: Record<string, unknown>): AnkiCard | null {
   if (question === null || answer === null || source === null) {
     return null
   }
-  const acs = str(s['acs'])
+  // Oral items tag every ACS element they cover (acs is a string array).
+  const acs = Array.isArray(s['acs'])
+    ? s['acs'].filter((x): x is string => typeof x === 'string' && x.trim() !== '')
+    : []
   return {
     front: question,
     back: answer,
     source,
-    tags: acs === null ? ['miss', 'oral'] : ['miss', 'oral', acs],
+    tags: ['miss', 'oral', ...acs],
   }
 }
 

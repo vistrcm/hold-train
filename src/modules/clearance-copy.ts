@@ -389,7 +389,7 @@ function renderCopyMode(pane: HTMLElement, options: CopyDrillOptions): void {
 
   const clearanceEl = pane.querySelector<HTMLElement>('.copy-clearance')!
   const gotitBtn = pane.querySelector<HTMLButtonElement>('.copy-gotit')!
-  const form = pane.querySelector<HTMLElement>('.copy-form')!
+  const form = pane.querySelector<HTMLFormElement>('.copy-form')!
   const errorEl = pane.querySelector<HTMLElement>('.copy-error')!
   const reviewEl = pane.querySelector<HTMLElement>('.copy-review')!
   const nextBtn = pane.querySelector<HTMLButtonElement>('.copy-next')!
@@ -409,6 +409,9 @@ function renderCopyMode(pane: HTMLElement, options: CopyDrillOptions): void {
   }
 
   function showListening(): void {
+    // Fresh scenario, fresh copy: markup defaults back (turn radios unchecked
+    // so the standard-turns trap regrades honestly every time).
+    form.reset()
     clearanceEl.textContent = `“${drill.scenario.clearanceText}”`
     gotitBtn.hidden = false
     form.hidden = true

@@ -168,3 +168,21 @@ geometry; timing-wind: j4, j8(c), j5; reports: 5-3-3 a1(f)/(g), i6 + P/CG + 91.1
 - JO 7110.65 4-6-4 also lists "track, azimuth" among holdable references; the
   pilot-facing content follows the AIM 5-3-8 i list (radial, course, bearing, airway,
   route), which is what a pilot copies.
+
+## Post-completion review fix — 2026-07-22 (code review iteration 1)
+
+- **Fixed: HSI thumb-band placement** (`src/ui/hsi.ts`). The screen-fixed band was
+  drawn at +90°..+110° (mirrored 250°..270°); the direct/parallel boundary — the
+  AIM 70° line, `d = −70` in `entry.ts` — sits at course − heading = **+70°** on a
+  heading-up card, so the band belongs at **+70°..+90°** (mirrored 270°..290°), edge
+  ON the line, exactly as the plan specified (Task 15 note, "+70°..+90°"). As drawn,
+  the aid taught the direct sector as extending to 3 o'clock, misclassifying 20° of
+  parallel headings as direct. Derived from the engine's sector math (the oracle);
+  regression test: "standard hold: 20° band from the 70° line to the 3 o'clock index"
+  and the mirrored case in `src/ui/hsi.test.ts`.
+- **Fixed: thumb-method lesson prose** (`src/content/lessons.ts`, "entries" lesson).
+  "lay a thumb just behind the 3 o'clock point … leading edge marks the 70° line" was
+  internally inconsistent with the geometry above; now reads "just ahead of the
+  3 o'clock point", covering the 20° toward the nose, leading edge on the 70° line.
+  Sector-reading instructions in the paragraph were already correct and unchanged.
+  Covered by the lesson-content tests in `src/content/lessons.test.ts`.

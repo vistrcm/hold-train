@@ -381,6 +381,22 @@ describe('renderClearanceCopy', () => {
     expect(el.querySelector<HTMLElement>('.copy-form')!.hidden).toBe(true)
   })
 
+  it('clears the previous copy from the form when the next scenario starts', () => {
+    renderClearanceCopy(el, { seed: SEED_STATED_COURSE, store: testStore() })
+    const scenario = generateCopyScenario(SEED_STATED_COURSE)
+    el.querySelector<HTMLButtonElement>('.copy-gotit')!.click()
+    fillForm(perfectCopy(scenario.expected))
+    el.querySelector<HTMLButtonElement>('.copy-submit')!.click()
+    el.querySelector<HTMLButtonElement>('.copy-next')!.click()
+
+    // Stale answers must not carry into the new clearance — especially the
+    // turn radios, or the standard-turns trap would grade itself.
+    expect(el.querySelector<HTMLInputElement>('[data-field="fix"]')!.value).toBe('')
+    expect(el.querySelector<HTMLInputElement>('[data-field="degrees"]')!.value).toBe('')
+    expect(el.querySelector<HTMLInputElement>('[data-field="efc"]')!.value).toBe('')
+    expect(el.querySelector<HTMLInputElement>('input[name="turn"]:checked')).toBeNull()
+  })
+
   it('switches to the TO/FROM micro-drill and grades a tap', () => {
     renderClearanceCopy(el, { seed: 5, store: testStore() })
     el.querySelector<HTMLButtonElement>('.copy-mode[data-mode="tofrom"]')!.click()

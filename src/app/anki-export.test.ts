@@ -95,7 +95,8 @@ describe('missesToCards', () => {
       question: 'What is an EFC and why does it matter?',
       answer: 'Expect further clearance time; lost-comm departure time and fuel planning.',
       source: 'P/CG "Expect Further Clearance (Time)"',
-      acs: 'IR.III.B.R1',
+      // The oral bank tags each item with an ACS element ARRAY (oral.ts).
+      acs: ['IR.III.B.R1', 'IR.III.B.K2'],
     },
   }
 
@@ -121,11 +122,40 @@ describe('missesToCards', () => {
     expect(c.tags).toEqual(expect.arrayContaining(['miss', 'written', 'speeds']))
   })
 
-  it('converts an oral miss with its ACS element tag', () => {
+  it('converts an oral miss with every ACS element tag it covers', () => {
     const c = missesToCards([oralMiss])[0]!
     expect(c.front).toBe('What is an EFC and why does it matter?')
     expect(c.back).toContain('Expect further clearance time')
-    expect(c.tags).toEqual(expect.arrayContaining(['miss', 'oral', 'IR.III.B.R1']))
+    expect(c.tags).toEqual(expect.arrayContaining(['miss', 'oral', 'IR.III.B.R1', 'IR.III.B.K2']))
+  })
+
+  it('converts an oral miss recorded by the real oral-prep flow (store round-trip)', () => {
+    // Guards the snapshot contract end-to-end: what oral-prep.ts records is
+    // what missesToCards must read — a fixture drift here masked a real bug.
+    const backing = new Map<string, string>()
+    const store = createStore({
+      storage: {
+        getItem: (k) => backing.get(k) ?? null,
+        setItem: (k, v) => backing.set(k, v),
+      },
+    })
+    store.recordMiss('oral', {
+      itemId: 'oral-x',
+      question: 'Q',
+      answer: 'A',
+      source: 'AIM 5-3-8',
+      acs: ['IR.III.B.K1'],
+    })
+    const c = missesToCards(store.loadState().misses)[0]!
+    expect(c.tags).toContain('IR.III.B.K1')
+  })
+
+  it('shows an entry-miss heading of 0 as 360° per the display convention', () => {
+    const c = missesToCards([
+      { ...entryMiss, scenario: { ...entryMiss.scenario as object, heading: 0 } },
+    ])[0]!
+    expect(c.front).toContain('360°')
+    expect(c.front).not.toContain(' 0°')
   })
 
   it('keeps chronological order across drill types', () => {
@@ -141,6 +171,18 @@ describe('missesToCards', () => {
       { drill: 'written', at: 6, scenario: 'not-a-record' },
     ]
     expect(missesToCards(bad)).toHaveLength(0)
+  })
+
+  it('does not (yet) export clearance-copy, to-from, or wind-lab misses', () => {
+    // Deliberate deferral (plan Task 14): these drills record misses under
+    // ids missesToCards does not convert. Pin it so a future exporter for
+    // them is a conscious change, and so the README wording stays honest.
+    const deferred: Miss[] = [
+      { drill: 'clearance-copy', at: 7, scenario: { clearanceText: 'x' } },
+      { drill: 'to-from', at: 8, scenario: { prompt: 'x', answer: 'N' } },
+      { drill: 'wind-lab', at: 9, scenario: { seed: 1 } },
+    ]
+    expect(missesToCards(deferred)).toHaveLength(0)
   })
 
   it('returns an empty array for no misses', () => {
@@ -189,7 +231,7 @@ describe('anki export screen', () => {
         question: `Q${i}`,
         answer: `A${i}`,
         source: 'AIM 5-3-8',
-        acs: 'IR.III.B.K1',
+        acs: ['IR.III.B.K1'],
       })
     }
     return s

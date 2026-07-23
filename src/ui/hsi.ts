@@ -1,8 +1,8 @@
 // HSI (horizontal situation indicator) approximating a G1000 PFD compass
 // rose: heading-up rotating card, magenta course pointer, fixed lubber line
 // and aircraft symbol. Two optional teaching overlays:
-//   - thumb band: the 20° entry-shortcut aid from the 3 o'clock index to the
-//     70° line (9 o'clock side for nonstandard holds) — fixed to the airframe
+//   - thumb band: the 20° entry-shortcut aid from the 70° line down to the
+//     3 o'clock index (9 o'clock side for nonstandard holds) — airframe-fixed
 //   - sector wedges: AIM 5-3-8 j3 entry sectors, magnetic (rotate with card)
 // Pure rendering: state in, SVG out. No internal state, no listeners.
 
@@ -127,9 +127,12 @@ function coursePointer(course: number): string {
 }
 
 function thumbBand(turnDirection: TurnDirection): string {
-  // 20° from the 3 o'clock index to the 70° line (screen-fixed); mirrored to
-  // the 9 o'clock side for a nonstandard (left-turn) hold.
-  const [from, to] = turnDirection === 'right' ? [90, 110] : [250, 270]
+  // Screen-fixed 20° band whose nose-side edge is the 70° line: on a
+  // heading-up card the direct/parallel boundary (d = −70 in entry.ts) sits
+  // at course − heading = +70°, i.e. 70° right of the nose. The band spans
+  // from there down to the 3 o'clock index; mirrored to the 9 o'clock side
+  // for a nonstandard (left-turn) hold.
+  const [from, to] = turnDirection === 'right' ? [70, 90] : [270, 290]
   return (
     `<path class="hsi-thumb" data-from="${from}" data-to="${to}" ` +
     `d="${bandWedge(from, to, ROSE_R, ROSE_R - 8)}" fill="#e6a23c" fill-opacity="0.9"/>`
