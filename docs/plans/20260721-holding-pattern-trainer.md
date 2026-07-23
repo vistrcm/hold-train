@@ -271,10 +271,11 @@
 - ➕ sources re-fetched 2026-07-22 (AIM current HTML; JO 7110.65BB **Chg 3 eff 7/9/2026**; eCFR as of 7/21/2026; FAA-S-ACS-8C PDF; Garmin guides; FAA Lessons Learned AVA052). 7 fix groups, each with regression tests (415 tests, +12): turn-direction conditional matched to AIM i5/JO 4-6-4 verbatim ("left turns are to be made, the pilot requests, or the controller considers it necessary"); ±5° reframed to j8(d) heading-tolerance wording; bank-limiting card gained the maneuvering-speed-margin exception (j8(b)(4)); 5-minute rule split AIM 5-3-8 e vs JO 4-6-1 b; chart caveat added to chart-klvk-altam-speed; report cards cite only verified 5-3-3 a1(f)/(g); citations tightened to sub-paragraphs (j2/j4/j5/j8(c)/j8(d)/j7/j1/d/e/g/i). Full ledger in docs/content-audit.md.
 
 ### Task 18: Verify acceptance criteria
-- [ ] all implemented-tier requirements from Overview verified (nonstandard mirrors, boundary dual-correct grading, standard-turns trap, TO/FROM, realistic phraseology)
-- [ ] run full test suite: `npm test`
-- [ ] manual smoke test at 320/768/1280 px: implemented modules usable, touch targets adequate
-- [ ] engine test coverage: every exported function has golden + edge tests
+- [x] all implemented-tier requirements from Overview verified (nonstandard mirrors, boundary dual-correct grading, standard-turns trap, TO/FROM, realistic phraseology)
+- [x] run full test suite: `npm test`
+- [x] manual smoke test at 320/768/1280 px: implemented modules usable, touch targets adequate (automated via headless Chromium: all 9 routes × 3 widths — renders, no console errors, no horizontal overflow, buttons ≥44 px)
+- [x] engine test coverage: every exported function has golden + edge tests
+- ➕ requirement→test audit: nonstandard mirroring (entry.test.ts mirror properties), ±5° dual-correct grading (entry.test.ts j8 block + entry-drill "accepts boundary alternates"), standard-turns trap (clearance.test.ts "THE TRAP" + clearance-copy trap surfacing), TO/FROM (holdSide radial-FROM/bearing-TO goldens), phraseology (JO 7110.65BB 4-6-4 golden texts). Coverage audit found one untested export — `mulberry32` (seeds every drill's scenario stream) — added determinism/range/divergence/seed-0 tests (419 total). Smoke test found one real defect: clearance-copy overflowed 58 px at 320 px (number inputs keep ~270 px intrinsic width in flex rows); fixed with `width:100%; min-width:0` on non-radio inputs, re-verified clean.
 
 ### Task 19: [Final] Update documentation
 - [ ] README.md: what it trains, module → exam-phase map, how to run, Anki import, source policy

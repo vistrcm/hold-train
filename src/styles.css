@@ -296,8 +296,12 @@ button {
   min-height: var(--touch);
 }
 
-.copy-form input,
+/* text/number inputs must shrink with the viewport (default size attr
+   gives them ~270px intrinsic width, overflowing 320px screens) */
+.copy-form input:not([type='radio']),
 .copy-form select {
+  width: 100%;
+  min-width: 0;
   min-height: var(--touch);
   font-size: var(--fs-lg);
   padding: 0.4rem 0.8rem;

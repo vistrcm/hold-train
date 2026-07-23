@@ -4,6 +4,7 @@ import {
   clearanceText,
   generateClearance,
   gradeCopiedClearance,
+  mulberry32,
   type ClearanceFields,
   type CopiedClearance,
 } from './clearance'
@@ -326,5 +327,36 @@ describe('gradeCopiedClearance', () => {
   it('treats missing course degrees as incorrect rather than throwing', () => {
     const grade = gradeCopiedClearance({ ...perfectCopy, courseDegrees: undefined }, vorTimed)
     expect(grade.fields.find((f) => f.field === 'holdingCourse')!.correct).toBe(false)
+  })
+})
+
+describe('mulberry32 — seeded PRNG (drill scenario reproducibility)', () => {
+  it('same seed yields the same sequence (drills are replayable)', () => {
+    const a = mulberry32(42)
+    const b = mulberry32(42)
+    for (let i = 0; i < 100; i++) expect(a()).toBe(b())
+  })
+
+  it('every value is in [0, 1)', () => {
+    const rng = mulberry32(7)
+    for (let i = 0; i < 1000; i++) {
+      const v = rng()
+      expect(v).toBeGreaterThanOrEqual(0)
+      expect(v).toBeLessThan(1)
+    }
+  })
+
+  it('different seeds diverge', () => {
+    const a = mulberry32(1)
+    const b = mulberry32(2)
+    const seqA = Array.from({ length: 10 }, () => a())
+    const seqB = Array.from({ length: 10 }, () => b())
+    expect(seqA).not.toEqual(seqB)
+  })
+
+  it('seed 0 still produces a usable non-constant stream', () => {
+    const rng = mulberry32(0)
+    const seq = Array.from({ length: 10 }, () => rng())
+    expect(new Set(seq).size).toBeGreaterThan(1)
   })
 })
