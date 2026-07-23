@@ -192,10 +192,11 @@
 **Files:**
 - Create: `src/engine/wind.ts`, `src/engine/wind.test.ts`
 
-- [ ] write tests first from AIM worked examples: 8° inbound crab → 24° outbound (triple drift); zero wind → 60 s legs; DME endpoints (10+5→15; 28 away +8→20); timing adjustment direction ~1 s/kt
-- [ ] implement `inboundCrab`, `outboundHeading` (triple drift), `outboundTimeSeconds`, DME/ATD endpoint calculator
-- [ ] edge tests: direct crosswind, wind aligned with course, wind ≥ TAS rejected
-- [ ] run tests - must pass before next task
+- [x] write tests first from AIM worked examples: 8° inbound crab → 24° outbound (triple drift); zero wind → 60 s legs; DME endpoints (10+5→15; 28 away +8→20); timing adjustment direction ~1 s/kt
+- [x] implement `inboundCrab`, `outboundHeading` (triple drift), `outboundTimeSeconds`, DME/ATD endpoint calculator
+- [x] edge tests: direct crosswind, wind aligned with course, wind ≥ TAS rejected
+- [x] run tests - must pass before next task
+- ➕ AIM 5-3-8 re-fetched from faa.gov: triple drift (8°→24°) is verbatim in j8 (same recommended-actions list as the ±5° rule), timing in j4, DME/ATD examples in j5. The "~1 s/kt" heuristic is NOT in the AIM — `outboundTimeSeconds` computes exact ground-speed ratios (t_out = target·GSin/GSout); tests confirm ~1.2 s/kt emerges at 90 KTAS. Crab sign convention: positive = right; outbound single-drift correction is the exact negation of inbound crab, so triple drift is one line. Courses follow the engine's [0, 360) convention (360 rejected, HSI handles display).
 
 ### Task 12: Map view SVG component [P1]
 
