@@ -115,7 +115,6 @@ export function determineEntry(heading: number, hold: HoldCourse): EntryResult {
 export function entryGuidance(entry: Entry, hold: HoldCourse): EntryGuidance {
   const outboundCourse = reciprocal(hold.inboundCourse)
   const pattern = hold.turnDirection
-  const opposite: TurnDirection = pattern === 'right' ? 'left' : 'right'
   // Flying the outbound course, the holding side is opposite the pattern's
   // turn direction (right turns off the inbound leg put the racetrack on the
   // outbound leg's left).
@@ -139,11 +138,17 @@ export function entryGuidance(entry: Entry, hold: HoldCourse): EntryGuidance {
         source: GUIDANCE_SOURCE,
       }
     case 'parallel':
+      // AIM 5-3-8 j3(a): parallel outbound on the nonholding side, then "turn in
+      // the direction of the holding pattern through more than 180 degrees".
+      // The initial turn onto the outbound heading opposes the pattern (that is
+      // what puts the aircraft on the nonholding side); the reintercept turn
+      // follows it. Drawing it out confirms the AIM's two clauses agree: from
+      // the outbound heading, only the pattern-direction turn exceeds 180°.
       return {
         entry,
         outboundHeading: outboundCourse,
         side: 'nonholding',
-        turnToInbound: opposite,
+        turnToInbound: pattern,
         source: GUIDANCE_SOURCE,
       }
   }

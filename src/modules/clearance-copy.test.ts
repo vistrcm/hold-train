@@ -235,6 +235,23 @@ describe('generateToFromScenario', () => {
     }
     expect(kinds).toEqual(new Set(['radial', 'bearing']))
   })
+
+  // The 180° radial reciprocates to 0, which the engine stores but no pilot
+  // ever says. A drill about course conventions must not be the place the app
+  // prints "inbound course 0°" — see courseText in src/format.ts.
+  it('speaks a reciprocal of 0 as 360, never as 0', () => {
+    const s = generateToFromScenario(114) // radial 180 → inbound reciprocal 0
+    expect(s.kind).toBe('radial')
+    expect(s.degrees).toBe(180)
+    expect(s.explanation).toContain('inbound course 360°')
+  })
+
+  it('never prints a bare 0° course in any explanation', () => {
+    for (let seed = 0; seed < 500; seed++) {
+      const s = generateToFromScenario(seed)
+      expect(s.explanation, `seed ${seed}`).not.toMatch(/\b0°/)
+    }
+  })
 })
 
 describe('createToFromDrill', () => {

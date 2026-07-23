@@ -43,7 +43,7 @@ export const CORE_DECK: readonly AnkiCard[] = [
   },
   {
     front: 'Parallel entry: which side of the course do you reintercept from?',
-    back: 'Parallel the inbound course outbound on the non-holding side, then turn (through more than 180°) back toward the holding side to reintercept the inbound course or return to the fix.',
+    back: 'Parallel the holding course outbound on the non-holding side for one minute, then turn IN THE DIRECTION OF THE HOLDING PATTERN through more than 180°, and return to the fix or intercept the inbound course. The reintercept turn follows the pattern (right in a standard hold) — only that direction exceeds 180°.',
     source: 'AIM 5-3-8 j3 (entry procedures)',
     tags: ['rote', 'entry', 'IR.III.B.S1'],
   },

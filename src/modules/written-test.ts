@@ -323,6 +323,10 @@ export function renderWrittenTest(el: HTMLElement, options: WrittenTestOptions =
     progressEl.textContent = ''
     questionEl.textContent = ''
     optionsEl.innerHTML = ''
+    // the figure belongs to the question being replaced; only showQuestion
+    // otherwise resets it, so the report would inherit the last question's HSI
+    figureEl.hidden = true
+    figureEl.innerHTML = ''
     nextBtn.hidden = true
     panelEl.innerHTML = `
       <div class="written-report">

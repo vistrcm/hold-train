@@ -242,20 +242,24 @@ describe('entry-path illustration (engine is the oracle)', () => {
     expect(d[8]).toBe(1) // sweep: right turn
   })
 
-  it('parallel: leg on the non-holding side, reintercept turn opposite the pattern', () => {
-    // course 360, right turns → holding side east; parallel leg west of course line
+  it('parallel: leg on the non-holding side, >180° reintercept turn with the pattern', () => {
+    // course 360, right turns → holding side east; parallel leg west of course line.
+    // AIM 5-3-8 j3(a) turns "in the direction of the holding pattern through more
+    // than 180 degrees" — so a right-turn hold reintercepts clockwise, not counter.
     const el = render({ holdSpec: hold(), entryPath: 'parallel' })
     const d = nums(el.querySelector('.map-entry path')!.getAttribute('d'))
     expect(d[2]).toBeLessThan(100) // west = non-holding side
-    expect(d[8]).toBe(0) // sweep: left turn, opposite the right-turn pattern
+    expect(d[7]).toBe(1) // large-arc: more than 180°
+    expect(d[8]).toBe(1) // sweep: right turn, with the right-turn pattern
   })
 
   it('parallel mirrors for a nonstandard hold', () => {
-    // course 360, left turns → holding side west; parallel leg east, right reintercept
+    // course 360, left turns → holding side west; parallel leg east, left reintercept
     const el = render({ holdSpec: hold({ turnDirection: 'left' }), entryPath: 'parallel' })
     const d = nums(el.querySelector('.map-entry path')!.getAttribute('d'))
     expect(d[2]).toBeGreaterThan(100)
-    expect(d[8]).toBe(1)
+    expect(d[7]).toBe(1)
+    expect(d[8]).toBe(0)
   })
 
   it('direct: follows the racetrack turn at the fix', () => {

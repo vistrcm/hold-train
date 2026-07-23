@@ -21,6 +21,7 @@ import {
   type HoldSpec,
 } from '../engine/clearance'
 import { cardinalFromCourse, normalizeDeg, reciprocal, type Cardinal } from '../engine/geometry'
+import { courseText } from '../format'
 
 export type CopyMode = 'copy' | 'tofrom'
 
@@ -178,7 +179,7 @@ export function generateToFromScenario(seed: number): ToFromScenario {
   const explanation =
     kind === 'radial'
       ? `A radial points FROM the station: the hold sits out along the ${degrees}° radial, ` +
-        `${answer} of the station, inbound course ${inbound}°.`
+        `${answer} of the station, inbound course ${courseText(inbound)}.`
       : `A bearing points TO the station: ${degrees}° is the inbound course, so the hold ` +
         `lies on the reciprocal side — ${answer} of the station.`
   return {

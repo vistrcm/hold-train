@@ -244,3 +244,54 @@ geometry; timing-wind: j4, j8(c), j5; reports: 5-3-3 a1(f)/(g), i6 + P/CG + 91.1
   text on the screen while every other module signals correct with `#3fbf6f`. Added
   `--ok` and `--border` to `:root`. Regression test: "defines every custom property
   it references" in `src/styles.test.ts` (catches the whole class, not these two).
+- **Fixed: the parallel entry's reintercept turn was inverted app-wide**
+  (`src/engine/entry.ts`, `src/engine/sim.ts`, `src/ui/mapview.ts`,
+  `src/modules/entry-drill.ts`, `src/content/lessons.ts`, `src/content/oral.ts`,
+  `src/content/anki-deck.ts`). `entryGuidance('parallel')` returned
+  `turnToInbound: opposite`, so a standard right-turn hold was taught as a LEFT
+  reintercept, and the lesson/oral/Anki prose said "turn toward the holding side".
+  AIM 5-3-8 j3(a), fetched from faa.gov: "turn to a heading to parallel the holding
+  course outbound on the nonholding side for one minute, **turn in the direction of
+  the holding pattern through more than 180 degrees**, and return to the holding fix
+  or intercept the holding course inbound." Drawn out (inbound 270, right turns,
+  outbound 090) the aircraft ends south-east of the fix, which bears ~285: a right
+  turn is 195°, a left turn 165° — only the pattern direction can be the AIM's "more
+  than 180 degrees", so both clauses agree. The source of the error was
+  `docs/research-claude.md`, a secondary note whose own sentence was self-
+  contradictory; that line is now corrected in place with the derivation.
+  `sim.ts` needed more than a sign flip — one `turnSign` drove both the turn onto
+  outbound (which genuinely opposes the pattern; that is what puts the aircraft on
+  the nonholding side) and the reintercept, and turning to the inbound heading is
+  exactly 180° either way, rolling out 2R off course and never intercepting. The
+  two signs are now separate and parallel rolls out on a 30° intercept.
+  Regression tests: "parallel: outbound course on the nonholding side, reintercept
+  WITH the pattern" and "every entry reintercepts in the pattern direction" in
+  `src/engine/entry.test.ts`; "parallel: outbound turn opposes the pattern,
+  reintercept turn follows it" and "parallel reintercept sweeps more than 180°" in
+  `src/engine/sim.test.ts`; the large-arc and sweep assertions in
+  `src/ui/mapview.test.ts`.
+- **Fixed: invented hold data was presented as a chart for real local fixes**
+  (`src/engine/clearance.ts`, `src/modules/entry-drill.ts`). `PUBLISHED_HOLDS` used
+  "plausible NorCal names", three of which are real waypoints — CEDES (Livermore),
+  SUNOL, and TRACY, which sits beside KTCY — and `chartNote` rendered the invented
+  course, turns and leg length as `Chart: TRACY — inbound course 120°, left turns,
+  4 NM legs.` The existing guard only required disjointness from the app's own
+  `CHART_HOLDS`, not from real charts. Fixtures renamed to ZORVU/QUIBO/VAXNU
+  (verified to return no waypoint record on opennav.com, the same check that
+  correctly rejects JEMKO), and the line now reads "Practice plate (fictitious
+  fix) — …" so the label holds even if a future name collides. Regression tests:
+  "marks the plate line as a practice plate, never as a real chart" and "no fixture
+  reuses a real NorCal fix name the student might fly" in
+  `src/modules/entry-drill.test.ts`.
+- **Fixed: the TO/FROM drill printed a 0° course** (`src/modules/clearance-copy.ts`).
+  The radial explanation interpolated `${inbound}°` raw instead of `courseText`, so
+  the 180° radial — 73 of the first 5000 seeds — read "inbound course 0°" in the one
+  drill dedicated to course conventions. Regression tests: "speaks a reciprocal of 0
+  as 360, never as 0" and "never prints a bare 0° course in any explanation" in
+  `src/modules/clearance-copy.test.ts`.
+- **Fixed: the exam score report inherited the last question's HSI**
+  (`src/modules/written-test.ts`). `showReport` cleared the progress, question and
+  option elements but not `figureEl`, which only `showQuestion` resets — so
+  finishing on an entry question left a heading rose above the score. Regression
+  test: "clears the HSI figure when the score report replaces the question" in
+  `src/modules/written-test.test.ts`.

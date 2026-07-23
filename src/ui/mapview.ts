@@ -1,7 +1,7 @@
 // Map view: north-up plan view of a holding pattern — racetrack on the
 // holding side, fix marker, ownship, flown ground track vs ghost track, and
 // entry-path illustrations (teardrop 30° offset toward the holding side;
-// parallel on the non-holding side with an opposite-direction reintercept).
+// parallel on the non-holding side with a >180° pattern-direction reintercept).
 // Entry directions come from entryGuidance — the engine is the oracle.
 // Same dark instrument-panel aesthetic as the HSI.
 // Pure rendering: state in, SVG out. No internal state, no listeners.
@@ -169,14 +169,15 @@ function entryPathD(entry: Entry, g: EntryGuidance, hold: MapHold, legNm: number
     )
   }
 
-  // parallel: outbound on the non-holding side, reintercept turning opposite
+  // parallel: outbound on the non-holding side, then a >180° turn in the
+  // pattern's direction back to an intercept (AIM 5-3-8 j3(a))
   const nonHoldingSide = unit(normalizeDeg(c - 90 * s))
   const legEnd = add(add(fix, unit(g.outboundHeading), legNm), nonHoldingSide, PARALLEL_OFFSET_NM)
-  const opposite: 1 | -1 = s === 1 ? -1 : 1
-  const center = turnCenter(legEnd, g.outboundHeading, opposite)
-  // roll out angled 30° back into the inbound course
-  const rollout = pointAtHeading(center, normalizeDeg(c - 30 * s), opposite)
-  const sweep = opposite === 1 ? 1 : 0
+  const center = turnCenter(legEnd, g.outboundHeading, s)
+  // roll out angled 30° into the inbound course, converging from the
+  // non-holding side
+  const rollout = pointAtHeading(center, normalizeDeg(c + 30 * s), s)
+  const sweep = s === 1 ? 1 : 0
   return (
     `M ${pt(fix, scale)} L ${pt(legEnd, scale)} ` +
     `A ${rr} ${rr} 0 1 ${sweep} ${pt(rollout, scale)} L ${pt(fix, scale)}`

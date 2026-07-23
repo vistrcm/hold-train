@@ -96,15 +96,22 @@ export function generateScenario(seed: number): EntryScenario {
   return scenario
 }
 
-/** The plate line a pilot would read for an "as published" clearance. */
+/**
+ * The plate line a pilot would read for an "as published" clearance.
+ *
+ * Labelled as a practice plate on purpose: the course, turns and leg length come
+ * from the invented PUBLISHED_HOLDS fixtures, not from a chart. Presenting them
+ * as charted data would be negative training if a fixture name ever collides
+ * with a real fix — which it has.
+ */
 export function chartNote(holdSpec: HoldSpec): string {
   const leg =
     holdSpec.leg.unit === 'min'
       ? `${holdSpec.leg.value} minute legs`
       : `${holdSpec.leg.value} NM legs`
   return (
-    `Chart: ${holdSpec.fix} — inbound course ${courseText(holdSpec.inboundCourse)}, ` +
-    `${holdSpec.turnDirection} turns, ${leg}.`
+    `Practice plate (fictitious fix) — ${holdSpec.fix}: inbound course ` +
+    `${courseText(holdSpec.inboundCourse)}, ${holdSpec.turnDirection} turns, ${leg}.`
   )
 }
 
@@ -283,7 +290,9 @@ export function renderEntryDrill(el: HTMLElement, options: EntryDrillOptions = {
     feedbackEl.innerHTML = `
       <p class="entry-verdict">${verdict}</p>
       <p class="entry-guidance">Fly it: cross the fix, outbound heading ${courseText(g.outboundHeading)}
-        on the ${g.side} side, then ${g.turnToInbound} turn back to the inbound course.</p>
+        on the ${g.side} side, then ${g.turnToInbound} turn${
+          g.entry === 'parallel' ? ' through more than 180°' : ''
+        } back to the inbound course.</p>
       <p class="entry-timing">${timing}</p>
       <p class="entry-source"><cite>${fb.result.source}</cite></p>
     `

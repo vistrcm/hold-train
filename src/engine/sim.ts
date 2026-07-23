@@ -8,8 +8,9 @@
 // speed changes): the training target is the pilot's numbers, per AIM 5-3-8
 // j8 (drift correction) and j4 (adjust outbound legs for the 1-minute
 // inbound). The circuit starts at the fix heading the inbound course; the
-// entry choice sets the turn directions (parallel turns opposite the
-// pattern), the decisions set everything else. The inbound leg is flown
+// entry choice sets the turn directions (parallel turns onto outbound against
+// the pattern, then reintercepts with it through more than 180° per AIM 5-3-8
+// j3(a)), the decisions set everything else. The inbound leg is flown
 // straight on the rollout heading until crossing the line abeam the fix, so
 // the debrief can report honest timing and cross-track — including a
 // teardrop that does not re-intercept by itself.
@@ -28,6 +29,11 @@ export const TURN_RATE_DEG_PER_S = 3
 export const MAX_SIM_SECONDS = 900
 
 const DT = 0.1 // s per integration step
+// Angle the parallel entry's reintercept turn rolls out on, measured into the
+// inbound course. Any positive angle makes the pattern-direction turn exceed
+// 180° as AIM 5-3-8 j3(a) requires; 30° matches the teardrop offset the same
+// paragraph specifies, so the two entries roll out on the same intercept.
+const PARALLEL_INTERCEPT_DEG = 30
 const SAMPLE_SECONDS = 1 // ground-track sampling interval
 const MAX_OUTBOUND_SECONDS = 600
 const MAX_CRAB_DEG = 45
@@ -128,9 +134,20 @@ export function flyCircuit(
 
   const c = hold.inboundCourse
   const pattern: 1 | -1 = hold.turnDirection === 'right' ? 1 : -1
-  // Parallel maneuvers on the non-holding side: both turns oppose the pattern.
-  const turnSign: 1 | -1 = decisions.entry === 'parallel' ? (pattern === 1 ? -1 : 1) : pattern
-  const rolloutHeading = normalizeDeg(c + decisions.inboundCrab)
+  const isParallel = decisions.entry === 'parallel'
+  // AIM 5-3-8 j3(a). The parallel entry's two turns oppose each other: the turn
+  // onto the outbound heading is made toward the non-holding side (against the
+  // pattern), and the reintercept is "in the direction of the holding pattern
+  // through more than 180 degrees". Direct and teardrop turn with the pattern
+  // throughout.
+  const outboundTurnSign: 1 | -1 = isParallel ? (pattern === 1 ? -1 : 1) : pattern
+  const reinterceptTurnSign: 1 | -1 = pattern
+  // Parallel rolls out on an intercept heading angled back into the course, not
+  // on the inbound heading itself — turning to the inbound heading would be
+  // exactly 180°, which rolls out parallel to the course and never intercepts.
+  const rolloutHeading = normalizeDeg(
+    c + (isParallel ? PARALLEL_INTERCEPT_DEG * pattern : 0) + decisions.inboundCrab,
+  )
 
   // integrator state
   const pos: SimPoint = { e: 0, n: 0 }
@@ -154,11 +171,11 @@ export function flyCircuit(
     }
   }
 
-  function turnTo(target: number): void {
-    let remaining = turnAmount(heading, target, turnSign)
+  function turnTo(target: number, s: 1 | -1): void {
+    let remaining = turnAmount(heading, target, s)
     while (remaining > 1e-9) {
       const dt = Math.min(DT, remaining / TURN_RATE_DEG_PER_S)
-      step(dt, turnSign * TURN_RATE_DEG_PER_S)
+      step(dt, s * TURN_RATE_DEG_PER_S)
       remaining -= TURN_RATE_DEG_PER_S * dt
     }
     heading = target // absorb float rounding from the partial last step
@@ -174,11 +191,12 @@ export function flyCircuit(
   }
 
   // 1: turn from the inbound course heading to the decided outbound heading
-  turnTo(decisions.outboundHeading)
+  turnTo(decisions.outboundHeading, outboundTurnSign)
   // 2: outbound leg
   flyStraight(decisions.outboundSeconds)
-  // 3: turn to the crab-corrected inbound heading
-  turnTo(rolloutHeading)
+  // 3: turn to the crab-corrected inbound heading (parallel: to the intercept
+  // heading, through more than 180°)
+  turnTo(rolloutHeading, reinterceptTurnSign)
 
   // 4: fly straight until crossing the line abeam the fix
   const alongE = Math.sin(c * DEG)

@@ -232,6 +232,25 @@ describe('renderWrittenTest (jsdom)', () => {
     expect(report.textContent).toMatch(/weak|Weak|strong|Strong|all topics/i)
   })
 
+  // showReport clears the question, options and progress; the figure is only
+  // reset by showQuestion, so an entry question as the last item left its HSI
+  // hanging above the score — a heading rose the student can no longer act on.
+  it('clears the HSI figure when the score report replaces the question', () => {
+    const entryBank = QUESTIONS.filter((q) => q.entry !== undefined)
+    const el = document.createElement('div')
+    renderWrittenTest(el, { mode: 'practice', seed: 1, store: testStore(), bank: entryBank })
+    const figure = el.querySelector<HTMLElement>('.written-figure')!
+    expect(figure.hidden).toBe(false) // entry question → rose is up
+
+    // answer through the end of the bank
+    while (el.querySelector('.written-report') === null) {
+      el.querySelector<HTMLButtonElement>('.written-option')!.click()
+      el.querySelector<HTMLButtonElement>('.written-next')!.click()
+    }
+    expect(figure.hidden).toBe(true)
+    expect(figure.querySelector('svg.hsi')).toBeNull()
+  })
+
   it('shows an HSI figure for entry questions and none otherwise', () => {
     const entryBank = QUESTIONS.filter((q) => q.entry !== undefined)
     const el = document.createElement('div')

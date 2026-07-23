@@ -78,7 +78,7 @@ export const LESSONS: readonly Lesson[] = [
     drillLabel: 'Drill entry determination',
     paragraphs: [
       {
-        text: 'Entry sectors are set by a line 70° to the inbound course through the fix. Direct (≈180° sector): cross the fix and turn to the outbound heading. Teardrop (≈70° sector): at the fix turn to a heading 30° off the outbound course toward the holding side, fly about 1 minute, then turn to intercept inbound. Parallel (≈110° sector): parallel the course outbound on the non-holding side for about 1 minute, then turn toward the holding side to reintercept the inbound course.',
+        text: 'Entry sectors are set by a line 70° to the inbound course through the fix. Direct (≈180° sector): cross the fix and turn to the outbound heading. Teardrop (≈70° sector): at the fix turn to a heading 30° off the outbound course toward the holding side, fly about 1 minute, then turn to intercept inbound. Parallel (≈110° sector): parallel the course outbound on the non-holding side for about 1 minute, then turn in the direction of the holding pattern through more than 180° and return to the fix or intercept the inbound course. The parallel reintercept catches people out: it turns the same way the pattern does (right in a standard hold), away from the course at first, because that is the only direction that makes the turn exceed 180°.',
         source: 'AIM 5-3-8 j3 (entry procedures), FIG 5-3-4',
       },
       {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createStore, type Store } from '../app/store'
-import { generateClearance } from '../engine/clearance'
+import { generateClearance, PUBLISHED_HOLDS } from '../engine/clearance'
 import { determineEntry, ENTRIES, type Entry } from '../engine/entry'
 import {
   COCKPIT_TARGET_SECONDS,
@@ -359,6 +359,30 @@ describe('every scenario is answerable from what the pilot is shown', () => {
       } else {
         expect(s.chartNote, `seed ${seed}`).toBeUndefined()
       }
+    }
+  })
+
+  // The plate line is the one place the drill shows course/turn/leg data as if
+  // it came off a chart, but PUBLISHED_HOLDS is invented practice data. Fixture
+  // names have collided with real waypoints before (CEDES, SUNOL and TRACY are
+  // real NorCal fixes, TRACY beside KTCY), so the rendered line must say it is
+  // fictitious — a student must never memorize invented data for a fix they fly.
+  it('marks the plate line as a practice plate, never as a real chart', () => {
+    for (let seed = 0; seed < 500; seed++) {
+      const s = generateScenario(seed)
+      if (s.holdSpec.fixKind === 'charted') {
+        expect(s.chartNote, `seed ${seed}`).toMatch(/practice plate/i)
+        expect(s.chartNote, `seed ${seed}`).toMatch(/fictitious/i)
+      }
+    }
+  })
+
+  it('no fixture reuses a real NorCal fix name the student might fly', () => {
+    // Verified against opennav.com: CEDES (Livermore), SUNOL and TRACY are real
+    // waypoints; the remaining fixture names return no waypoint record.
+    const real = ['CEDES', 'SUNOL', 'TRACY', 'JEMKO']
+    for (const h of PUBLISHED_HOLDS) {
+      expect(real, `fixture ${h.fix}`).not.toContain(h.fix)
     }
   })
 

@@ -185,12 +185,19 @@ export function clearanceText(fields: ClearanceFields): string {
 
 // --- seeded scenario generation ---------------------------------------------
 
-// Practice fixtures only: plausible NorCal names for drilling phraseology.
-// Task 8 introduces holds derived from current FAA dTPP charts; nothing here
-// claims to match a real chart. Names must stay disjoint from CHART_HOLDS in
+// Practice fixtures only: invented names for drilling phraseology. Task 8
+// introduces holds derived from current FAA dTPP charts; nothing here claims to
+// match a real chart. Names must stay disjoint from CHART_HOLDS in
 // src/content/questions.ts — a fixture sharing a charted fix's name would
 // teach invented course and turn data for a hold the student actually flies
 // (see the disjointness test in clearance.test.ts).
+//
+// They must also stay disjoint from REAL waypoints, which is the trap the
+// original "plausible NorCal names" wording walked into: CEDES (Livermore),
+// SUNOL and TRACY are all real fixes, and TRACY sits beside KTCY. Verify a new
+// fixture name returns no waypoint record (opennav.com/waypoint/US/<NAME>)
+// before adding it. The rendered plate line is labelled fictitious regardless —
+// see chartNote in src/modules/entry-drill.ts.
 const VOR_NAMES = ['Manteca', 'Linden', 'Sacramento', 'Modesto', 'Panoche'] as const
 const NDB_NAMES = ['Amber', 'Delta', 'Cooper'] as const
 
@@ -200,9 +207,9 @@ export const PUBLISHED_HOLDS: ReadonlyArray<{
   turnDirection: TurnDirection
   leg: LegSpec
 }> = [
-  { fix: 'CEDES', inboundCourse: 300, turnDirection: 'right', leg: { unit: 'min', value: 1 } },
-  { fix: 'TRACY', inboundCourse: 120, turnDirection: 'left', leg: { unit: 'nm', value: 4 } },
-  { fix: 'SUNOL', inboundCourse: 45, turnDirection: 'right', leg: { unit: 'min', value: 1 } },
+  { fix: 'ZORVU', inboundCourse: 300, turnDirection: 'right', leg: { unit: 'min', value: 1 } },
+  { fix: 'QUIBO', inboundCourse: 120, turnDirection: 'left', leg: { unit: 'nm', value: 4 } },
+  { fix: 'VAXNU', inboundCourse: 45, turnDirection: 'right', leg: { unit: 'min', value: 1 } },
   { fix: 'BRIXO', inboundCourse: 210, turnDirection: 'left', leg: { unit: 'min', value: 1 } },
 ]
 

@@ -200,18 +200,38 @@ describe('entryGuidance', () => {
     expect(g.turnToInbound).toBe('right')
   })
 
-  it('parallel: outbound course on the nonholding side, reintercept opposite the pattern', () => {
+  // AIM 5-3-8 j3(a): "turn to a heading to parallel the holding course outbound
+  // on the nonholding side for one minute, turn IN THE DIRECTION OF THE HOLDING
+  // PATTERN through more than 180 degrees, and return to the holding fix or
+  // intercept the holding course inbound."
+  //
+  // Drawn out (inbound 270, right turns, outbound 090): the aircraft parallels
+  // outbound on the south (nonholding) side, ending south-east of the fix. The
+  // fix then bears roughly 285. A RIGHT turn 090 -> 285 is 195 deg (more than
+  // 180); a LEFT turn is 165 deg (less than 180). Only the pattern direction
+  // satisfies the AIM's "more than 180 degrees", so the two clauses agree.
+  it('parallel: outbound course on the nonholding side, reintercept WITH the pattern', () => {
     const g = entryGuidance('parallel', hold)
     expect(g.outboundHeading).toBe(90)
     expect(g.side).toBe('nonholding')
-    expect(g.turnToInbound).toBe('left')
+    expect(g.turnToInbound).toBe('right')
   })
 
-  it('nonstandard mirrors: teardrop offset flips, parallel reintercept is right', () => {
+  it('nonstandard mirrors: teardrop offset flips, parallel reintercept is left', () => {
     expect(entryGuidance('teardrop', nonStd(270)).outboundHeading).toBe(120)
     expect(entryGuidance('teardrop', nonStd(270)).turnToInbound).toBe('left')
-    expect(entryGuidance('parallel', nonStd(270)).turnToInbound).toBe('right')
+    expect(entryGuidance('parallel', nonStd(270)).turnToInbound).toBe('left')
     expect(entryGuidance('direct', nonStd(270)).turnToInbound).toBe('left')
+  })
+
+  it('every entry reintercepts in the pattern direction (AIM 5-3-8 j3)', () => {
+    for (const inbound of [0, 45, 90, 180, 270, 315]) {
+      for (const h of [std(inbound), nonStd(inbound)]) {
+        for (const e of ENTRIES) {
+          expect(entryGuidance(e, h).turnToInbound).toBe(h.turnDirection)
+        }
+      }
+    }
   })
 
   it('every guidance cites an FAA source', () => {

@@ -149,13 +149,35 @@ describe('entry shapes', () => {
     expect(r.inboundCrossTrackNm).toBeGreaterThan(0.5)
   })
 
-  it('parallel flies the non-holding side with opposite turns and returns', () => {
+  // AIM 5-3-8 j3(a): parallel turns onto the outbound heading toward the
+  // NONholding side, then reintercepts "in the direction of the holding pattern
+  // through more than 180 degrees". The two turns oppose each other — that is
+  // the whole shape of the entry, and why it is the only maneuver the AIM puts
+  // on the nonholding side.
+  it('parallel: outbound turn opposes the pattern, reintercept turn follows it', () => {
     const r = flyCircuit(RIGHT_NORTH, decisions({ entry: 'parallel' }), CALM)
     expect(r.completed).toBe(true)
+    // right-turn hold → holding side east; the whole entry stays west of course
     for (const p of r.track) {
       expect(p.e).toBeLessThan(0.01)
     }
-    expect(Math.abs(r.inboundCrossTrackNm)).toBeLessThan(0.05)
+    // honest physics: the reintercept turn rolls out on an intercept heading,
+    // so the aircraft is still on the nonholding side abeam the fix — it has
+    // not joined the course yet. Cross-track is signed toward the holding side.
+    expect(r.inboundCrossTrackNm).toBeLessThan(-0.5)
+  })
+
+  it('parallel reintercept sweeps more than 180° (the AIM 5-3-8 j3(a) overshoot)', () => {
+    // A pure sign flip would leave an exactly-180° turn, which rolls out
+    // parallel to the course 2R off and never intercepts. Measure the turn by
+    // the track's westward excursion: the >180° loop reaches further from the
+    // course than the 2R the outbound turn alone produces.
+    const r = flyCircuit(RIGHT_NORTH, decisions({ entry: 'parallel' }), CALM)
+    const westmost = Math.min(...r.track.map((p) => p.e))
+    // R ≈ 0.4775 (file header). Outbound turn alone ends 2R west and an
+    // opposite-direction reintercept loops back east, never passing 2R. The
+    // pattern-direction loop centers at 3R and reaches ~4R.
+    expect(westmost).toBeLessThan(-3 * 0.4775)
   })
 
   // Left-turn mirrors: the turnSign inversion is exactly the sign-convention
@@ -175,13 +197,16 @@ describe('entry shapes', () => {
     expect(r.inboundCrossTrackNm).toBeGreaterThan(0.5)
   })
 
-  it('left-turn parallel mirrors: flies the east (non-holding) side and returns', () => {
+  it('left-turn parallel mirrors: flies the east (non-holding) side', () => {
     const r = flyCircuit(LEFT_NORTH, decisions({ entry: 'parallel' }), CALM)
     expect(r.completed).toBe(true)
     for (const p of r.track) {
       expect(p.e).toBeGreaterThan(-0.01)
     }
-    expect(Math.abs(r.inboundCrossTrackNm)).toBeLessThan(0.05)
+    // cross-track is signed toward the holding side, so a nonholding-side
+    // rollout is negative in both the standard and nonstandard case
+    expect(r.inboundCrossTrackNm).toBeLessThan(-0.5)
+    expect(Math.max(...r.track.map((p) => p.e))).toBeGreaterThan(3 * 0.4775)
   })
 })
 
