@@ -205,8 +205,9 @@ function entryExplanation(scenario: EntryScenario, result: EntryResult): string 
   const alt = result.alternates.map((a) => ENTRY_LABELS[a].toLowerCase()).join(' or ')
   return (
     base +
-    ` The heading lies within 5° of the sector boundary, so ${alt} is equally acceptable ` +
-    `(AIM 5-3-8 j8) — written questions key this case as a combined answer.`
+    ` The heading lies within 5° of the sector boundary — AIM 5-3-8 j8(d) treats ±5° in ` +
+    `heading as within good operating limits for determining entry — so ${alt} is equally ` +
+    `acceptable; written questions key this case as a combined answer.`
   )
 }
 
@@ -227,7 +228,7 @@ function buildEntryQuestion(spec: EntrySpec): WrittenQuestion {
 }
 
 const ENTRY_SOURCE = 'AIM 5-3-8 j3, FIG 5-3-4'
-const ENTRY_BOUNDARY_SOURCE = 'AIM 5-3-8 j3, FIG 5-3-4; ±5° per AIM 5-3-8 j8'
+const ENTRY_BOUNDARY_SOURCE = 'AIM 5-3-8 j3, FIG 5-3-4; ±5° per AIM 5-3-8 j8(d)'
 
 const ENTRY_SPECS: readonly EntrySpec[] = [
   {
@@ -350,7 +351,7 @@ const STATIC_QUESTIONS: readonly WrittenQuestion[] = [
     explanation:
       'From the minimum holding altitude through 6,000 ft MSL the maximum holding ' +
       'airspeed is 200 KIAS; 6,001–14,000 ft is 230 KIAS; 14,001 ft and above is 265 KIAS.',
-    source: 'AIM 5-3-8 j (maximum holding airspeeds table)',
+    source: 'AIM 5-3-8 j2 (maximum holding airspeeds table)',
     acs: 'IR.III.B.K1',
   },
   {
@@ -362,7 +363,7 @@ const STATIC_QUESTIONS: readonly WrittenQuestion[] = [
     explanation:
       'The 6,001–14,000 ft MSL band allows a maximum of 230 KIAS. Below it (MHA–6,000) ' +
       'the limit is 200 KIAS; above 14,000 ft it is 265 KIAS.',
-    source: 'AIM 5-3-8 j (maximum holding airspeeds table)',
+    source: 'AIM 5-3-8 j2 (maximum holding airspeeds table)',
     acs: 'IR.III.B.K1',
   },
   {
@@ -372,7 +373,7 @@ const STATIC_QUESTIONS: readonly WrittenQuestion[] = [
     options: ['200 KIAS', '230 KIAS', '265 KIAS'],
     answerIndex: 2,
     explanation: 'At 14,001 ft MSL and above the maximum holding airspeed is 265 KIAS.',
-    source: 'AIM 5-3-8 j (maximum holding airspeeds table)',
+    source: 'AIM 5-3-8 j2 (maximum holding airspeeds table)',
     acs: 'IR.III.B.K1',
   },
   {
@@ -389,7 +390,7 @@ const STATIC_QUESTIONS: readonly WrittenQuestion[] = [
       'A speed restriction is depicted in parentheses inside the pattern, e.g. (175). ' +
       'Slow to at or below it before initially crossing the fix to stay inside protected ' +
       'airspace; notify ATC if unable.',
-    source: 'AIM 5-3-8 j (airspeed restrictions depicted in parenthesis)',
+    source: 'AIM 5-3-8 j2(b) (airspeed restrictions depicted in parenthesis)',
     acs: 'IR.III.B.K1',
   },
   {
@@ -403,7 +404,7 @@ const STATIC_QUESTIONS: readonly WrittenQuestion[] = [
     explanation:
       'Holding patterns from 6,001 to 14,000 ft MSL may be restricted to a maximum of ' +
       '210 KIAS instead of the normal 230 KIAS; the nonstandard pattern is depicted by an icon.',
-    source: 'AIM 5-3-8 j (210 KIAS icon exception)',
+    source: 'AIM 5-3-8 j2(b) (210 KIAS icon exception)',
     acs: 'IR.III.B.K1',
   },
 
@@ -417,7 +418,7 @@ const STATIC_QUESTIONS: readonly WrittenQuestion[] = [
     explanation:
       'The inbound leg is 1 minute at or below 14,000 ft MSL and 1½ minutes above ' +
       '14,000 ft MSL.',
-    source: 'AIM 5-3-8 j (inbound leg timing)',
+    source: 'AIM 5-3-8 j4 (inbound leg timing)',
     acs: 'IR.III.B.K1',
   },
   {
@@ -427,7 +428,7 @@ const STATIC_QUESTIONS: readonly WrittenQuestion[] = [
     options: ['1 minute', '1½ minutes', '2 minutes'],
     answerIndex: 1,
     explanation: 'Above 14,000 ft MSL the inbound leg time is 1½ minutes.',
-    source: 'AIM 5-3-8 j (inbound leg timing)',
+    source: 'AIM 5-3-8 j4 (inbound leg timing)',
     acs: 'IR.III.B.K1',
   },
   {
@@ -444,7 +445,7 @@ const STATIC_QUESTIONS: readonly WrittenQuestion[] = [
       'Outbound timing begins over or abeam the fix, whichever occurs later. If the ' +
       'abeam position cannot be determined, start timing when the turn to outbound is ' +
       'completed.',
-    source: 'AIM 5-3-8 j (outbound timing)',
+    source: 'AIM 5-3-8 j4(b) (outbound timing)',
     acs: 'IR.III.B.K1',
   },
   {
@@ -460,7 +461,7 @@ const STATIC_QUESTIONS: readonly WrittenQuestion[] = [
     explanation:
       'Fly the initial outbound leg for 1 minute (1½ above 14,000 ft), then adjust ' +
       'subsequent outbound times as necessary so the inbound leg comes out on time.',
-    source: 'AIM 5-3-8 j (outbound timing adjustment)',
+    source: 'AIM 5-3-8 j4 (outbound timing adjustment)',
     acs: 'IR.III.B.K1',
   },
   {
@@ -474,7 +475,7 @@ const STATIC_QUESTIONS: readonly WrittenQuestion[] = [
     explanation:
       'DME/ATD holding uses distances instead of time: the end of the outbound leg is ' +
       'determined by the DME readout. Outbound away from the station: 10 + 5 = 15 DME.',
-    source: 'AIM 5-3-8 j (DME/GPS ATD holding), FIG 5-3-6',
+    source: 'AIM 5-3-8 j5 (DME/GPS ATD holding), FIG 5-3-6',
     acs: 'IR.III.B.K1',
   },
   {
@@ -488,7 +489,7 @@ const STATIC_QUESTIONS: readonly WrittenQuestion[] = [
     explanation:
       'Distances are measured from the DME station for both ends of the pattern. ' +
       'Outbound toward the station from a 28 DME fix with 8 NM legs ends at 28 − 8 = 20 DME.',
-    source: 'AIM 5-3-8 j (DME/GPS ATD holding), FIG 5-3-7',
+    source: 'AIM 5-3-8 j5 (DME/GPS ATD holding), FIG 5-3-7',
     acs: 'IR.III.B.K1',
   },
 
@@ -542,7 +543,7 @@ const STATIC_QUESTIONS: readonly WrittenQuestion[] = [
       'When 3 minutes or less from a clearance limit without a clearance beyond the fix, ' +
       'start slowing so you cross the fix, initially, at or below the maximum holding ' +
       'airspeed.',
-    source: 'AIM 5-3-8 (speed reduction approaching a clearance limit)',
+    source: 'AIM 5-3-8 d (speed reduction approaching a clearance limit)',
     acs: 'IR.III.B.K1',
   },
   {
@@ -558,7 +559,7 @@ const STATIC_QUESTIONS: readonly WrittenQuestion[] = [
     explanation:
       'The expect-further-clearance time tells you when to depart the fix under lost ' +
       'communications (14 CFR 91.185(c)(3)) and anchors your fuel/diversion decision.',
-    source: 'AIM 5-3-8 (EFC); JO 7110.65BB 4-6-1; 14 CFR 91.185(c)(3)',
+    source: 'AIM 5-3-8 i6 (EFC element); FAA JO 7110.65BB 4-6-1; 14 CFR 91.185(c)(3)',
     acs: 'IR.III.B.K1',
   },
 
@@ -665,7 +666,7 @@ const STATIC_QUESTIONS: readonly WrittenQuestion[] = [
     explanation:
       'Standard pattern: right turns. Nonstandard pattern: left turns — flown only when ' +
       'the clearance or chart says so.',
-    source: 'AIM 5-3-8 j (descriptive terms)',
+    source: 'AIM 5-3-8 j1 (descriptive terms)',
     acs: 'IR.III.B.K1',
   },
   {
@@ -675,10 +676,10 @@ const STATIC_QUESTIONS: readonly WrittenQuestion[] = [
     options: ['Right turns (standard pattern)', 'Left turns', 'Turns in the direction of the last vector'],
     answerIndex: 0,
     explanation:
-      'Controllers state the turn direction only when left turns are required; silence ' +
-      'means a standard right-turn pattern. This is the classic trap on both the written ' +
-      'and the radio.',
-    source: 'JO 7110.65BB 4-6-4; AIM 5-3-8 j',
+      'Turn direction is stated if left turns are to be made, the pilot requests it, or ' +
+      'the controller considers it necessary — so an omitted direction means a standard ' +
+      'right-turn pattern. This is the classic trap on both the written and the radio.',
+    source: 'FAA JO 7110.65BB 4-6-4; AIM 5-3-8 i5, j1',
     acs: 'IR.III.B.K1',
   },
   {
@@ -694,7 +695,7 @@ const STATIC_QUESTIONS: readonly WrittenQuestion[] = [
     explanation:
       'When holding at a VOR station, begin the turn to the outbound leg at the time of ' +
       'the first complete reversal of the TO/FROM indicator.',
-    source: 'AIM 5-3-8 (holding at a VOR station)',
+    source: 'AIM 5-3-8 g (holding at a VOR station)',
     acs: 'IR.III.B.K1',
   },
   {
@@ -747,7 +748,7 @@ const STATIC_QUESTIONS: readonly WrittenQuestion[] = [
     explanation:
       'The chart depicts “4 NM” legs: the end of the outbound leg is determined by ' +
       'along-track distance, not timing.' + CHART_CAVEAT,
-    source: `${chartHold('HAIRE').source}; AIM 5-3-8 j (DME/GPS ATD holding)`,
+    source: `${chartHold('HAIRE').source}; AIM 5-3-8 j5 (DME/GPS ATD holding)`,
     acs: 'IR.III.B.K1',
   },
   {
@@ -789,8 +790,8 @@ const STATIC_QUESTIONS: readonly WrittenQuestion[] = [
     answerIndex: 1,
     explanation:
       'No special restriction is depicted, so the altitude table applies: at or below ' +
-      '6,000 ft MSL the maximum holding airspeed is 200 KIAS.',
-    source: `AIM 5-3-8 j (maximum holding airspeeds table); ${chartHold('ALTAM').source}`,
+      '6,000 ft MSL the maximum holding airspeed is 200 KIAS.' + CHART_CAVEAT,
+    source: `AIM 5-3-8 j2 (maximum holding airspeeds table); ${chartHold('ALTAM').source}`,
     acs: 'IR.III.B.K1',
   },
   {

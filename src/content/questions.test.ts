@@ -150,3 +150,29 @@ describe('chart-derived holds (KTCY / KLVK, verified current cycle)', () => {
     expect(altam.inboundCourse).toBe(radialToInboundCourse(60))
   })
 })
+
+describe('content-audit regressions (Task 17, verified against FAA sources)', () => {
+  it('every chart-topic question carries the chart-currency caveat', () => {
+    for (const q of QUESTIONS.filter((q) => q.topic === 'chart')) {
+      expect(q.explanation, q.id).toMatch(/procedures amend frequently/)
+    }
+  })
+
+  it('near-boundary explanations state the AIM j8(d) heading-tolerance framing', () => {
+    const boundary = entryQuestions.filter(
+      (q) => determineEntry(q.entry.heading, q.entry).alternates.length > 0,
+    )
+    expect(boundary.length).toBeGreaterThanOrEqual(2)
+    for (const q of boundary) {
+      expect(q.explanation, q.id).toMatch(/good operating limits/)
+      expect(q.explanation, q.id).toContain('j8(d)')
+    }
+  })
+
+  it('omitted-turn-direction explanation states the full JO/AIM conditional, not "only left"', () => {
+    const q = QUESTIONS.find((q) => q.id === 'pattern-omitted-direction')!
+    expect(q.explanation).toMatch(/left turns are to be made/)
+    expect(q.explanation).toMatch(/requests it|considers it necessary/)
+    expect(q.explanation).not.toMatch(/only when left turns/)
+  })
+})

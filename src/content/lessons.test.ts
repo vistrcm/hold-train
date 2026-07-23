@@ -96,4 +96,19 @@ describe('required lesson content', () => {
     expect(text).toMatch(/91\.185/)
     expect(text).toMatch(/time and altitude/i)
   })
+
+  it('anatomy clearance paragraph follows the verbatim AIM 5-3-8 i element list', () => {
+    const text = lessonText('anatomy')
+    expect(text).toMatch(/eight cardinal compass points/)
+    expect(text).toMatch(/left turns are to be made/)
+    expect(text).toMatch(/requests|considers it necessary/)
+    expect(text).not.toMatch(/only when left turns/)
+  })
+
+  it('entries lesson states the ±5° rule in AIM j8(d) heading-tolerance framing', () => {
+    const lesson = LESSONS.find((l) => l.id === 'entries')!
+    const boundary = lesson.paragraphs.find((p) => /±5°|5° of a sector/.test(p.text))!
+    expect(boundary.text).toMatch(/good operating limits/)
+    expect(boundary.source).toContain('j8(d)')
+  })
 })

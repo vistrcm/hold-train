@@ -20,13 +20,13 @@ export const CORE_DECK: readonly AnkiCard[] = [
   {
     front: 'Maximum holding airspeeds by altitude band?',
     back: 'MHA–6,000 ft: 200 KIAS. 6,001–14,000 ft: 230 KIAS. Above 14,000 ft: 265 KIAS. A charted icon may restrict further, e.g. (175).',
-    source: 'AIM 5-3-8 j (maximum holding airspeeds table; icon restrictions)',
+    source: 'AIM 5-3-8 j2 (maximum holding airspeeds table; icon restrictions)',
     tags: ['rote', 'speeds', 'IR.III.B.K1'],
   },
   {
     front: 'Inbound leg timing at and below 14,000 ft MSL — and above?',
     back: '1 minute at or below 14,000 ft MSL; 1½ minutes above 14,000 ft MSL.',
-    source: 'AIM 5-3-8 j (inbound leg timing)',
+    source: 'AIM 5-3-8 j4 (inbound leg timing)',
     tags: ['rote', 'timing', 'IR.III.B.K1'],
   },
   {
@@ -50,31 +50,31 @@ export const CORE_DECK: readonly AnkiCard[] = [
   {
     front: 'Wind correction outbound relative to the inbound crab?',
     back: 'Triple the inbound drift correction outbound (8° inbound crab → 24° opposite outbound). FAA reference answer is triple; many CFIs teach double drift in slow trainers as a field technique.',
-    source: 'AIM 5-3-8 j (wind compensation: triple the inbound drift correction outbound)',
+    source: 'AIM 5-3-8 j8(c) (wind compensation: triple the inbound drift correction outbound)',
     tags: ['rote', 'wind', 'IR.III.B.R4', 'IR.III.B.S5'],
   },
   {
     front: 'Bank angle rules for non-RNAV holding turns?',
     back: '3° per second, or 30° bank, or 25° bank with a flight director — whichever requires the least bank angle.',
-    source: 'AIM 5-3-8 j (bank angle)',
+    source: 'AIM 5-3-8 j8(b) (bank angle)',
     tags: ['rote', 'pattern', 'IR.III.B.K1'],
   },
   {
     front: 'How exact must your heading be at an entry-sector boundary?',
-    back: 'Sector boundaries carry a ±5° tolerance — within 5° of a boundary, either adjacent entry is acceptable.',
-    source: 'AIM 5-3-8 j3 (entry procedures), j8 (±5° tolerance)',
+    back: 'The AIM treats ±5° in heading as within good operating limits for determining entry — within 5° of a boundary, either adjacent entry is acceptable.',
+    source: 'AIM 5-3-8 j8(d) (±5° heading tolerance)',
     tags: ['rote', 'entry', 'IR.III.B.S1'],
   },
   {
     front: 'When do you slow to holding speed?',
     back: 'Start the speed reduction when 3 minutes or less from the holding fix, so you cross the fix initially at or below the maximum holding airspeed.',
-    source: 'AIM 5-3-8 (speed reduction approaching a clearance limit)',
+    source: 'AIM 5-3-8 d (speed reduction approaching a clearance limit)',
     tags: ['rote', 'speeds', 'IR.III.B.S2'],
   },
   {
     front: 'How far in advance does ATC issue holding instructions or a clearance beyond the fix?',
-    back: 'Whenever possible, at least 5 minutes before the aircraft reaches the clearance limit. Nothing received approaching the limit? Ask.',
-    source: 'AIM 5-3-8 (clearance beyond the fix)',
+    back: 'At least 5 minutes before the aircraft reaches the clearance limit — holding instructions when delay is expected; "whenever possible" for a clearance beyond the fix when none is. Nothing received approaching the limit? Ask.',
+    source: 'AIM 5-3-8 e (clearance beyond the fix); FAA JO 7110.65BB 4-6-1 b (holding instructions)',
     tags: ['rote', 'reports', 'IR.III.B.K1'],
   },
   {
@@ -86,38 +86,38 @@ export const CORE_DECK: readonly AnkiCard[] = [
   {
     front: 'Which holding reports are required to ATC?',
     back: 'Report the time and altitude/flight level reaching the holding fix or clearance limit, and report leaving it.',
-    source: 'AIM 5-3-8 (reports at the clearance limit); AIM 5-3-3 a1(f), (g)',
+    source: 'AIM 5-3-3 a1(f), (g)',
     tags: ['rote', 'reports', 'IR.III.B.S7'],
   },
   // ── TRAPS: where the test and real world bite ──────────────────────────
   {
     front: 'Clearance omits the turn direction — which way do you turn?',
-    back: 'Right turns (standard pattern). ATC states the direction only for left (nonstandard) turns; silence means standard.',
-    source: 'FAA JO 7110.65BB 4-6-4; AIM 5-3-8 j',
+    back: 'Right turns (standard pattern). Direction is stated if left turns are to be made, the pilot requests it, or the controller considers it necessary — silence means standard.',
+    source: 'FAA JO 7110.65BB 4-6-4; AIM 5-3-8 i5, j1',
     tags: ['trap', 'pattern', 'IR.III.B.K1'],
   },
   {
     front: 'Holding at exactly 14,000 ft MSL — inbound leg 1 or 1½ minutes?',
     back: '1 minute. The 1½-minute leg applies ABOVE 14,000 ft MSL, not at it.',
-    source: 'AIM 5-3-8 j (inbound leg timing)',
+    source: 'AIM 5-3-8 j4 (inbound leg timing)',
     tags: ['trap', 'timing', 'IR.III.B.K1'],
   },
   {
     front: 'In radar contact — do you still report reaching and leaving the holding fix?',
     back: 'Yes. Reaching/leaving the clearance limit reports are required regardless of radar contact.',
-    source: 'AIM 5-3-8 (reports at the clearance limit); AIM 5-3-3 a1(f), (g)',
+    source: 'AIM 5-3-3 a1(f), (g)',
     tags: ['trap', 'reports', 'IR.III.B.S7'],
   },
   {
     front: 'When does outbound timing start?',
     back: 'Over or abeam the fix, whichever occurs LATER. If the abeam position cannot be determined, start timing when the turn to outbound is completed.',
-    source: 'AIM 5-3-8 j (outbound timing)',
+    source: 'AIM 5-3-8 j4(b) (outbound timing)',
     tags: ['trap', 'timing', 'IR.III.B.S3a'],
   },
   {
     front: 'Inbound leg came out at 45 seconds — what do you adjust?',
     back: 'Adjust the OUTBOUND leg (lengthen it) to make the INBOUND leg come out at the target time. Never chase the inbound leg directly.',
-    source: 'AIM 5-3-8 j (outbound timing adjustment)',
+    source: 'AIM 5-3-8 j4 (outbound timing adjustment)',
     tags: ['trap', 'timing', 'IR.III.B.S5'],
   },
   {
@@ -129,7 +129,7 @@ export const CORE_DECK: readonly AnkiCard[] = [
   {
     front: 'How does an RNAV/GPS system pick your hold entry — and why can it surprise you?',
     back: 'Many systems select the entry from ground track, not heading — strong drift can produce an unexpected entry. RNAV guidance may also execute a fly-by turn starting well before the fix.',
-    source: 'AIM 5-3-8 (RNAV holding considerations)',
+    source: 'AIM 5-3-8 j7 (RNAV holding: ground-track entry, fly-by turns)',
     tags: ['trap', 'entry', 'IR.III.B.S1', 'IR.III.B.S6'],
   },
   // ── SAFETY-CRITICAL ────────────────────────────────────────────────────
@@ -142,7 +142,7 @@ export const CORE_DECK: readonly AnkiCard[] = [
   {
     front: 'Why must you cross the holding fix at or below maximum holding airspeed?',
     back: 'Protected airspace is designed around the maximum holding speeds; crossing faster can take the turn outside protected airspace.',
-    source: 'AIM 5-3-8 (speed reduction approaching a clearance limit); j (maximum holding airspeeds table)',
+    source: 'AIM 5-3-8 d (speed reduction approaching a clearance limit); j2 (maximum holding airspeeds table)',
     tags: ['safety', 'speeds', 'IR.III.B.S2'],
   },
   {
@@ -153,14 +153,14 @@ export const CORE_DECK: readonly AnkiCard[] = [
   },
   {
     front: 'Your flight guidance system limits bank in holding — what is the rule?',
-    back: 'Do not use bank-limiting below 25° unless it is not pilot-selectable or aircraft limitations require it; if bank must stay below 25°, advise ATC that additional holding area is required.',
-    source: 'AIM 5-3-8 j (RNAV bank-angle limiting)',
+    back: 'Do not use bank-limiting below 25° unless it is not pilot-selectable, aircraft limitations require it, or minimum maneuvering speed margins demand it; if bank must stay below 25°, advise ATC that additional area for holding is required.',
+    source: 'AIM 5-3-8 j8(b)(4) (RNAV bank-angle limiting)',
     tags: ['safety', 'pattern', 'IR.III.B.S6'],
   },
   {
     front: 'The GPS keeps flying outbound past the charted leg length — do you wait?',
     back: 'No — be prepared to intervene if the outbound-to-inbound turn does not begin within a reasonable distance of the charted leg, especially when the hold is a course reversal.',
-    source: 'AIM 5-3-8 (RNAV holding considerations)',
+    source: 'AIM 5-3-8 j8(f) (RNAV holding: be prepared to intervene)',
     tags: ['safety', 'pattern', 'IR.III.B.S6'],
   },
   {

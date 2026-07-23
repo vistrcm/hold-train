@@ -263,11 +263,12 @@
 - Modify: `src/content/*.ts` (fixes only)
 - Create: `docs/content-audit.md`
 
-- [ ] cross-check every content string **against the FAA primary sources directly (AIM, ACS, 14 CFR, JO 7110.65) plus reputable internet cross-checks** — numbers, rule statements, phraseology; record each check pass/fixed in `docs/content-audit.md`
-- [ ] verify every entry answer is engine-generated (no hand-keyed entry answers anywhere)
-- [ ] verify caveat-flagged content renders its caveat (triple-vs-double drift, G1000 software-version features, ±5° boundary)
-- [ ] fix discrepancies; add regression tests for each fix
-- [ ] run tests - must pass before task 18
+- [x] cross-check every content string **against the FAA primary sources directly (AIM, ACS, 14 CFR, JO 7110.65) plus reputable internet cross-checks** — numbers, rule statements, phraseology; record each check pass/fixed in `docs/content-audit.md`
+- [x] verify every entry answer is engine-generated (no hand-keyed entry answers anywhere)
+- [x] verify caveat-flagged content renders its caveat (triple-vs-double drift, G1000 software-version features, ±5° boundary)
+- [x] fix discrepancies; add regression tests for each fix
+- [x] run tests - must pass before task 18
+- ➕ sources re-fetched 2026-07-22 (AIM current HTML; JO 7110.65BB **Chg 3 eff 7/9/2026**; eCFR as of 7/21/2026; FAA-S-ACS-8C PDF; Garmin guides; FAA Lessons Learned AVA052). 7 fix groups, each with regression tests (415 tests, +12): turn-direction conditional matched to AIM i5/JO 4-6-4 verbatim ("left turns are to be made, the pilot requests, or the controller considers it necessary"); ±5° reframed to j8(d) heading-tolerance wording; bank-limiting card gained the maneuvering-speed-margin exception (j8(b)(4)); 5-minute rule split AIM 5-3-8 e vs JO 4-6-1 b; chart caveat added to chart-klvk-altam-speed; report cards cite only verified 5-3-3 a1(f)/(g); citations tightened to sub-paragraphs (j2/j4/j5/j8(c)/j8(d)/j7/j1/d/e/g/i). Full ledger in docs/content-audit.md.
 
 ### Task 18: Verify acceptance criteria
 - [ ] all implemented-tier requirements from Overview verified (nonstandard mirrors, boundary dual-correct grading, standard-turns trap, TO/FROM, realistic phraseology)

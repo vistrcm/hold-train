@@ -107,3 +107,30 @@ describe('required content presence', () => {
     }
   })
 })
+
+describe('content-audit regressions (Task 17, verified against FAA sources)', () => {
+  const byId = (id: string) => ORAL_ITEMS.find((i) => i.id === id)!
+
+  it('entries item carries the ±5° boundary caveat in AIM j8(d) framing', () => {
+    const item = byId('entries')
+    expect(item.caveat).toMatch(/±5°|5°/)
+    expect(item.caveat).toMatch(/good operating limits/)
+    expect(item.source).toContain('j8(d)')
+  })
+
+  it('turn-direction items state the full AIM i5 conditional, not "only left"', () => {
+    for (const id of ['clearance-elements', 'standard-vs-nonstandard']) {
+      const item = byId(id)
+      expect(item.answer, id).toMatch(/left turns are to be made/)
+      expect(item.answer, id).toMatch(/requests|considers it necessary/)
+      expect(item.answer, id).not.toMatch(/only when left turns/)
+    }
+  })
+
+  it('clearance elements follow the verbatim AIM 5-3-8 i list', () => {
+    const item = byId('clearance-elements')
+    expect(item.answer).toMatch(/eight cardinal compass points/)
+    expect(item.answer).toMatch(/leg length in miles if DME or RNAV/i)
+    expect(item.answer).toMatch(/EFC/)
+  })
+})

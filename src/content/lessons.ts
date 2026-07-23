@@ -54,19 +54,19 @@ export const LESSONS: readonly Lesson[] = [
     drillLabel: 'Drill copying holding clearances',
     paragraphs: [
       {
-        text: 'The pattern hangs on the holding fix: the inbound leg flies the holding course to the fix, the turns and outbound leg stay on the holding side. Standard holding uses right turns; nonstandard uses left. Controllers state the turn direction only when left turns are required — a clearance with no stated direction means right turns. Assuming left from silence is the classic trap.',
-        source: 'AIM 5-3-8 j; FAA JO 7110.65BB 4-6-4',
+        text: 'The pattern hangs on the holding fix: the inbound leg flies the holding course to the fix, the turns and outbound leg stay on the holding side. Standard holding uses right turns; nonstandard uses left. Turn direction is stated if left turns are to be made, the pilot requests it, or the controller considers it necessary — a clearance with no stated direction means right turns. Assuming left from silence is the classic trap.',
+        source: 'AIM 5-3-8 i5, j1; FAA JO 7110.65BB 4-6-4',
       },
       {
         text: 'Leg length: the inbound leg is 1 minute at or below 14,000 ft MSL and 1½ minutes above 14,000. DME/RNAV holds use distance legs instead — the outbound leg ends when the limit distance is reached.',
-        source: 'AIM 5-3-8 j (inbound leg timing; DME/GPS ATD holding)',
+        source: 'AIM 5-3-8 j4 (inbound leg timing); j5 (DME/GPS ATD holding)',
       },
       {
         text: 'Maximum holding speeds — the protected airspace is sized for them: 200 KIAS at or below 6,000 ft MSL, 230 KIAS from 6,001 through 14,000 ft, 265 KIAS above 14,000 ft. Charted holds may restrict further with an icon like (175). Start slowing when 3 minutes or less from the fix so you cross it at or below holding speed.',
-        source: 'AIM 5-3-8 j (maximum holding airspeeds; speed reduction)',
+        source: 'AIM 5-3-8 j2 (maximum holding airspeeds); d (speed reduction)',
       },
       {
-        text: 'A holding clearance comes in a fixed element order: direction of holding from the fix; the fix; the radial, course, bearing, airway, or route to hold on; leg length in miles if DME or RNAV is used; direction of turns if left turns are required; and the EFC time. For a charted hold ATC may abbreviate to direction and "as published".',
+        text: 'A holding clearance comes in a fixed element order: direction of holding from the fix (one of the eight cardinal compass points); the fix; the radial, course, bearing, airway, or route to hold on; leg length in miles if DME or RNAV is used; direction of turn if left turns are to be made (also stated on pilot request or when the controller considers it necessary); and the EFC time. For a charted hold ATC may abbreviate to direction and "as published".',
         source: 'FAA JO 7110.65BB 4-6-4, 4-6-1; AIM 5-3-8 i',
       },
     ],
@@ -79,11 +79,11 @@ export const LESSONS: readonly Lesson[] = [
     paragraphs: [
       {
         text: 'Entry sectors are set by a line 70° to the inbound course through the fix. Direct (≈180° sector): cross the fix and turn to the outbound heading. Teardrop (≈70° sector): at the fix turn to a heading 30° off the outbound course toward the holding side, fly about 1 minute, then turn to intercept inbound. Parallel (≈110° sector): parallel the course outbound on the non-holding side for about 1 minute, then turn toward the holding side to reintercept the inbound course.',
-        source: 'AIM 5-3-8 j3 (entry procedures)',
+        source: 'AIM 5-3-8 j3 (entry procedures), FIG 5-3-4',
       },
       {
-        text: 'Within ±5° of a sector boundary, either adjacent entry is acceptable — this tolerance is why test answers are sometimes keyed "parallel or teardrop". Nonstandard (left-turn) patterns mirror everything: same sectors, reflected across the holding course.',
-        source: 'AIM 5-3-8 j8 (±5° tolerance), j3 (nonstandard mirroring)',
+        text: 'The AIM treats ±5° in heading as within good operating limits for determining entry, so within 5° of a sector boundary either adjacent entry is acceptable — this tolerance is why test answers are sometimes keyed "parallel or teardrop". Nonstandard (left-turn) patterns mirror everything: same sectors, reflected across the holding course.',
+        source: 'AIM 5-3-8 j8(d) (±5° heading tolerance), j3 (nonstandard mirroring)',
       },
       {
         text: 'The thumb method visualizes the sectors on the heading indicator. With heading up, set the course pointer to the inbound holding course and lay a thumb just behind the 3 o\'clock point of the rose for a standard hold (9 o\'clock for nonstandard) — its leading edge marks the 70° line. Read where the head of the course pointer sits: in the 180° arc from that line up over the nose, enter direct; behind the line on the thumb side, back to the tail, parallel; in the remaining 70° wedge behind the tail on the far side, teardrop. This is a field technique, not FAA doctrine — the sectors it shows are the AIM\'s.',
@@ -103,7 +103,7 @@ export const LESSONS: readonly Lesson[] = [
       },
       {
         text: 'Wind correction: establish the crab that holds the inbound course, then apply roughly triple that inbound drift correction on the outbound leg — the constant-rate turns accumulate drift that the outbound leg must pre-correct. Example: 8° of inbound correction → about 24° outbound, applied opposite. Many CFIs teach double drift in the field; both converge — the AIM (and the written test) answer is triple.',
-        source: 'AIM 5-3-8 j8 (triple the inbound drift correction outbound)',
+        source: 'AIM 5-3-8 j8(c) (triple the inbound drift correction outbound)',
       },
       {
         text: 'DME/ATD legs end on distance, not time. Holding away from the station with the fix at 10 DME and 5 NM legs, the outbound leg ends at 15 DME; holding toward the station with the fix at 28 DME and 8 NM legs, the outbound leg ends at 20 DME.',

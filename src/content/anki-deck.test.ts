@@ -124,4 +124,30 @@ describe('CORE_DECK key facts (verified against FAA sources)', () => {
   it('RNAV entry chosen from ground track, not heading', () => {
     expect(backMatching(/ground track/i)).toBeDefined()
   })
+
+  it('bank-limiter card includes all three AIM j8(b)(4) exceptions', () => {
+    const card = backMatching(/25°[\s\S]*advise ATC/i)
+    expect(card?.back).toMatch(/maneuvering speed/)
+    expect(card?.source).toContain('j8(b)(4)')
+  })
+
+  it('±5° card uses the AIM j8(d) heading-tolerance framing', () => {
+    const card = backMatching(/±5°|5° of a boundary/)
+    expect(card?.back).toMatch(/good operating limits/)
+    expect(card?.source).toContain('j8(d)')
+  })
+
+  it('5-minute advance-notice card cites both AIM 5-3-8 e and JO 7110.65 4-6-1', () => {
+    const card = backMatching(/5 minutes before/)
+    expect(card?.source).toContain('AIM 5-3-8 e')
+    expect(card?.source).toContain('4-6-1')
+  })
+
+  it('holding-report cards cite the verified AIM 5-3-3 a1(f), (g)', () => {
+    const cards = CORE_DECK.filter((c) => /report/i.test(c.front))
+    expect(cards.length).toBeGreaterThanOrEqual(2)
+    for (const card of cards) {
+      expect(card.source, card.front).toContain('AIM 5-3-3 a1(f), (g)')
+    }
+  })
 })

@@ -123,7 +123,7 @@ export const ORAL_ITEMS: readonly OralItem[] = [
     id: 'clearance-elements',
     question: 'What are the elements of a holding clearance, in order?',
     answer:
-      'Direction of holding from the fix (one of the eight cardinal points); the holding fix; the radial, course, bearing, airway, or route on which to hold; leg length in miles if DME or RNAV is used; direction of turns if left turns are required; and the EFC time plus any pertinent additional delay information. For a charted hold, ATC may abbreviate to direction and "as published" — you fly the charted pattern.',
+      'Direction of holding from the fix (one of the eight cardinal compass points); the holding fix; the radial, course, bearing, airway, or route on which to hold; leg length in miles if DME or RNAV is used; direction of turn if left turns are to be made (also stated on pilot request or when the controller considers it necessary); and the EFC time plus any pertinent additional delay information. For a charted hold, ATC may abbreviate to direction and "as published" — you fly the charted pattern.',
     acs: ['IR.III.B.K1'],
     source: 'FAA JO 7110.65BB 4-6-4 (holding instructions), 4-6-1 (as published, EFC); AIM 5-3-8 i',
   },
@@ -132,9 +132,9 @@ export const ORAL_ITEMS: readonly OralItem[] = [
     question:
       'Standard versus nonstandard holding pattern — and what if the controller states no turn direction?',
     answer:
-      'Standard holding uses right turns; nonstandard uses left turns. Controllers state the turn direction only when left turns are required, so a clearance with no turn direction means a standard pattern: make right turns. Assuming left turns from an omitted direction is the classic trap.',
+      'Standard holding uses right turns; nonstandard uses left turns. Turn direction is stated if left turns are to be made, the pilot requests it, or the controller considers it necessary — so a clearance with no turn direction means a standard pattern: make right turns. Assuming left turns from an omitted direction is the classic trap.',
     acs: ['IR.III.B.K1'],
-    source: 'FAA JO 7110.65BB 4-6-4; AIM 5-3-8 j',
+    source: 'FAA JO 7110.65BB 4-6-4; AIM 5-3-8 i5, j1',
   },
   {
     id: 'max-speeds',
@@ -142,7 +142,7 @@ export const ORAL_ITEMS: readonly OralItem[] = [
     answer:
       'At or below 6,000 ft MSL: 200 KIAS. From 6,001 through 14,000 ft: 230 KIAS. Above 14,000 ft: 265 KIAS. The protected airspace around a holding pattern is sized for these speeds — exceeding them risks flying out of protected (obstacle- and traffic-protected) airspace. Charted holds may restrict speed further with a number in a parenthetical icon, e.g. (175); if you cannot comply, notify ATC.',
     acs: ['IR.III.B.K1'],
-    source: 'AIM 5-3-8 j (maximum holding airspeeds table; icon restrictions)',
+    source: 'AIM 5-3-8 j2 (maximum holding airspeeds table; icon restrictions)',
   },
   {
     id: 'slow-to-holding-speed',
@@ -150,7 +150,7 @@ export const ORAL_ITEMS: readonly OralItem[] = [
     answer:
       'Start the speed reduction when 3 minutes or less from the holding fix, so you cross the fix at or below maximum holding speed. In the 172 that means slowing toward ~90 KIAS and setting power for fuel conservation — endurance, not speed, is what matters in a hold.',
     acs: ['IR.III.B.S2'],
-    source: 'AIM 5-3-8 (speed reduction approaching a clearance limit); FAA-S-ACS-8C IR.III.B.S2',
+    source: 'AIM 5-3-8 d (speed reduction approaching a clearance limit); FAA-S-ACS-8C IR.III.B.S2',
   },
   {
     id: 'entries',
@@ -158,9 +158,9 @@ export const ORAL_ITEMS: readonly OralItem[] = [
     answer:
       'Sectors are set by a line 70° to the inbound course through the fix. Direct (≈180° sector): cross the fix and turn to the outbound heading. Teardrop (≈70° sector): at the fix turn to a heading 30° off the outbound course toward the holding side, fly about 1 minute, then turn toward the inbound course. Parallel (≈110° sector): parallel the course outbound on the non-holding side for about 1 minute, then turn toward the holding side to reintercept inbound. The entries are FAA-recommended, derived from the design of the obstacle-protection areas.',
     acs: ['IR.III.B.K1', 'IR.III.B.S1'],
-    source: 'AIM 5-3-8 j3 (entry procedures), j8 (±5° tolerance)',
+    source: 'AIM 5-3-8 j3 (entry procedures), FIG 5-3-4, j8(d) (±5° heading tolerance)',
     caveat:
-      'Within ±5° of a sector boundary, either adjacent entry is acceptable — test answers keyed "parallel or teardrop" come from this tolerance.',
+      'AIM 5-3-8 j8(d) treats ±5° in heading as within good operating limits for determining entry — within 5° of a sector boundary, either adjacent entry is acceptable; test answers keyed "parallel or teardrop" come from this tolerance.',
   },
   {
     id: 'fix-arrival',
@@ -176,7 +176,7 @@ export const ORAL_ITEMS: readonly OralItem[] = [
     answer:
       'The inbound leg is 1 minute at or below 14,000 ft MSL and 1½ minutes above 14,000. DME/RNAV holds use distance legs instead: the outbound leg ends when the limit distance is reached. Published holds may chart specific leg lengths or speed restrictions — comply with them.',
     acs: ['IR.III.B.K1', 'IR.III.B.S3a'],
-    source: 'AIM 5-3-8 j (inbound leg timing; DME/GPS ATD holding)',
+    source: 'AIM 5-3-8 j4 (inbound leg timing); j5 (DME/GPS ATD holding)',
   },
   {
     id: 'outbound-timing',
@@ -184,7 +184,7 @@ export const ORAL_ITEMS: readonly OralItem[] = [
     answer:
       'Start timing outbound over or abeam the fix, whichever occurs later; if the abeam position cannot be determined, start when the turn to outbound is completed. Then adjust the outbound time on later circuits so the inbound leg comes out at 1 minute (1½ above 14,000 ft).',
     acs: ['IR.III.B.K1', 'IR.III.B.S5'],
-    source: 'AIM 5-3-8 j (outbound timing)',
+    source: 'AIM 5-3-8 j4 (outbound timing)',
   },
   {
     id: 'wind-correction',
@@ -192,7 +192,7 @@ export const ORAL_ITEMS: readonly OralItem[] = [
     answer:
       'Compensate for drift on the straight legs: establish the crab that holds the inbound course, then apply roughly triple that inbound drift correction on the outbound leg — the turns are flown at a constant rate, so the outbound leg must pre-correct for the drift accumulated through both turns.',
     acs: ['IR.III.B.R4', 'IR.III.B.S5'],
-    source: 'AIM 5-3-8 j (wind compensation: triple the inbound drift correction outbound)',
+    source: 'AIM 5-3-8 j8(c) (wind compensation: triple the inbound drift correction outbound)',
     caveat:
       'Triple drift is the AIM reference technique (and the written-test answer); many CFIs teach double drift in the field. Both converge — fly what your CFII briefs, answer the AIM on the test.',
   },
@@ -262,7 +262,7 @@ export const ORAL_ITEMS: readonly OralItem[] = [
     acs: ['IR.III.B.S6'],
     source: "Garmin G1000 Pilot's Guide (hold sequencing and SUSP)",
     caveat:
-      'Software-version dependent — verify the behavior on the actual aircraft before relying on it; not an FAA source.',
+      'Software-version dependent — early non-WAAS units guide only the inbound course and prompt the entry as text; verify the behavior on the actual aircraft before relying on it. Not an FAA source.',
   },
   {
     id: 'g1000-obs-hold',
