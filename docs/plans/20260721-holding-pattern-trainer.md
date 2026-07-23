@@ -203,9 +203,10 @@
 **Files:**
 - Create: `src/ui/mapview.ts`, `src/ui/mapview.test.ts`
 
-- [ ] write tests first (jsdom): racetrack on holding side; standard/nonstandard mirror; ownship position/heading; ground-track polyline; entry-path illustration (teardrop 30° offset; parallel on non-holding side, opposite reintercept)
-- [ ] implement `renderMap(el, { holdSpec, ownship?, track?, ghostTrack? })` — north-up, scaled for 1-min legs at ~90 KTAS; same clean instrument-chart aesthetic as the HSI (frontend-design skill)
-- [ ] run tests - must pass before next task
+- [x] write tests first (jsdom): racetrack on holding side; standard/nonstandard mirror; ownship position/heading; ground-track polyline; entry-path illustration (teardrop 30° offset; parallel on non-holding side, opposite reintercept)
+- [x] implement `renderMap(el, { holdSpec, ownship?, track?, ghostTrack? })` — north-up, scaled for 1-min legs at ~90 KTAS; same clean instrument-chart aesthetic as the HSI (frontend-design skill)
+- [x] run tests - must pass before next task
+- ➕ geometry in NM east/north of the fix (fix at origin), single `project()` to the 200×200 viewBox; turn radius 0.48 NM (standard-rate 180° at ~90 kt = 1.5 NM/π), scale adapts so 4-NM DME legs still fit; entry paths consume `entryGuidance` verbatim (engine is the oracle) with per-entry colors matching the HSI sectors; `MapPoint {e, n}` NM offsets are the track interface Task 13's sim will emit; extra `entryPath?: Entry` prop covers the plan's entry-illustration tests
 
 ### Task 13: Wind & Timing Lab — decision sim [P1]
 

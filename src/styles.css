@@ -99,6 +99,14 @@ button {
   margin-inline: auto;
 }
 
+/* Map view: north-up hold plan view; viewBox-only SVG, scales like the HSI */
+.mapview {
+  display: block;
+  width: 100%;
+  max-width: 420px;
+  margin-inline: auto;
+}
+
 /* Entry drill */
 .entry-modes {
   display: flex;
