@@ -31,7 +31,7 @@ export interface SectorArc {
 
 export interface EntryResult {
   primary: Entry
-  /** Entries also acceptable within ±5° of a sector boundary (AIM 5-3-8 j8). */
+  /** Entries also acceptable within ±5° of a sector boundary (AIM 5-3-8 j8(d)). */
   alternates: Entry[]
   sectors: Record<Entry, SectorArc>
   source: string
@@ -48,7 +48,7 @@ export interface EntryGuidance {
   source: string
 }
 
-const SOURCE = 'AIM 5-3-8 j3, FIG 5-3-4; ±5° per AIM 5-3-8 j8'
+const SOURCE = 'AIM 5-3-8 j3, FIG 5-3-4; ±5° per AIM 5-3-8 j8(d)'
 const GUIDANCE_SOURCE = 'AIM 5-3-8 j3'
 
 /** ±5° in heading is within good operating limits for determining entry. */

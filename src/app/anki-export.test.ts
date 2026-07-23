@@ -5,6 +5,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AnkiCard } from '../content/anki-deck'
 import { createStore, type Miss, type Store } from './store'
+import { ENTRIES } from '../engine/entry'
+import { createEntryDrill } from '../modules/entry-drill'
+import { createWrittenTest } from '../modules/written-test'
 import {
   ankiExportScreen,
   downloadTsv,
@@ -127,6 +130,49 @@ describe('missesToCards', () => {
     expect(c.front).toBe('What is an EFC and why does it matter?')
     expect(c.back).toContain('Expect further clearance time')
     expect(c.tags).toEqual(expect.arrayContaining(['miss', 'oral', 'IR.III.B.R1', 'IR.III.B.K2']))
+  })
+
+  it('renders the heading with the app-wide three-digit readout', () => {
+    // The card and the drill must read the same: 040°, not 40°.
+    const c = missesToCards([{ ...entryMiss, scenario: { ...(entryMiss.scenario as object), heading: 40 } }])[0]!
+    expect(c.front).toContain('040°')
+  })
+
+  it('carries the plate line so an "as published" miss stays answerable', () => {
+    // The clearance states neither course nor turn direction; without the
+    // chart line the card cannot be answered away from the drill.
+    const scenario = {
+      ...(entryMiss.scenario as object),
+      clearanceText: 'Hold northeast of CEDES as published, expect further clearance at 0710.',
+      chartNote: 'Chart: CEDES — inbound course 300°, left turns, 1 minute legs.',
+    }
+    const c = missesToCards([{ ...entryMiss, scenario }])[0]!
+    expect(c.front).toContain('left turns')
+    expect(c.front).toContain('300°')
+  })
+
+  it('converts an entry miss recorded by the real entry drill (store round-trip)', () => {
+    // Same contract guard as the oral case below: what entry-drill.ts records
+    // is what missesToCards must read.
+    const store = createStore({ storage: undefined, now: () => 0 })
+    const drill = createEntryDrill({ mode: 'cockpit', seed: 4, store, now: () => 0 })
+    const wrong = ENTRIES.find((e) => e !== drill.scenario.result.primary && !drill.scenario.result.alternates.includes(e))!
+    drill.answer(wrong)
+    const c = missesToCards(store.loadState().misses)[0]!
+    expect(c.front).toContain(drill.scenario.clearanceText)
+    expect(c.front).toContain(drill.scenario.chartNote!)
+    expect(c.back).toContain(drill.scenario.result.primary)
+  })
+
+  it('converts a written miss recorded by the real written test (store round-trip)', () => {
+    const store = createStore({ storage: undefined, now: () => 0 })
+    const test = createWrittenTest({ mode: 'practice', seed: 3, store, now: () => 0 })
+    const q = test.question
+    const wrongIndex = q.answerIndex === 0 ? 1 : 0
+    test.answer(wrongIndex)
+    const c = missesToCards(store.loadState().misses)[0]!
+    expect(c.front).toContain(q.question)
+    expect(c.back).toContain(q.options[q.answerIndex]!)
   })
 
   it('converts an oral miss recorded by the real oral-prep flow (store round-trip)', () => {

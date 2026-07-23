@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import {
   ENTRY_BENCHMARK,
+  MAX_MISSES,
   RECENT_WINDOW,
   type AppState,
   type DrillResult,
@@ -297,5 +298,20 @@ describe('averageTimeSeconds', () => {
   it('is null with no attempts', () => {
     expect(averageTimeSeconds(undefined)).toBeNull()
     expect(averageTimeSeconds(statsFrom([]))).toBeNull()
+  })
+})
+
+describe('miss retention', () => {
+  it(`keeps the newest ${MAX_MISSES} misses so storage cannot grow without bound`, () => {
+    // An overflowing quota fails into the in-memory fallback, which silently
+    // loses every drill stat on the next reload.
+    const store = createStore({ storage: memStorage(), now: () => 0 })
+    for (let i = 0; i < MAX_MISSES + 25; i++) {
+      store.recordMiss('entry', { n: i })
+    }
+    const misses = store.loadState().misses
+    expect(misses).toHaveLength(MAX_MISSES)
+    expect((misses[0]!.scenario as { n: number }).n).toBe(25)
+    expect((misses.at(-1)!.scenario as { n: number }).n).toBe(MAX_MISSES + 24)
   })
 })

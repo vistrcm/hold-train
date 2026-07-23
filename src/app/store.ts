@@ -8,6 +8,9 @@ export const STATE_VERSION = 1
 /** Recent results kept per drill, sized to the entry benchmark window. */
 export const RECENT_WINDOW = 20
 
+/** Newest misses kept for the Anki export; older ones are dropped. */
+export const MAX_MISSES = 200
+
 /**
  * Entry-drill proficiency target: of the last 20 timed answers, 18 correct in
  * under 10 s each, and 95% answered in under 15 s.
@@ -105,7 +108,14 @@ function isAppState(x: unknown): x is AppState {
 }
 
 function defaultStorage(): StateStorage | undefined {
-  return typeof localStorage === 'undefined' ? undefined : localStorage
+  // Reading window.localStorage throws SecurityError when the browser blocks
+  // site data. This runs at module scope (`export const store` below), so an
+  // uncaught throw here would blank the whole app instead of one drill's stats.
+  try {
+    return typeof localStorage === 'undefined' ? undefined : localStorage
+  } catch {
+    return undefined
+  }
 }
 
 export function createStore(options: StoreOptions = {}): Store {
@@ -170,6 +180,9 @@ export function createStore(options: StoreOptions = {}): Store {
   function recordMiss(drill: string, scenario: unknown): AppState {
     const state = loadState()
     state.misses.push({ drill, at: now(), scenario: structuredClone(scenario) })
+    // Bounded so a long study history cannot grow past the storage quota, which
+    // fails silently into the memory fallback and loses every stat on reload.
+    state.misses = state.misses.slice(-MAX_MISSES)
     saveState(state)
     return state
   }

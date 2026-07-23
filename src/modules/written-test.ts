@@ -116,6 +116,10 @@ export function createWrittenTest(options: WrittenTestOptions = {}): WrittenTest
   const store = options.store ?? appStore
   const now = options.now ?? (() => Date.now())
   const bank = options.bank ?? QUESTIONS
+  if (bank.length === 0) {
+    // An empty run finishes immediately and scores 0/0 — NaN percent, no report.
+    throw new RangeError('question bank is empty')
+  }
   const seed = options.seed ?? Math.floor(Math.random() * 2 ** 31)
   // +1 keeps the option stream independent of the selection stream.
   const optionRng = mulberry32(Math.trunc(seed) + 1)

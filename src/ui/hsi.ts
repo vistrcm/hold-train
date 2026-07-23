@@ -8,6 +8,7 @@
 
 import type { Entry, SectorArc, TurnDirection } from '../engine/entry'
 import { normalizeDeg } from '../engine/geometry'
+import { courseText } from '../format'
 
 export interface HSIProps {
   /** Aircraft magnetic heading; the card rotates so it sits under the lubber. */
@@ -64,12 +65,6 @@ function bandWedge(from: number, to: number, outer: number, inner: number): stri
     `M ${ao.x} ${ao.y} A ${outer} ${outer} 0 ${largeArc} 1 ${bo.x} ${bo.y} ` +
     `L ${bi.x} ${bi.y} A ${inner} ${inner} 0 ${largeArc} 0 ${ai.x} ${ai.y} Z`
   )
-}
-
-/** Aviation heading readout: three digits, 0 shown as 360. */
-function headingText(heading: number): string {
-  const h = Math.round(heading) === 0 ? 360 : Math.round(heading)
-  return `${String(h).padStart(3, '0')}°`
 }
 
 function ticks(): string {
@@ -144,7 +139,7 @@ export function renderHSI(el: Element, props: HSIProps): void {
   const course = props.course === undefined ? undefined : normalizeDeg(props.course)
 
   const aria =
-    `Heading ${headingText(heading)}` + (course === undefined ? '' : `, course ${headingText(course)}`)
+    `Heading ${courseText(heading)}` + (course === undefined ? '' : `, course ${courseText(course)}`)
 
   el.innerHTML =
     `<svg class="hsi" viewBox="0 0 200 200" role="img" aria-label="${aria}">` +
@@ -163,6 +158,6 @@ export function renderHSI(el: Element, props: HSIProps): void {
     `stroke="#e8edf2" stroke-width="2" fill="none" stroke-linecap="round"/>` +
     `<rect x="79" y="0" width="42" height="15" rx="2" fill="#0d1115" stroke="#2a323c"/>` +
     `<text class="hsi-heading-readout" x="${C}" y="11.5" text-anchor="middle" fill="#7fd0ff" ` +
-    `font-size="11" font-weight="700" font-family="system-ui, sans-serif">${headingText(heading)}</text>` +
+    `font-size="11" font-weight="700" font-family="system-ui, sans-serif">${courseText(heading)}</text>` +
     `</svg>`
 }

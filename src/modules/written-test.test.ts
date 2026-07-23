@@ -251,3 +251,11 @@ describe('renderWrittenTest (jsdom)', () => {
     expect(writtenTestScreen.title.length).toBeGreaterThan(0)
   })
 })
+
+describe('createWrittenTest input validation', () => {
+  it('rejects an empty bank instead of reporting NaN percent', () => {
+    // An empty run is "finished" at construction, so report() would divide by
+    // zero and hand the dashboard a NaN score.
+    expect(() => createWrittenTest({ bank: [], store: testStore() })).toThrow(RangeError)
+  })
+})

@@ -12,7 +12,8 @@
 
 import type { LegSpec } from '../engine/clearance'
 import { type Entry, type EntryGuidance, type TurnDirection, entryGuidance } from '../engine/entry'
-import { normalizeDeg } from '../engine/geometry'
+import { assertCourse, normalizeDeg } from '../engine/geometry'
+import { courseText } from '../format'
 
 /** Position in NM east/north of the holding fix. */
 export interface MapPoint {
@@ -81,12 +82,6 @@ function pt(p: MapPoint, scale: number): string {
   return `${x} ${y}`
 }
 
-function assertCourse(deg: number): void {
-  if (!Number.isFinite(deg) || deg < 0 || deg >= 360) {
-    throw new RangeError(`inboundCourse must be in [0, 360), got ${deg}`)
-  }
-}
-
 function assertPoint(p: MapPoint, name: string): void {
   if (!Number.isFinite(p.e) || !Number.isFinite(p.n)) {
     throw new RangeError(`${name} must be finite NM offsets, got (${p.e}, ${p.n})`)
@@ -98,12 +93,6 @@ function legLengthNm(leg: LegSpec): number {
     throw new RangeError(`leg value must be positive, got ${leg.value}`)
   }
   return leg.unit === 'min' ? leg.value * NM_PER_MIN : leg.value
-}
-
-/** Aviation course readout: three digits, 0 shown as 360. */
-function courseText(course: number): string {
-  const c = Math.round(course) === 0 ? 360 : Math.round(course)
-  return `${String(c).padStart(3, '0')}°`
 }
 
 // --- layers ------------------------------------------------------------------
@@ -261,7 +250,7 @@ function northArrow(): string {
 
 export function renderMap(el: Element, props: MapProps): void {
   const hold = props.holdSpec
-  assertCourse(hold.inboundCourse)
+  assertCourse(hold.inboundCourse, 'inboundCourse')
   const legNm = legLengthNm(hold.leg)
   // fit leg + turn diameter + entry-turn excursions along the course axis
   const scale = ROOM / (legNm + 3 * TURN_RADIUS_NM)

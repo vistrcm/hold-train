@@ -59,6 +59,24 @@ regression test in the matching `*.test.ts`).
    TO/FROM reversal **g**, clearance elements **i** (EFC = i6). G1000 published-hold
    caveat enriched: early non-WAAS units guide only the inbound course.
 
+8. **"As published" entry-drill scenarios were unanswerable.** A charted clearance
+   states neither inbound course nor turn direction (JO 7110.65 4-6-4 — the pilot reads
+   them off the plate), but the drill keyed the answer from the hidden published turn
+   direction and cockpit mode shows no thumb overlay. Two of the four fixtures are
+   left-turn, so a student applying "silence means right turns" was graded wrong on
+   roughly 5% of items: negative training on a rule that must be reflexive. The drill
+   now prints the plate line (`chartNote`) alongside the clearance, and the miss
+   snapshot and Anki card carry it. Regression tests in `entry-drill.test.ts`
+   ("every scenario is answerable from what the pilot is shown") and `anki-export.test.ts`.
+9. **`HAIRE` practice fixture contradicted the real charted hold.** `PUBLISHED_HOLDS`
+   in `clearance.ts` invented 210°/left/1-min for HAIRE while `CHART_HOLDS` carries the
+   dTPP 2607 values (231°/right/4 NM) for the KTCY RNAV (GPS) RWY 12 missed hold the
+   student actually flies. The fixture is renamed `BRIXO`. Regression test in
+   `clearance.test.ts`: fixture names are disjoint from `CHART_HOLDS`.
+10. **Citation precision gaps left by item 7.** `entry.ts` still rendered
+    `AIM 5-3-8 j8` for the ±5° tolerance (now `j8(d)`) and `wind.ts` rendered
+    `AIM 5-3-8 j8` for triple drift (now `j8(c)`), both user-visible.
+
 ## Verification: every content string, by file
 
 ### src/content/questions.ts
@@ -110,7 +128,7 @@ regression test in the matching `*.test.ts`).
 | automation-intervene | monitor; clearance outranks the box | ACS S6/S8; AIM j8(f) | pass |
 | srm-in-hold | SRM, scan, disorientation risk | ACS S8; AIM 8-1-5 (leans) | pass |
 
-### src/content/anki-deck.ts (24 cards)
+### src/content/anki-deck.ts (25 cards)
 
 All rote/trap/safety card facts re-verified against the same paragraphs as above:
 speeds j2 · timing j4 · sectors j3 + FIG 5-3-4 · teardrop/parallel j3 · triple drift

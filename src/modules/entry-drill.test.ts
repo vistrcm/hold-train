@@ -10,6 +10,10 @@ import {
   gradeEntryAnswer,
   renderEntryDrill,
 } from './entry-drill'
+import { courseText } from '../format'
+
+/** First seed whose generated clearance is a charted "as published" hold. */
+const CHARTED_SEED = 4
 
 /** In-memory store so tests never touch jsdom localStorage. */
 function testStore(): Store {
@@ -305,12 +309,65 @@ describe('renderEntryDrill screen', () => {
     ).toBe('true')
   })
 
+  it('shows the plate line for an "as published" clearance', () => {
+    const { el } = setup('cockpit', CHARTED_SEED)
+    const chart = el.querySelector<HTMLElement>('.entry-chart')!
+    expect(chart.hidden).toBe(false)
+    expect(chart.textContent).toContain(generateScenario(CHARTED_SEED).chartNote!)
+  })
+
+  it('hides the plate line when the clearance states course and turns', () => {
+    const { el } = setup('cockpit', 0)
+    expect(el.querySelector<HTMLElement>('.entry-chart')!.hidden).toBe(true)
+  })
+
   it('shows session and cockpit-benchmark stats', () => {
     const { el } = setup('cockpit')
     answerButton(el, generateScenario(42).result.primary).click()
     const stats = el.querySelector('.entry-stats')!.textContent!
     expect(stats).toContain('1/1')
     expect(stats).toContain('18/20')
+  })
+})
+
+// Regression: an "as published" clearance is legitimately silent on inbound
+// course and turn direction (JO 7110.65 4-6-4) — the pilot reads them off the
+// plate. Cockpit mode shows no thumb overlay, so without the plate line the
+// left-turn charted fixtures graded a correct "silence means right turns"
+// inference as wrong: negative training on the one rule that must be reflexive.
+describe('every scenario is answerable from what the pilot is shown', () => {
+  /** Turn direction a pilot could read off the prompt alone. */
+  function turnDirectionShown(seed: number): 'left' | 'right' {
+    const s = generateScenario(seed)
+    const shown = `${s.clearanceText} ${s.chartNote ?? ''}`
+    return /left turns/.test(shown) ? 'left' : 'right'
+  }
+
+  it('the turn direction the prompt implies is the one the answer key uses', () => {
+    for (let seed = 0; seed < 500; seed++) {
+      const { holdSpec } = generateScenario(seed)
+      expect(turnDirectionShown(seed), `seed ${seed}`).toBe(holdSpec.turnDirection)
+    }
+  })
+
+  it('charted holds carry the plate line; spoken clearances do not need one', () => {
+    for (let seed = 0; seed < 500; seed++) {
+      const s = generateScenario(seed)
+      if (s.holdSpec.fixKind === 'charted') {
+        expect(s.chartNote, `seed ${seed}`).toContain(courseText(s.holdSpec.inboundCourse))
+        expect(s.chartNote, `seed ${seed}`).toContain(`${s.holdSpec.turnDirection} turns`)
+      } else {
+        expect(s.chartNote, `seed ${seed}`).toBeUndefined()
+      }
+    }
+  })
+
+  it('the spoken text still omits course and turns for a charted hold', () => {
+    // The clearance itself must stay faithful to ATC phraseology.
+    const s = generateScenario(CHARTED_SEED)
+    expect(s.clearanceText).toContain('as published')
+    expect(s.clearanceText).not.toContain('left turns')
+    expect(s.clearanceText).not.toContain('radial')
   })
 })
 

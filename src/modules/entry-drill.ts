@@ -25,6 +25,7 @@ import {
   type EntryResult,
 } from '../engine/entry'
 import { renderHSI, type HSIProps } from '../ui/hsi'
+import { courseText } from '../format'
 
 export type DrillMode = 'learn' | 'cockpit'
 
@@ -38,6 +39,12 @@ export interface EntryScenario {
   /** Aircraft heading when the clearance is received. */
   heading: number
   clearanceText: string
+  /**
+   * What the plate says, for "as published" clearances only. ATC omits course
+   * and turn direction there (JO 7110.65 4-6-4) because the pilot reads them
+   * off the chart — without this the entry is not determinable from the prompt.
+   */
+  chartNote?: string
   holdSpec: HoldSpec
   /** Engine answer key: primary entry, boundary alternates, sector arcs. */
   result: EntryResult
@@ -76,13 +83,29 @@ export function generateScenario(seed: number): EntryScenario {
   // of whatever the clearance generator drew.
   const rng = mulberry32(Math.trunc(seed) ^ 0x9e3779b9)
   const heading = Math.floor(rng() * 360)
-  return {
+  const scenario: EntryScenario = {
     seed,
     heading,
     clearanceText: clearance.text,
     holdSpec,
     result: determineEntry(heading, holdSpec),
   }
+  if (holdSpec.fixKind === 'charted') {
+    scenario.chartNote = chartNote(holdSpec)
+  }
+  return scenario
+}
+
+/** The plate line a pilot would read for an "as published" clearance. */
+export function chartNote(holdSpec: HoldSpec): string {
+  const leg =
+    holdSpec.leg.unit === 'min'
+      ? `${holdSpec.leg.value} minute legs`
+      : `${holdSpec.leg.value} NM legs`
+  return (
+    `Chart: ${holdSpec.fix} — inbound course ${courseText(holdSpec.inboundCourse)}, ` +
+    `${holdSpec.turnDirection} turns, ${leg}.`
+  )
 }
 
 /** Correct = the engine's primary entry or any ±5° boundary alternate. */
@@ -130,6 +153,8 @@ export function createEntryDrill(options: EntryDrillOptions = {}): EntryDrillCon
           heading: scenario.heading,
           holdSpec: scenario.holdSpec,
           clearanceText: scenario.clearanceText,
+          // Without the plate line an "as published" card is unanswerable.
+          chartNote: scenario.chartNote,
           chosen,
           expected: scenario.result.primary,
           alternates: scenario.result.alternates,
@@ -168,12 +193,6 @@ const ENTRY_LABELS: Record<Entry, string> = {
   parallel: 'Parallel',
 }
 
-/** Aviation course readout: three digits, 0 shown as 360. */
-function course3(deg: number): string {
-  const d = Math.round(deg) === 0 ? 360 : Math.round(deg)
-  return `${String(d).padStart(3, '0')}°`
-}
-
 export function renderEntryDrill(el: HTMLElement, options: EntryDrillOptions = {}): void {
   const mode = options.mode ?? 'learn'
   const drill = createEntryDrill({ ...options, mode })
@@ -186,6 +205,7 @@ export function renderEntryDrill(el: HTMLElement, options: EntryDrillOptions = {
         <button class="entry-mode" data-mode="cockpit" aria-pressed="${mode === 'cockpit'}">Cockpit · ${COCKPIT_TARGET_SECONDS} s</button>
       </div>
       <p class="entry-clearance"></p>
+      <p class="entry-chart" hidden></p>
       <div class="entry-hsi"></div>
       <div class="entry-answers">
         ${ENTRIES.map(
@@ -199,6 +219,7 @@ export function renderEntryDrill(el: HTMLElement, options: EntryDrillOptions = {
   `
 
   const clearanceEl = el.querySelector<HTMLElement>('.entry-clearance')!
+  const chartEl = el.querySelector<HTMLElement>('.entry-chart')!
   const hsiEl = el.querySelector<HTMLElement>('.entry-hsi')!
   const feedbackEl = el.querySelector<HTMLElement>('.entry-feedback')!
   const nextBtn = el.querySelector<HTMLButtonElement>('.entry-next')!
@@ -229,6 +250,10 @@ export function renderEntryDrill(el: HTMLElement, options: EntryDrillOptions = {
 
   function showScenario(): void {
     clearanceEl.textContent = `“${drill.scenario.clearanceText}”`
+    // "As published" is silent on course and turns; the plate supplies them.
+    const note = drill.scenario.chartNote
+    chartEl.textContent = note ?? ''
+    chartEl.hidden = note === undefined
     drawHSI(false)
     feedbackEl.textContent = ''
     feedbackEl.className = 'entry-feedback'
@@ -257,7 +282,7 @@ export function renderEntryDrill(el: HTMLElement, options: EntryDrillOptions = {
     feedbackEl.className = `entry-feedback ${fb.correct ? 'is-correct' : 'is-wrong'}`
     feedbackEl.innerHTML = `
       <p class="entry-verdict">${verdict}</p>
-      <p class="entry-guidance">Fly it: cross the fix, outbound heading ${course3(g.outboundHeading)}
+      <p class="entry-guidance">Fly it: cross the fix, outbound heading ${courseText(g.outboundHeading)}
         on the ${g.side} side, then ${g.turnToInbound} turn back to the inbound course.</p>
       <p class="entry-timing">${timing}</p>
       <p class="entry-source"><cite>${fb.result.source}</cite></p>

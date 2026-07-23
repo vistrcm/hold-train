@@ -52,6 +52,38 @@ describe('entry questions: the engine is the oracle', () => {
     expect(entryQuestions.length).toBeGreaterThanOrEqual(8)
   })
 
+  // The check above compares determineEntry against itself — it proves the bank
+  // is machine-keyed but cannot catch a wrong scenario. These expectations were
+  // hand-derived by drawing, using the same sector rule as the engine goldens
+  // (d = signed diff from inbound course to heading, right positive; direct
+  // -70 < d < 110, teardrop 110 <= d <= 180, parallel -180 < d <= -70;
+  // nonstandard mirrors about the holding course) — AIM 5-3-8 j3, FIG 5-3-4.
+  const GOLDEN: ReadonlyArray<{ id: string; answer: string; d: string }> = [
+    { id: 'entry-ktcy-haire', answer: 'Teardrop', d: 'C=231 H=040 -> d=+169' },
+    { id: 'entry-klvk-uhhut', answer: 'Parallel', d: 'C=255 H=120 -> d=-135' },
+    { id: 'entry-ktcy-oyoso', answer: 'Direct', d: 'C=116 H=155 left -> mirrored d=-39' },
+    { id: 'entry-klvk-altam', answer: 'Teardrop or parallel', d: 'C=240 H=060 -> d=180 exactly' },
+  ]
+
+  it('chart scenarios match answers derived by hand from FIG 5-3-4', () => {
+    for (const g of GOLDEN) {
+      const q = entryQuestions.find((x) => x.id === g.id)
+      expect(q, g.id).toBeDefined()
+      expect(q!.options[q!.answerIndex], `${g.id} (${g.d})`).toBe(g.answer)
+    }
+  })
+
+  it('the question text states the same course and turns used to key it', () => {
+    // Prose and scenario drift apart silently: the engine would still key the
+    // scenario correctly while the student reads different numbers.
+    for (const g of GOLDEN) {
+      const q = entryQuestions.find((x) => x.id === g.id)!
+      expect(q.question, g.id).toContain(String(q.entry.inboundCourse).padStart(3, '0'))
+      expect(q.question, g.id).toContain(String(q.entry.heading).padStart(3, '0'))
+      expect(q.question.toLowerCase(), g.id).toContain(`${q.entry.turnDirection} turns`)
+    }
+  })
+
   it('keyed answer always equals the determineEntry output for the embedded scenario', () => {
     for (const q of entryQuestions) {
       const result = determineEntry(q.entry.heading, q.entry)

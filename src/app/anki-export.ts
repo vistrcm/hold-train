@@ -7,6 +7,7 @@
 import { CORE_DECK, type AnkiCard } from '../content/anki-deck'
 import type { Screen } from './router'
 import { store as appStore, type Miss, type Store } from './store'
+import { courseText } from '../format'
 
 export const CORE_FILENAME = 'hold-train-core.tsv'
 export const MISSES_FILENAME = 'hold-train-misses.tsv'
@@ -37,12 +38,6 @@ function str(x: unknown): string | null {
   return typeof x === 'string' && x.trim() !== '' ? x : null
 }
 
-/** Aviation heading readout: 0 shown as 360 (app-wide display convention). */
-function headingText(heading: number): string {
-  const h = Math.round(heading)
-  return `${h === 0 ? 360 : h}°`
-}
-
 function entryMissCard(drill: string, s: Record<string, unknown>): AnkiCard | null {
   const clearanceText = str(s['clearanceText'])
   const expected = str(s['expected'])
@@ -54,8 +49,12 @@ function entryMissCard(drill: string, s: Record<string, unknown>): AnkiCard | nu
   const also = alternates.length > 0 ? ` (also acceptable: ${alternates.join(', ')})` : ''
   const chosen = str(s['chosen'])
   const missed = chosen === null ? '' : `\nYou answered: ${chosen}.`
+  // "As published" clearances state neither course nor turns — the snapshot's
+  // plate line is what makes the card answerable away from the drill.
+  const chart = str(s['chartNote'])
+  const chartLine = chart === null ? '' : `\n${chart}`
   return {
-    front: `${clearanceText}\nYour heading: ${headingText(heading)} — which entry?`,
+    front: `${clearanceText}${chartLine}\nYour heading: ${courseText(heading)} — which entry?`,
     back: `Correct entry: ${expected}${also}.${missed}`,
     source: ENTRY_MISS_SOURCE,
     tags: ['miss', drill],

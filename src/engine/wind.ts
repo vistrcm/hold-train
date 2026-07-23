@@ -21,7 +21,7 @@ export interface Wind {
 }
 
 export const WIND_SOURCE =
-  'AIM 5-3-8 j8 (drift correction; triple the inbound correction outbound)'
+  'AIM 5-3-8 j8(c) (drift correction; triple the inbound correction outbound)'
 export const TIMING_SOURCE =
   'AIM 5-3-8 j4 (1-minute inbound at/below 14,000 ft MSL; adjust outbound to achieve it)'
 export const DME_SOURCE = 'AIM 5-3-8 j5 (end of outbound leg by DME/ATD readout)'
@@ -63,7 +63,7 @@ export function inboundCrab(inboundCourse: number, wind: Wind, tasKt: number): n
 /**
  * Outbound heading using the AIM triple-drift technique: the single-drift
  * outbound correction is the exact negation of the inbound crab (same wind,
- * reciprocal course), tripled per AIM 5-3-8 j8.
+ * reciprocal course), tripled per AIM 5-3-8 j8(c).
  */
 export function outboundHeading(inboundCourse: number, wind: Wind, tasKt: number): number {
   const crab = inboundCrab(inboundCourse, wind, tasKt)

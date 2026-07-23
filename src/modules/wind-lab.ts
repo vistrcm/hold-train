@@ -28,6 +28,7 @@ import {
 } from '../engine/sim'
 import { TIMING_SOURCE, WIND_SOURCE, groundSpeeds, type Wind } from '../engine/wind'
 import { renderMap } from '../ui/mapview'
+import { courseText } from '../format'
 
 
 export const ACS_SOURCE = 'FAA-S-ACS-8C Task III.B (maintain selected headings ±10°)'
@@ -225,12 +226,6 @@ export function createWindLab(options: WindLabOptions = {}): WindLabController {
 
 // --- screen -----------------------------------------------------------------
 
-/** Aviation course readout: three digits, 0 shown as 360. */
-function course3(deg: number): string {
-  const d = Math.round(deg) === 0 ? 360 : Math.round(deg)
-  return `${String(d).padStart(3, '0')}°`
-}
-
 function crabText(crab: number): string {
   const rounded = Math.round(crab * 10) / 10
   if (rounded === 0) {
@@ -276,9 +271,9 @@ export function renderWindLab(el: HTMLElement, options: WindLabOptions = {}): vo
   function showScenario(): void {
     const { hold, wind } = lab.scenario
     scenarioEl.textContent =
-      `Hold at ${hold.fix}: inbound course ${course3(hold.inboundCourse)}, ` +
+      `Hold at ${hold.fix}: inbound course ${courseText(hold.inboundCourse)}, ` +
       `${hold.turnDirection} turns, 1-minute legs. ` +
-      `Wind ${course3(wind.directionFrom)} at ${wind.speedKt} kt, TAS ${HOLD_TAS_KT} kt.`
+      `Wind ${courseText(wind.directionFrom)} at ${wind.speedKt} kt, TAS ${HOLD_TAS_KT} kt.`
     renderMap(mapEl, { holdSpec: lab.scenario.hold })
     debriefEl.textContent = ''
     debriefEl.className = 'lab-debrief'
@@ -309,8 +304,8 @@ export function renderWindLab(el: HTMLElement, options: WindLabOptions = {}): vo
     debriefEl.innerHTML = `
       <p class="lab-verdict">${verdict}</p>
       <ul class="lab-rows">
-        <li>Outbound heading: yours ${course3(d.numbers.outboundHeading)}, textbook
-          ${course3(d.target.outboundHeading)} (Δ ${Math.round(Math.abs(d.headingErrorDeg))}°,
+        <li>Outbound heading: yours ${courseText(d.numbers.outboundHeading)}, textbook
+          ${courseText(d.target.outboundHeading)} (Δ ${Math.round(Math.abs(d.headingErrorDeg))}°,
           triple drift — <cite>${d.sources.wind}</cite>; tolerance <cite>${d.sources.acs}</cite>)</li>
         <li>Inbound crab: yours ${crabText(d.numbers.crab)}, computed ${crabText(d.target.crab)}</li>
         <li>Outbound time: yours ${Math.round(d.numbers.outboundSeconds)} s, rule

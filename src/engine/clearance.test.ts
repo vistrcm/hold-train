@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import { cardinalFromCourse, normalizeDeg, reciprocal } from './geometry'
+import { CHART_HOLDS } from '../content/questions'
 import {
+  PUBLISHED_HOLDS,
   clearanceText,
   generateClearance,
   gradeCopiedClearance,
@@ -358,5 +360,18 @@ describe('mulberry32 — seeded PRNG (drill scenario reproducibility)', () => {
     const rng = mulberry32(0)
     const seq = Array.from({ length: 10 }, () => rng())
     expect(new Set(seq).size).toBeGreaterThan(1)
+  })
+})
+
+describe('PUBLISHED_HOLDS practice fixtures', () => {
+  // The fixtures invent course, turn direction, and legs. Reusing a real
+  // charted fix's name would state those invented numbers for a hold the
+  // student actually flies — "Hold northeast of HAIRE as published" once
+  // taught 210°/left against the charted 231°/right.
+  it('never reuses the name of a fix charted in the written bank', () => {
+    const charted = new Set(CHART_HOLDS.map((h) => h.fix))
+    for (const hold of PUBLISHED_HOLDS) {
+      expect(charted.has(hold.fix), hold.fix).toBe(false)
+    }
   })
 })

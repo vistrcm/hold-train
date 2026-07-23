@@ -43,7 +43,7 @@ Requires Node.js 20.19+ or 22.12+ (Vite 8's engines requirement). Phone/tablet f
 
 1. Open the **Anki Export** module (`#/anki`) and download `hold-train-core.tsv` (fixed deck) and/or `hold-train-misses.tsv` (built from your recorded entry-drill, written-test, and oral-prep misses).
 2. In Anki: File → Import, pick the TSV. Fields are tab-separated: front, back, tags. Enable "Allow HTML in fields" (newlines are exported as `<br>`).
-3. Tags carry topic + ACS element code, so you can filter (e.g., `IR.III.B.K1`).
+3. Core-deck and oral-miss cards are tagged with their ACS element codes, so you can filter (e.g., `IR.III.B.K1`). Entry-drill and written-test miss cards are tagged `miss` plus the drill (and, for written misses, the topic).
 
 ## Source policy
 

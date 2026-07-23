@@ -342,6 +342,21 @@ describe('renderClearanceCopy', () => {
     expect(el.querySelector<HTMLElement>('.copy-next')!.hidden).toBe(false)
   })
 
+  it('grades an "as published" copy, where course and legs are not spoken', () => {
+    // A quarter of generated clearances take this branch: the form must accept
+    // "published" for both course and leg and grade all six fields.
+    renderClearanceCopy(el, { seed: SEED_PUBLISHED, store: testStore() })
+    const scenario = generateCopyScenario(SEED_PUBLISHED)
+    expect(scenario.expected.courseKind).toBe('published')
+    el.querySelector<HTMLButtonElement>('.copy-gotit')!.click()
+    fillForm(perfectCopy(scenario.expected))
+    el.querySelector<HTMLButtonElement>('.copy-submit')!.click()
+
+    const review = el.querySelector<HTMLElement>('.copy-review')!
+    expect(review.querySelectorAll('.copy-row.is-correct')).toHaveLength(6)
+    expect(review.querySelectorAll('.copy-row.is-wrong')).toHaveLength(0)
+  })
+
   it('marks the standard-turns trap row distinctly when copied as left', () => {
     renderClearanceCopy(el, { seed: SEED_UNSTATED_TURNS, store: testStore() })
     const scenario = generateCopyScenario(SEED_UNSTATED_TURNS)

@@ -13,7 +13,8 @@ export function normalizeDeg(deg: number): number {
   return ((deg % 360) + 360) % 360
 }
 
-function assertCourse(deg: number, name: string): void {
+/** Courses live in [0, 360) inside the engine — 360 is rejected, not wrapped. */
+export function assertCourse(deg: number, name: string): void {
   if (!Number.isFinite(deg) || deg < 0 || deg >= 360) {
     throw new RangeError(`${name} must be in [0, 360), got ${deg}`)
   }

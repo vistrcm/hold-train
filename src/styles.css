@@ -122,6 +122,16 @@ button {
   color: var(--text);
 }
 
+/* What the plate says for an "as published" clearance — not spoken by ATC, so
+   it reads as chart data rather than as part of the radio call. */
+.entry-chart {
+  font-size: var(--fs-sm);
+  color: var(--text-dim);
+  border-left: 3px solid var(--surface);
+  padding-left: 0.6rem;
+  margin: 0.35rem 0;
+}
+
 .entry-answers {
   display: flex;
   gap: 0.5rem;

@@ -17,7 +17,7 @@
 // Frame: NM east/north of the holding fix (the map view's MapPoint shape).
 
 import type { Entry, TurnDirection } from './entry'
-import { normalizeDeg } from './geometry'
+import { assertCourse, normalizeDeg } from './geometry'
 import { inboundCrab, outboundHeading, outboundTimeSeconds, type Wind } from './wind'
 
 /** C172 holding speed the lab trains at. */
@@ -79,12 +79,6 @@ export function textbookDecisions(hold: SimHold, wind: Wind, tasKt = HOLD_TAS_KT
     outboundHeading: outboundHeading(hold.inboundCourse, wind, tasKt),
     inboundCrab: inboundCrab(hold.inboundCourse, wind, tasKt),
     outboundSeconds: outboundTimeSeconds(hold.inboundCourse, wind, tasKt),
-  }
-}
-
-function assertCourse(deg: number, name: string): void {
-  if (!Number.isFinite(deg) || deg < 0 || deg >= 360) {
-    throw new RangeError(`${name} must be in [0, 360), got ${deg}`)
   }
 }
 
