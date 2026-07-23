@@ -251,8 +251,9 @@
 - Create: `src/modules/dashboard.ts`, `src/modules/dashboard.test.ts`
 - Modify: `src/app/router.ts`, `src/main.ts`
 
-- [ ] per-module readiness vs benchmarks (entry accuracy/time, exam-sim score, oral ACS coverage); written/oral/flight mapping to ACS Task III.B; tests for benchmark computation
-- [ ] run tests - must pass before next task
+- [x] per-module readiness vs benchmarks (entry accuracy/time, exam-sim score, oral ACS coverage); written/oral/flight mapping to ACS Task III.B; tests for benchmark computation
+- [x] run tests - must pass before next task
+- ➕ no new state: entry card reuses `benchmarkReport` (store is the oracle for the 18/20 <10 s + 95% <15 s targets); exam-sim readiness = recent window (20 = exactly one `EXAM_LENGTH` exam) vs the written module's own `WEAK_TOPIC_THRESHOLD` (70%); oral weak areas recovered from the `acs` tags already snapshotted into oral misses, listed in ACS order. Checkride map derives element codes from `ACS_ELEMENTS` by kind (knowledge→written+oral, risk→oral+flight, skill→flight — labeled as this app's study plan, not an FAA assignment) and references real `Screen` objects so renamed routes fail tests. Screen registered in `main.ts` at `#dashboard` (registry lives there, not `router.ts`); non-benchmarked drills get a plain activity table.
 
 ### Required closing tasks (always run, after whatever tier you stop at)
 

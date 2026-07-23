@@ -1,6 +1,7 @@
 import { ankiExportScreen } from './app/anki-export'
 import { createRouter, type Screen } from './app/router'
 import { clearanceCopyScreen } from './modules/clearance-copy'
+import { dashboardScreen } from './modules/dashboard'
 import { entryDrillScreen } from './modules/entry-drill'
 import { learnScreen } from './modules/learn'
 import { oralPrepScreen } from './modules/oral-prep'
@@ -16,6 +17,7 @@ const screens: Screen[] = [
   windLabScreen,
   clearanceCopyScreen,
   ankiExportScreen,
+  dashboardScreen,
 ]
 
 const root = document.querySelector<HTMLElement>('#app')

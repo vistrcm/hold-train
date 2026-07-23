@@ -410,3 +410,59 @@ button {
   display: block;
   margin-top: 0.5rem;
 }
+
+/* Dashboard: readiness cards, activity table, checkride map */
+.dash-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.dash-card {
+  border: 1px solid var(--border, #ccc);
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+}
+
+.dash-card[data-ready='true'] .dash-status {
+  color: var(--ok, #2e7d32);
+  font-weight: 600;
+}
+
+.dash-card ul {
+  margin: 0.25rem 0 0;
+  padding-left: 1.25rem;
+  font-size: var(--fs-sm);
+}
+
+.dash-weak {
+  font-size: var(--fs-sm);
+}
+
+.dash-activity {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs-sm);
+}
+
+.dash-activity th,
+.dash-activity td {
+  text-align: left;
+  padding: 0.4rem 0.5rem;
+  border-bottom: 1px solid var(--border, #ccc);
+}
+
+.dash-phase {
+  margin-top: 0.75rem;
+}
+
+.dash-modules a {
+  display: inline-block;
+  min-height: var(--touch);
+  padding: 0.6rem 0.25rem 0.6rem 0;
+}
+
+.dash-elements,
+.dash-source {
+  font-size: var(--fs-sm);
+}
