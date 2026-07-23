@@ -165,10 +165,11 @@
 - Create: `src/content/oral.test.ts`, `src/modules/oral-prep.test.ts`
 - Modify: `src/app/router.ts`
 
-- [ ] write content-validation tests first: every item has ACS element tag (IR.III.B.K1, R1–R4, S1–S8), model answer, FAA `source`; coverage test: every Task III.B element has ≥1 item
-- [ ] author oral Q&A: clearance elements, reports, lost comm, protected airspace/holding side, max speeds and why, fuel/EFC ADM (Avianca 052 framing), **G1000 hold behavior (SUSP, OBS holds, when to intervene) as Q&A content** (replaces the cut G1000 module; flag software-version-dependent features)
-- [ ] implement self-test flow: question → reveal answer → self-grade (got it / partial / missed); missed → Anki export; browse-by-ACS-element view
-- [ ] run tests - must pass before task 10
+- [x] write content-validation tests first: every item has ACS element tag (IR.III.B.K1, R1–R4, S1–S8), model answer, FAA `source`; coverage test: every Task III.B element has ≥1 item
+- [x] author oral Q&A: clearance elements, reports, lost comm, protected airspace/holding side, max speeds and why, fuel/EFC ADM (Avianca 052 framing), **G1000 hold behavior (SUSP, OBS holds, when to intervene) as Q&A content** (replaces the cut G1000 module; flag software-version-dependent features)
+- [x] implement self-test flow: question → reveal answer → self-grade (got it / partial / missed); missed → Anki export; browse-by-ACS-element view
+- [x] run tests - must pass before task 10
+- ➕ ACS element list encodes all 14 Task III.B codes incl. `IR.III.B.S3a` (confirmed in FAA-S-ACS-8C's own added-codes list); AIM 5-5-15 (minimum fuel advisory) verified via faa.gov chapter listing. Items carry `caveat` fields (triple-vs-double drift, G1000 software-version, ±5°) ready for Task 17's caveat-rendering check. Grades: only "got it" counts correct under drill id `oral`; only "missed" records a miss (Anki-ready snapshot). Browse view keeps empty elements visible as a coverage checklist. Screen registered in `main.ts` (registry lives there, not `router.ts`).
 
 ### Task 10: Anki export [P0]
 
