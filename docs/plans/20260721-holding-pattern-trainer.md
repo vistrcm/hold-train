@@ -151,11 +151,12 @@
 - Create: `src/content/questions.test.ts`, `src/modules/written-test.test.ts`
 - Modify: `src/app/router.ts`
 
-- [ ] fetch current FAA charts (dTPP) for **KTCY RNAV (GPS) RWY 12** (missed-approach hold) and a **KLVK** procedure with a hold; derive hold parameters from the real charts — checkbox blocked until verified current
-- [ ] write content-validation tests first: every question has options, keyed answer, explanation, FAA `source`, `acs` tag; entry-question answers MUST come from `determineEntry` (engine is the oracle; dual-keyed "parallel or teardrop" allowed only when engine says near-boundary)
-- [ ] author ~40 original FAA-IRA-style questions: diagram-based entry determination, missed-approach-hold entries on the KTCY/KLVK chart scenarios, max speeds (200/230/265, (175) icon), timing (1 vs 1½ min; outbound-start rule), required reports, EFC/lost-comm 91.185(c)(3), standard-vs-nonstandard
-- [ ] implement practice mode (immediate explanation + citation; misses recorded) and exam-sim mode (fixed-length, literal option formats incl. "parallel or teardrop", no aids, weak-area score report)
-- [ ] run tests - must pass before task 9
+- [x] fetch current FAA charts (dTPP) for **KTCY RNAV (GPS) RWY 12** (missed-approach hold) and a **KLVK** procedure with a hold; derive hold parameters from the real charts — checkbox blocked until verified current
+- [x] write content-validation tests first: every question has options, keyed answer, explanation, FAA `source`, `acs` tag; entry-question answers MUST come from `determineEntry` (engine is the oracle; dual-keyed "parallel or teardrop" allowed only when engine says near-boundary)
+- [x] author ~40 original FAA-IRA-style questions: diagram-based entry determination, missed-approach-hold entries on the KTCY/KLVK chart scenarios, max speeds (200/230/265, (175) icon), timing (1 vs 1½ min; outbound-start rule), required reports, EFC/lost-comm 91.185(c)(3), standard-vs-nonstandard
+- [x] implement practice mode (immediate explanation + citation; misses recorded) and exam-sim mode (fixed-length, literal option formats incl. "parallel or teardrop", no aids, weak-area score report)
+- [x] run tests - must pass before task 9
+- ➕ chart data verified against dTPP cycle 2607 (eff. 9 Jul–6 Aug 2026) cross-checked with same-cycle CIFP records: KTCY HAIRE missed hold (231° in, RT, 4 NM) + OYOSO HILPT (116° in, LT, 4 NM); KLVK UHHUT HILPT (255° in, RT, 4 NM) + ALTAM missed hold on the OAK 060 radial (240° in, LT, 1 min). Bank: 43 questions (11 entry, engine-keyed via `entryOptionSet`; 32 static, source-verified). Exam sim: seeded 20-question draw, empty answer ack (no key leak mid-exam), weak-topic report <70%. Screen registered in `main.ts` (registry lives there, not `router.ts`).
 
 ### Task 9: Oral-exam prep module [P0]
 

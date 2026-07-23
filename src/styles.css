@@ -143,3 +143,49 @@ button {
 .entry-stats {
   font-size: var(--fs-sm);
 }
+
+/* Written test */
+.written-modes {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.written-mode[aria-pressed='true'] {
+  outline: 2px solid var(--accent);
+}
+
+.written-progress {
+  font-size: var(--fs-sm);
+}
+
+.written-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.written-option {
+  text-align: left;
+}
+
+.written-option.is-chosen {
+  outline: 2px solid var(--accent);
+}
+
+.written-feedback p,
+.written-report p {
+  margin: 0.35rem 0;
+}
+
+.written-feedback.is-correct .written-verdict {
+  color: #3fbf6f;
+}
+
+.written-feedback.is-wrong .written-verdict {
+  color: #e05c5c;
+}
+
+.written-next {
+  width: 100%;
+  margin-top: 0.5rem;
+}
