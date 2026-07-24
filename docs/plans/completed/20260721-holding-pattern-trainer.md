@@ -135,7 +135,7 @@
 
 **Files:**
 - Create: `src/modules/entry-drill.ts`, `src/modules/entry-drill.test.ts`
-- Modify: `src/app/router.ts`
+- Modify: `src/main.ts` (route registry)
 
 - [x] write tests first: seeded scenarios (standard/nonstandard, fix types; prompt = realistic clearance text + current heading on HSI); grading accepts primary + boundary alternates; timer per answer; miss recorded with scenario; explanation payload includes sector overlay + FAA citation
 - [x] implement drill screen: clearance text + HSI; three-button answer (direct/teardrop/parallel), touch-sized; instant feedback with sector overlay and citation
@@ -149,7 +149,7 @@
 **Files:**
 - Create: `src/content/questions.ts`, `src/modules/written-test.ts`
 - Create: `src/content/questions.test.ts`, `src/modules/written-test.test.ts`
-- Modify: `src/app/router.ts`
+- Modify: `src/main.ts` (route registry)
 
 - [x] fetch current FAA charts (dTPP) for **KTCY RNAV (GPS) RWY 12** (missed-approach hold) and a **KLVK** procedure with a hold; derive hold parameters from the real charts — checkbox blocked until verified current
 - [x] write content-validation tests first: every question has options, keyed answer, explanation, FAA `source`, `acs` tag; entry-question answers MUST come from `determineEntry` (engine is the oracle; dual-keyed "parallel or teardrop" allowed only when engine says near-boundary)
@@ -163,7 +163,7 @@
 **Files:**
 - Create: `src/content/oral.ts`, `src/modules/oral-prep.ts`
 - Create: `src/content/oral.test.ts`, `src/modules/oral-prep.test.ts`
-- Modify: `src/app/router.ts`
+- Modify: `src/main.ts` (route registry)
 
 - [x] write content-validation tests first: every item has ACS element tag (IR.III.B.K1, R1–R4, S1–S8), model answer, FAA `source`; coverage test: every Task III.B element has ≥1 item
 - [x] author oral Q&A: clearance elements, reports, lost comm, protected airspace/holding side, max speeds and why, fuel/EFC ADM (Avianca 052 framing), **G1000 hold behavior (SUSP, OBS holds, when to intervene) as Q&A content** (replaces the cut G1000 module; flag software-version-dependent features)
@@ -176,7 +176,7 @@
 **Files:**
 - Create: `src/content/anki-deck.ts`, `src/app/anki-export.ts`
 - Create: `src/content/anki-deck.test.ts`, `src/app/anki-export.test.ts`
-- Modify: `src/app/router.ts`
+- Modify: `src/main.ts` (route registry)
 
 - [x] write tests first: TSV escaping (tabs/newlines); every fixed-deck card has front/back/tags (topic + ACS element); misses deck converts stored misses (entry scenarios, oral items, question misses) into cards
 - [x] author fixed deck from the ROTE/TRAP/SAFETY call-outs (`research-claude.md` §Anki, each verified against its FAA source; citations on card backs)
@@ -213,24 +213,24 @@
 **Files:**
 - Create: `src/engine/sim.ts`, `src/modules/wind-lab.ts`
 - Create: `src/engine/sim.test.ts`, `src/modules/wind-lab.test.ts`
-- Modify: `src/app/router.ts`
+- Modify: `src/main.ts` (route registry)
 
 - [x] write sim tests first: no-wind correctly-flown hold → ~60 s inbound, closed racetrack; textbook triple-drift decisions in known wind → inbound within seconds of 60; no-crab decisions → measurable drift
 - [x] implement fixed-timestep integrator (standard-rate turns, ~90 KTAS, wind per step; decisions as input: entry, outbound heading, crab, outbound seconds) + ground-track output
 - [x] implement predict → fly → debrief flow: user states expected crab/outbound heading/time first (CFI Notebook exercise), engine flies it, debrief shows measured vs target (ACS ±10° framing), next-circuit timing suggestion; misses recorded
 - [x] run tests - must pass before next task
-- ➕ physics finding encoded in tests: the AIM ratio-timing rule models only the straight legs — wind keeps drifting the pattern during the two 1-minute turns, so textbook decisions leave the first inbound ~10 s off in a 15 kt crosswind and ~+34 s with a 20 kt inbound headwind. Since inbound time is affine in outbound time, one adjustment of (60 − measured)·GSin/GSout seconds closes it to ≤3 s (that IS AIM 5-3-8 j4's "adjust subsequent outbound legs"); `groundSpeeds` added to `wind.ts` for it. Lab therefore grades the *decisions* (outbound heading + crab vs engine within ACS ±10° — verified verbatim in FAA-S-ACS-8C Task III.B "selected headings ±10°"; planned time within 10 s of the rule), while measured inbound drives the next-circuit suggestion; only the first circuit per scenario is scored (re-fly = practice loop). Entry decision sets sim turn directions (parallel opposite); teardrop honestly crosses ~0.75 NM holding-side without an intercept (no intercept logic — decisions, not autopilot). Screen registered in `main.ts` at `#wind-lab`; ghost track = sim flying the textbook numbers.
+- ➕ physics finding encoded in tests: the AIM ratio-timing rule models only the straight legs — wind keeps drifting the pattern during the two 1-minute turns, so textbook decisions leave the first inbound ~10 s off in a 15 kt crosswind and ~+34 s with a 20 kt inbound headwind. Since inbound time is affine in outbound time, one adjustment of (60 − measured)·GSin/GSout seconds closes it to ≤3 s (that IS AIM 5-3-8 j4's "adjust subsequent outbound legs"); `groundSpeeds` added to `wind.ts` for it. Lab therefore grades the *decisions* (outbound heading + crab vs engine within ACS ±10° — verified verbatim in FAA-S-ACS-8C Task III.B "selected headings ±10°"; planned time within 10 s of the rule), while measured inbound drives the next-circuit suggestion; only the first circuit per scenario is scored (re-fly = practice loop). Entry decision sets sim turn directions (parallel opposite); teardrop honestly crosses ~0.75 NM holding-side without an intercept (no intercept logic — decisions, not autopilot). Screen registered in `main.ts` at `#/wind-lab`; ghost track = sim flying the textbook numbers.
 
 ### Task 14: Clearance copy drill [P1]
 
 **Files:**
 - Create: `src/modules/clearance-copy.ts`, `src/modules/clearance-copy.test.ts`
-- Modify: `src/app/router.ts`
+- Modify: `src/main.ts` (route registry)
 
 - [x] write tests first: field-by-field grading; standard-turns trap surfaced; "as published" grades only present fields; TO/FROM micro-drill grading (bearing TO vs radial FROM → which side of the fix)
 - [x] implement: clearance shown briefly then hidden (like real radio) → structured field form → graded review with citations; TO/FROM micro-drill mode; misses recorded
 - [x] run tests - must pass before next task
-- ➕ engine already held all the grading (`gradeCopiedClearance` from Task 4 is the oracle); the module adds only presentation + the pure `holdSide(kind, degrees)` (radial FROM → hold on the radial side; bearing TO → reciprocal side, P/CG). Clearance auto-hides after ~spoken duration (450 ms/word, 4 s floor) with a "got it" skip; empty degrees input is treated as not-copied (Number('') is 0, which would falsely match a spoken 360). Trap review row gets a distinct `.is-trap` accent. Misses stored under `clearance-copy` / `to-from`; Anki export skips unknown drill ids by design, so exporting these misses is deferred (would extend Task 10's converters). Screen registered in `main.ts` at `#clearance-copy`.
+- ➕ engine already held all the grading (`gradeCopiedClearance` from Task 4 is the oracle); the module adds only presentation + the pure `holdSide(kind, degrees)` (radial FROM → hold on the radial side; bearing TO → reciprocal side, P/CG). Clearance auto-hides after ~spoken duration (450 ms/word, 4 s floor) with a "got it" skip; empty degrees input is treated as not-copied (Number('') is 0, which would falsely match a spoken 360). Trap review row gets a distinct `.is-trap` accent. Misses stored under `clearance-copy` / `to-from`; Anki export skips unknown drill ids by design, so exporting these misses is deferred (would extend Task 10's converters). Screen registered in `main.ts` at `#/clearance-copy`.
 
 ### P2 — cut unless time clearly remains
 
@@ -238,22 +238,22 @@
 
 **Files:**
 - Create: `src/content/lessons.ts`, `src/modules/learn.ts`, tests for both
-- Modify: `src/app/router.ts`
+- Modify: `src/main.ts` (route registry)
 
 - [x] short lesson pages in instructional order (why → anatomy → entries/thumb method → timing/wind → reports); every factual paragraph carries FAA `source`; each links to the relevant drill
 - [x] content-validation tests (ordering, sources present, drill links resolve)
 - [x] run tests - must pass before next task
-- ➕ 5 lessons, wording reuses statements already source-verified in Tasks 3/4/8/9/11 (Task 17 re-audits). No entry answers in lessons (engine stays the oracle); thumb-method paragraph explicitly labeled field technique with AIM cited only for the sector geometry, edges derived to match the Task 6 HSI overlay (+70°..+90°). Drill-link test imports the real Screen objects, so a renamed route fails tests. Screen registered first in `main.ts` at `#learn` (instructional entry point).
+- ➕ 5 lessons, wording reuses statements already source-verified in Tasks 3/4/8/9/11 (Task 17 re-audits). No entry answers in lessons (engine stays the oracle); thumb-method paragraph explicitly labeled field technique with AIM cited only for the sector geometry, edges derived to match the Task 6 HSI overlay (+70°..+90°). Drill-link test imports the real Screen objects, so a renamed route fails tests. Screen registered first in `main.ts` at `#/learn` (instructional entry point).
 
 ### Task 16: Progress dashboard [P2]
 
 **Files:**
 - Create: `src/modules/dashboard.ts`, `src/modules/dashboard.test.ts`
-- Modify: `src/app/router.ts`, `src/main.ts`
+- Modify: `src/main.ts` (route registry)
 
 - [x] per-module readiness vs benchmarks (entry accuracy/time, exam-sim score, oral ACS coverage); written/oral/flight mapping to ACS Task III.B; tests for benchmark computation
 - [x] run tests - must pass before next task
-- ➕ no new state: entry card reuses `benchmarkReport` (store is the oracle for the 18/20 <10 s + 95% <15 s targets); exam-sim readiness = recent window (20 = exactly one `EXAM_LENGTH` exam) vs the written module's own `WEAK_TOPIC_THRESHOLD` (70%); oral weak areas recovered from the `acs` tags already snapshotted into oral misses, listed in ACS order. Checkride map derives element codes from `ACS_ELEMENTS` by kind (knowledge→written+oral, risk→oral+flight, skill→flight — labeled as this app's study plan, not an FAA assignment) and references real `Screen` objects so renamed routes fail tests. Screen registered in `main.ts` at `#dashboard` (registry lives there, not `router.ts`); non-benchmarked drills get a plain activity table.
+- ➕ no new state: entry card reuses `benchmarkReport` (store is the oracle for the 18/20 <10 s + 95% <15 s targets); exam-sim readiness = recent window (20 = exactly one `EXAM_LENGTH` exam) vs the written module's own `EXAM_PASS_FRACTION` (70%); oral weak areas recovered from the `acs` tags already snapshotted into oral misses, listed in ACS order. Checkride map derives element codes from `ACS_ELEMENTS` by kind (knowledge→written+oral, risk→oral+flight, skill→flight — labeled as this app's study plan, not an FAA assignment) and references real `Screen` objects so renamed routes fail tests. Screen registered in `main.ts` at `#/dashboard` (registry lives there, not `router.ts`); non-benchmarked drills get a plain activity table.
 
 ### Required closing tasks (always run, after whatever tier you stop at)
 

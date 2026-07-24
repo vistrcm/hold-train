@@ -26,6 +26,13 @@ export const EXAM_LENGTH = 20
 /** Topics scored below this fraction in an exam are reported as weak. */
 export const WEAK_TOPIC_THRESHOLD = 0.7
 
+/**
+ * Fraction of a full exam that counts as ready on the dashboard. Equal to
+ * WEAK_TOPIC_THRESHOLD today but a separate decision: retuning which topics
+ * get flagged weak must not silently move the pass mark.
+ */
+export const EXAM_PASS_FRACTION = 0.7
+
 /** Exam results live under 'written-exam'; practice under 'written'. */
 const DRILL_IDS: Record<TestMode, string> = { practice: 'written', exam: 'written-exam' }
 

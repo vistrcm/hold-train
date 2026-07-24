@@ -11,6 +11,11 @@ import {
   type Store,
 } from '../app/store'
 import { ACS_ELEMENTS, ORAL_ITEMS } from '../content/oral'
+import { createClearanceCopyDrill, createToFromDrill } from './clearance-copy'
+import { createEntryDrill } from './entry-drill'
+import { createOralPrep } from './oral-prep'
+import { createWindLab } from './wind-lab'
+import { createWrittenTest } from './written-test'
 import {
   dashboardScreen,
   examReadiness,
@@ -20,7 +25,7 @@ import {
   renderDashboard,
   type ExamPhase,
 } from './dashboard'
-import { EXAM_LENGTH, WEAK_TOPIC_THRESHOLD } from './written-test'
+import { EXAM_LENGTH, EXAM_PASS_FRACTION } from './written-test'
 
 function results(n: number, correct: number, timeSeconds = 5): DrillResult[] {
   return Array.from({ length: n }, (_, i) => ({ correct: i < correct, timeSeconds }))
@@ -52,7 +57,7 @@ describe('examReadiness', () => {
 
   it('a full exam window at exactly the 70% threshold is met', () => {
     const state = emptyState()
-    const correct = Math.ceil(EXAM_LENGTH * WEAK_TOPIC_THRESHOLD)
+    const correct = Math.ceil(EXAM_LENGTH * EXAM_PASS_FRACTION)
     state.drills['written-exam'] = stats(results(EXAM_LENGTH, correct))
     const r = examReadiness(state)
     expect(r.answered).toBe(EXAM_LENGTH)
@@ -60,9 +65,23 @@ describe('examReadiness', () => {
     expect(r.met).toBe(true)
   })
 
+  it('a full exam recorded through the store reaches the readiness bar', () => {
+    // Not a hand-built window: recordDrillResult caps `recent` at RECENT_WINDOW,
+    // so an EXAM_LENGTH above that cap would make `met` permanently unreachable
+    // while every fabricated-state test above stayed green.
+    const store = createStore({ storage: undefined })
+    const correct = Math.ceil(EXAM_LENGTH * EXAM_PASS_FRACTION)
+    for (let i = 0; i < EXAM_LENGTH; i++) {
+      store.recordDrillResult('written-exam', { correct: i < correct, timeSeconds: 5 })
+    }
+    const r = examReadiness(store.loadState())
+    expect(r.answered).toBe(EXAM_LENGTH)
+    expect(r.met).toBe(true)
+  })
+
   it('a full exam window below the threshold is not met', () => {
     const state = emptyState()
-    const correct = Math.ceil(EXAM_LENGTH * WEAK_TOPIC_THRESHOLD) - 1
+    const correct = Math.ceil(EXAM_LENGTH * EXAM_PASS_FRACTION) - 1
     state.drills['written-exam'] = stats(results(EXAM_LENGTH, correct))
     expect(examReadiness(state).met).toBe(false)
   })
@@ -177,6 +196,70 @@ describe('README module → exam-phase table', () => {
       expect(documented.get(route), `README row for #/${route}`).toEqual(phasesForRoute)
     }
     expect([...documented.keys()].filter((r) => !actual.has(r))).toEqual([])
+  })
+})
+
+describe('drill ids are matched by string in more than one place', () => {
+  // CLAUDE.md: a drill id lives in the store, in ACTIVITY here, and in
+  // missesToCards. Nothing in the type system connects them, so a new drill is
+  // silently invisible on the dashboard. Read the ids back out of the modules
+  // that record them rather than restating the list a third time.
+  /** Answers one question in every drill and returns the keys it wrote. */
+  function recordedIds(): string[] {
+    const store = createStore({ storage: undefined })
+    const seed = 7
+
+    for (const mode of ['cockpit', 'learn'] as const) {
+      createEntryDrill({ mode, seed, store }).answer('direct')
+    }
+    for (const mode of ['practice', 'exam'] as const) {
+      createWrittenTest({ mode, seed, store }).answer(0)
+    }
+    const oral = createOralPrep({ store })
+    oral.reveal()
+    oral.grade('missed')
+    const lab = createWindLab({ seed, store })
+    lab.fly({ outboundHeading: 0, crab: 0, outboundSeconds: 60 })
+    const copy = createClearanceCopyDrill({ seed, store })
+    const e = copy.scenario.expected
+    copy.submit({
+      direction: e.direction,
+      fix: e.fix,
+      courseKind: e.courseKind,
+      leg: e.leg === 'unstated' ? { unit: 'min', value: 1 } : e.leg,
+      turnDirection: e.turnDirection === 'left' ? 'left' : 'right',
+      efc: e.efc,
+      ...(e.courseDegrees === undefined ? {} : { courseDegrees: e.courseDegrees }),
+    })
+    const toFrom = createToFromDrill({ seed, store })
+    toFrom.answer(toFrom.scenario.answer)
+
+    return Object.keys(store.loadState().drills).sort()
+  }
+
+  it('drives every drill and finds the eight documented ids', () => {
+    expect(recordedIds()).toEqual([
+      'clearance-copy',
+      'entry',
+      'entry-learn',
+      'oral',
+      'to-from',
+      'wind-lab',
+      'written',
+      'written-exam',
+    ])
+  })
+
+  it('every recorded drill id appears on the dashboard', () => {
+    document.body.innerHTML = '<div id="dash-root"></div>'
+    const el = document.querySelector<HTMLElement>('#dash-root')!
+    renderDashboard(el, { store: storeWith(emptyState()) })
+    const shown = new Set(
+      [...el.querySelectorAll('[data-drill]')].map((n) => n.getAttribute('data-drill')),
+    )
+    for (const id of recordedIds()) {
+      expect(shown.has(id), `dashboard has no row or card for '${id}'`).toBe(true)
+    }
   })
 })
 

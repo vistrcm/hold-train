@@ -119,6 +119,26 @@ describe('determineEntry — sector properties', () => {
     }
   })
 
+  it('the primary entry always lies in the sector arc drawn for it', () => {
+    // The −70/110/180 offsets are written out three times in entry.ts: in
+    // BOUNDARIES, in classify(), and in sectorArcs(). classify() decides the
+    // answer the student is graded on; sectorArcs() paints the HSI overlay they
+    // read it off. Nothing but this test keeps the two from drifting apart.
+    for (const c of courses) {
+      for (const hold of [std(c), nonStd(c)]) {
+        for (let h = 0; h < 360; h++) {
+          const { primary, sectors } = determineEntry(h, hold)
+          const arc = sectors[primary]
+          const into = normalizeDeg(h - arc.from)
+          // Closed arc: a heading exactly on a divider belongs to either
+          // neighbour, and the ±5° rule reports both as acceptable anyway.
+          expect(into <= arcWidth(arc), `${hold.turnDirection} ${c}: heading ${h} → ${primary}`)
+            .toBe(true)
+        }
+      }
+    }
+  })
+
   it('heading equal to the inbound course is always direct', () => {
     for (const c of courses) {
       expect(determineEntry(c, std(c)).primary).toBe('direct')

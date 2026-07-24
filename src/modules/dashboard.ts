@@ -5,7 +5,7 @@
 //
 // All readiness math reads existing store data — the entry benchmark comes
 // from store.benchmarkReport (the oracle for Task 7's targets), the exam-sim
-// score reuses the written test's own pass threshold, and oral weak areas
+// score uses the written test's EXAM_PASS_FRACTION, and oral weak areas
 // are recovered from the ACS tags already snapshotted into oral misses.
 
 import { ankiExportScreen } from '../app/anki-export'
@@ -24,7 +24,7 @@ import { entryDrillScreen } from './entry-drill'
 import { learnScreen } from './learn'
 import { oralPrepScreen } from './oral-prep'
 import { windLabScreen } from './wind-lab'
-import { EXAM_LENGTH, WEAK_TOPIC_THRESHOLD, writtenTestScreen } from './written-test'
+import { EXAM_LENGTH, EXAM_PASS_FRACTION, writtenTestScreen } from './written-test'
 
 export interface ExamReadiness {
   /** Recent exam-sim answers considered (the store window is one full exam). */
@@ -40,7 +40,7 @@ export function examReadiness(state: AppState): ExamReadiness {
   const recent = state.drills['written-exam']?.recent ?? []
   const correct = recent.filter((r) => r.correct).length
   const score = recent.length > 0 ? correct / recent.length : null
-  const met = recent.length >= EXAM_LENGTH && score !== null && score >= WEAK_TOPIC_THRESHOLD
+  const met = recent.length >= EXAM_LENGTH && score !== null && score >= EXAM_PASS_FRACTION
   return { answered: recent.length, correct, score, met }
 }
 
@@ -178,7 +178,7 @@ export function renderDashboard(el: HTMLElement, options: DashboardOptions = {})
 
   const examCard = card('written-exam', 'Written exam sim', exam.met, [
     `last ${exam.answered} answers: ${exam.score === null ? '—' : pct(exam.score)}`,
-    `target ${pct(WEAK_TOPIC_THRESHOLD)} over a full ${EXAM_LENGTH}-question exam`,
+    `target ${pct(EXAM_PASS_FRACTION)} over a full ${EXAM_LENGTH}-question exam`,
   ])
 
   const oralCard = card(

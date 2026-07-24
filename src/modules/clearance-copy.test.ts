@@ -6,6 +6,7 @@ import {
   type CopiedClearance,
 } from '../engine/clearance'
 import { cardinalFromCourse, normalizeDeg, reciprocal } from '../engine/geometry'
+import { courseText } from '../format'
 import {
   clearanceCopyScreen,
   createClearanceCopyDrill,
@@ -124,7 +125,6 @@ describe('createClearanceCopyDrill', () => {
 
     const fb = drill.submit(user)
     expect(fb.correct).toBe(false)
-    expect(fb.trapHit).toBe(true)
     const turns = fb.grade.fields.find((f) => f.field === 'turnDirection')
     expect(turns?.correct).toBe(false)
     expect(turns?.trap).toBe(true)
@@ -250,6 +250,18 @@ describe('generateToFromScenario', () => {
     for (let seed = 0; seed < 500; seed++) {
       const s = generateToFromScenario(seed)
       expect(s.explanation, `seed ${seed}`).not.toMatch(/\b0°/)
+    }
+  })
+
+  it('prints every bearing three-digit, prompt and explanation alike', () => {
+    // The stated course and the derived one appear in the same sentence; the
+    // pilot should not read "the 20° radial ... inbound course 200°".
+    for (let seed = 0; seed < 500; seed++) {
+      const s = generateToFromScenario(seed)
+      expect(s.prompt, `seed ${seed}`).toContain(courseText(s.degrees))
+      for (const text of [s.prompt, s.explanation]) {
+        expect(text, `seed ${seed}`).not.toMatch(/(?<!\d)\d{1,2}°/)
+      }
     }
   })
 })

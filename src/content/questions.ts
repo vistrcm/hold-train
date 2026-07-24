@@ -270,7 +270,7 @@ const ENTRY_SPECS: readonly EntrySpec[] = [
     id: 'entry-radial-classic',
     scenario: { heading: 235, inboundCourse: radialToInboundCourse(160), turnDirection: 'left' },
     question:
-      '“Hold southeast of the Modesto VOR on the 160 radial, left turns.” You approach ' +
+      '“Hold south of the Modesto VOR on the 160 radial, left turns.” You approach ' +
       'the VOR on a heading of 235°. Which entry is recommended?',
     source: ENTRY_BOUNDARY_SOURCE,
     acs: 'IR.III.B.K1',

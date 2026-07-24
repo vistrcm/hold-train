@@ -49,8 +49,6 @@ export interface CopyScenario {
 export interface CopyFeedback {
   correct: boolean
   grade: ClearanceGrade
-  /** The omitted-turns trap was graded wrong. */
-  trapHit: boolean
   timeSeconds: number
 }
 
@@ -123,7 +121,6 @@ export function createClearanceCopyDrill(options: CopyDrillOptions = {}): CopyDr
       return {
         correct: grade.allCorrect,
         grade,
-        trapHit: grade.fields.some((f) => f.trap === true && !f.correct),
         timeSeconds,
       }
     },
@@ -178,15 +175,18 @@ export function generateToFromScenario(seed: number): ToFromScenario {
   const inbound = kind === 'radial' ? reciprocal(normalizeDeg(degrees)) : normalizeDeg(degrees)
   const explanation =
     kind === 'radial'
-      ? `A radial points FROM the station: the hold sits out along the ${degrees}° radial, ` +
-        `${answer} of the station, inbound course ${courseText(inbound)}.`
-      : `A bearing points TO the station: ${degrees}° is the inbound course, so the hold ` +
-        `lies on the reciprocal side — ${answer} of the station.`
+      ? `A radial points FROM the station: the hold sits out along the ` +
+        `${courseText(degrees)} radial, ${answer} of the station, ` +
+        `inbound course ${courseText(inbound)}.`
+      : `A bearing points TO the station: ${courseText(degrees)} is the inbound course, ` +
+        `so the hold lies on the reciprocal side — ${answer} of the station.`
   return {
     seed,
     kind,
     degrees,
-    prompt: `“Hold on the ${degrees}° ${spoken}.” Which side of the station is the hold?`,
+    prompt:
+      `“Hold on the ${courseText(degrees)} ${spoken}.” ` +
+      `Which side of the station is the hold?`,
     answer,
     explanation,
     source: TOFROM_SOURCE,
@@ -293,9 +293,11 @@ function expectedText(field: GradedField, expected: ClearanceFields): string {
     case 'fix':
       return expected.fix
     case 'holdingCourse':
+      // courseDegrees is set whenever courseKind is radial/bearing: speakCourse
+      // throws on a missing one, so the clearance could not have been spoken.
       return expected.courseKind === 'published'
         ? 'as published'
-        : `${expected.courseDegrees}° ${expected.courseKind === 'radial' ? 'radial' : 'bearing to the station'}`
+        : `${courseText(expected.courseDegrees!)} ${expected.courseKind === 'radial' ? 'radial' : 'bearing to the station'}`
     case 'legLength':
       if (expected.leg === 'published') {
         return 'per chart'

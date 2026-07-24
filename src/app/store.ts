@@ -150,13 +150,17 @@ export function createStore(options: StoreOptions = {}): Store {
   }
 
   function saveState(state: AppState): void {
+    // No storage at all, or a write that failed (quota, private mode): the same
+    // in-memory fallback, so this session keeps working and the next one starts
+    // clean rather than reading a half-written state.
+    if (storage === undefined) {
+      memory = structuredClone(state)
+      return
+    }
     memory = null
     try {
-      storage?.setItem(KEY, JSON.stringify(state))
+      storage.setItem(KEY, JSON.stringify(state))
     } catch {
-      memory = structuredClone(state)
-    }
-    if (storage === undefined) {
       memory = structuredClone(state)
     }
   }
@@ -223,7 +227,7 @@ export interface BenchmarkReport {
   medianTimeSeconds: number | null
   /** ≥18 of a full 20-result window correct in under 10 s. */
   accuracyMet: boolean
-  /** ≥95% of the window answered in under 15 s. */
+  /** ≥95% of a full window answered in under 15 s. */
   speedMet: boolean
   met: boolean
 }
@@ -249,7 +253,9 @@ export function benchmarkReport(stats: DrillStats | undefined): BenchmarkReport 
 
   const fullWindow = recent.length >= b.window
   const accuracyMet = fullWindow && correctUnderTarget >= b.minCorrectUnderTarget
-  const speedMet = recent.length > 0 && underMax / recent.length >= b.minFractionUnderMax
+  // Same full-window gate as accuracy: the dashboard shows this flag on its own
+  // line, and "95% under 15 s" off two answers is not a benchmark.
+  const speedMet = fullWindow && underMax / recent.length >= b.minFractionUnderMax
   return {
     attempts: recent.length,
     correct,

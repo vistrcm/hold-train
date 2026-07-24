@@ -100,6 +100,10 @@ describe('exam mode', () => {
     expect(test.answer(0)).toBeNull()
   })
 
+  it('refuses an empty question bank rather than scoring 0/0', () => {
+    expect(() => createWrittenTest({ bank: [], store: testStore() })).toThrow(/empty/)
+  })
+
   it('report throws until the exam is finished', () => {
     const test = createWrittenTest({ mode: 'exam', seed: 9, store: testStore() })
     expect(() => test.report()).toThrow()
@@ -117,6 +121,12 @@ describe('exam mode', () => {
       test.answer(miss ? wrongIndex(q) : q.answerIndex)
       test.next()
     }
+    // Pin the fixture: both topic assertions below go vacuous if seed 5's exam
+    // happens to draw no 'speeds' question (nothing missed, so weakTopics is
+    // trivially empty) or no 'timing' question (trivially absent).
+    expect(answered.filter((a) => a.topic === 'speeds').length).toBeGreaterThan(0)
+    expect(answered.filter((a) => a.topic === 'timing').length).toBeGreaterThan(0)
+
     const report = test.report()
     const expectedCorrect = answered.filter((a) => a.correct).length
     expect(report.total).toBe(EXAM_LENGTH)

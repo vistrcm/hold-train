@@ -100,6 +100,30 @@ describe('clearanceText — golden phraseology (JO 7110.65BB 4-6-4; AIM 5-3-8 i)
   it('never states right turns (JO 7110.65BB 4-6-4: turns only if left)', () => {
     expect(clearanceText(vorTimed)).not.toContain('right turns')
   })
+
+  // A clearance the pilot can read but not fly back is negative training, so
+  // the renderer refuses malformed fields rather than speaking them.
+  it('rejects a course that is missing or outside [0, 360]', () => {
+    for (const courseDegrees of [undefined, -1, 361, 90.5, NaN]) {
+      expect(() => clearanceText({ ...vorTimed, courseDegrees }), `${courseDegrees}`).toThrow(
+        RangeError,
+      )
+    }
+  })
+
+  it('rejects a leg length that is not a positive whole number', () => {
+    for (const value of [0, -5, 2.5, NaN]) {
+      expect(() => clearanceText({ ...dmeLeft, leg: { unit: 'nm', value } }), `${value}`).toThrow(
+        /leg value/,
+      )
+    }
+  })
+
+  it('rejects an EFC that is not a 4-digit zulu time', () => {
+    for (const efc of ['', '930', '09300', '09:30', 'soon']) {
+      expect(() => clearanceText({ ...vorTimed, efc }), JSON.stringify(efc)).toThrow(/EFC/)
+    }
+  })
 })
 
 describe('generateClearance — seeded scenarios', () => {

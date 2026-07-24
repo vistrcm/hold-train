@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { createStore, type Store } from '../app/store'
 import { angleDiff } from '../engine/geometry'
-import { HOLD_TAS_KT, flyCircuit, textbookDecisions } from '../engine/sim'
+import {
+  HOLD_TAS_KT,
+  MAX_OUTBOUND_SECONDS,
+  flyCircuit,
+  textbookDecisions,
+} from '../engine/sim'
 import { groundSpeeds, inboundCrab, outboundHeading, outboundTimeSeconds } from '../engine/wind'
 import {
   ACS_SOURCE,
@@ -125,11 +130,50 @@ describe('createWindLab fly → debrief', () => {
     const d = lab.fly(numbers)
 
     expect(d.timingErrorSeconds).toBeCloseTo(d.sim.inboundSeconds - 60, 6)
+    // Direction and magnitude, not the formula re-typed: a long inbound means
+    // the outbound leg was too long, so the suggestion must come down, scaled
+    // by the ground-speed ratio. (That the number actually works is the next
+    // test — it flies the suggestion and checks the inbound closes to 60 s.)
     const gs = groundSpeeds(s.hold.inboundCourse, s.wind, HOLD_TAS_KT)
-    const exact =
-      numbers.outboundSeconds + ((60 - d.sim.inboundSeconds) * gs.inboundKt) / gs.outboundKt
-    // clamped to ≥1 s so the suggestion is always flyable
-    expect(d.nextOutboundSeconds).toBe(Math.max(1, Math.round(exact)))
+    const correction = d.nextOutboundSeconds - numbers.outboundSeconds
+    expect(Math.sign(correction)).toBe(Math.sign(60 - d.sim.inboundSeconds))
+    expect(Math.abs(correction)).toBeCloseTo(
+      (Math.abs(60 - d.sim.inboundSeconds) * gs.inboundKt) / gs.outboundKt,
+      0,
+    )
+  })
+
+  it('never suggests an outbound time the sim would reject', () => {
+    // The suggestion is the pilot's next input, so it has to satisfy the same
+    // bounds flyCircuit enforces. Rolling out already past the abeam line
+    // (large crab off a long leg) reads inboundSeconds ≈ 0, which drives the
+    // AIM j4 correction term maximally positive.
+    const lab = createWindLab({ seed: 76, store: testStore() })
+    const d = lab.fly({ outboundHeading: 0, crab: -45, outboundSeconds: 600 })
+    expect(d.sim.inboundSeconds).toBeLessThan(1)
+    expect(d.nextOutboundSeconds).toBeGreaterThanOrEqual(1)
+    expect(d.nextOutboundSeconds).toBeLessThanOrEqual(MAX_OUTBOUND_SECONDS)
+    expect(() => lab.fly({ ...d.numbers, outboundSeconds: d.nextOutboundSeconds })).not.toThrow()
+  })
+
+  it('debriefs a circuit that never made it back to the fix', () => {
+    // sim.completed === false is a real UI path: the verdict names it and the
+    // inbound row reads "never reached the fix" instead of a time.
+    const numbers = { ...textbookNumbers(1), outboundSeconds: 600 }
+    const lab = createWindLab({ seed: 1, store: testStore() })
+    const d = lab.fly(numbers)
+    expect(d.sim.completed).toBe(false)
+    expect(d.correct).toBe(false)
+    const el = document.createElement('div')
+    renderWindLab(el, { seed: 1, store: testStore() })
+    el.querySelector<HTMLInputElement>('.lab-input-heading')!.value =
+      String(numbers.outboundHeading)
+    el.querySelector<HTMLInputElement>('.lab-input-crab')!.value = String(numbers.crab)
+    el.querySelector<HTMLInputElement>('.lab-input-time')!.value = '600'
+    el.querySelector<HTMLButtonElement>('.lab-fly')!.click()
+    const debrief = el.querySelector<HTMLElement>('.lab-debrief')!
+    expect(debrief.textContent).toContain('never made it back to the fix')
+    expect(debrief.textContent).toContain('never reached the fix')
   })
 
   it('flying the suggested time next circuit closes the inbound to ~60 s', () => {

@@ -4,6 +4,7 @@ Browser-based holding-pattern trainer for the FAA instrument rating (C172 around
 
 ## What it trains
 
+- **Lessons** — 5 short read-once pages in study order (why holds exist → pattern anatomy → entries and the thumb method → timing and wind → holding reports), each paragraph carrying its own FAA citation and each lesson ending in a link to the drill that practices it.
 - **Entry determination** — direct / teardrop / parallel from a realistic clearance and your current heading on an HSI, per AIM 5-3-8 j3, including the ±5° boundary tolerance (near-boundary headings accept either adjacent entry).
 - **Clearance copying** — radio-style clearances generated in FAA JO 7110.65 4-6-4 phraseology, field-by-field grading, including the standard-turns trap (turn direction omitted ⇒ right turns) and radial-FROM vs bearing-TO.
 - **Wind correction and timing** — triple-drift outbound correction, outbound-timing adjustment, DME/ATD leg endpoints; a decision sim flies your numbers through wind and debriefs the ground track against ACS ±10° standards.
@@ -49,5 +50,6 @@ Requires Node.js 20.19+ or 22.12+ (Vite 8's engines requirement). Phone/tablet f
 
 - Every user-visible aviation fact carries a `source` field citing the **FAA primary source** (AIM 5-3-8/5-3-3, 14 CFR 91.185/91.167, FAA-S-ACS-8C Task III.B, FAA JO 7110.65), rendered in the UI. The audit ledger is in `docs/content-audit.md`.
 - Entry answers are never hand-keyed: `src/engine/entry.ts` is the oracle, validated by golden cases hand-derived by drawing plus property tests.
+- **Only the written-test chart questions use real procedures.** Entry-drill, clearance-copy and wind-lab scenarios are seeded *practice fixtures*: the fix names are invented, and so are their courses, turn directions and leg lengths. Where the app prints a plate line it labels it "Practice plate (fictitious fix)". Never carry a practice-fixture hold into the cockpit as if it were charted — a fixture name that collided with a real waypoint is the defect logged in `docs/content-audit.md`.
 - Chart scenarios (KTCY RNAV (GPS) RWY 12, KLVK) were derived from FAA dTPP cycle 2607 and cross-checked against same-cycle CIFP records. **Procedures amend every 28 days — verify against current charts before relying on them.** The user flies Jeppesen plates; figures here are FAA-styled, and styling differences are noted where they matter.
 - This is a study aid, not flight guidance. Nothing here supersedes current FAA publications, your charts, or your CFII.

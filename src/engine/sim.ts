@@ -35,7 +35,9 @@ const DT = 0.1 // s per integration step
 // paragraph specifies, so the two entries roll out on the same intercept.
 const PARALLEL_INTERCEPT_DEG = 30
 const SAMPLE_SECONDS = 1 // ground-track sampling interval
-const MAX_OUTBOUND_SECONDS = 600
+/** Longest outbound leg flyCircuit will accept. Callers that *suggest* a leg
+ *  time must clamp to this, or they hand the pilot a number the sim rejects. */
+export const MAX_OUTBOUND_SECONDS = 600
 const MAX_CRAB_DEG = 45
 const DEG = Math.PI / 180
 

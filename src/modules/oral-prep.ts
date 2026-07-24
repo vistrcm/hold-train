@@ -56,6 +56,12 @@ export function createOralPrep(options: OralPrepOptions = {}): OralPrepControlle
   const store = options.store ?? appStore
   const now = options.now ?? (() => Date.now())
   const items = options.items ?? ORAL_ITEMS
+  if (items.length === 0) {
+    // renderSelfTest reads the current item immediately, so an empty bank would
+    // throw out of Screen.render and leave the app blank. Fail at construction
+    // with a message that names the cause, as createWrittenTest does.
+    throw new RangeError('oral item bank is empty')
+  }
 
   let index = 0
   let revealed = false

@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { determineEntry, ENTRIES, type Entry } from '../engine/entry'
-import { radialToInboundCourse } from '../engine/geometry'
+import {
+  cardinalFromCourse,
+  normalizeDeg,
+  radialToInboundCourse,
+  type Cardinal,
+} from '../engine/geometry'
 import {
   CHART_CYCLE,
   CHART_HOLDS,
@@ -9,6 +14,17 @@ import {
   TOPICS,
   type WrittenQuestion,
 } from './questions'
+
+const LONG_CARDINAL: Record<Cardinal, string> = {
+  N: 'north',
+  NE: 'northeast',
+  E: 'east',
+  SE: 'southeast',
+  S: 'south',
+  SW: 'southwest',
+  W: 'west',
+  NW: 'northwest',
+}
 
 const entryQuestions = QUESTIONS.filter(
   (q): q is WrittenQuestion & Required<Pick<WrittenQuestion, 'entry'>> => q.entry !== undefined,
@@ -199,6 +215,22 @@ describe('content-audit regressions (Task 17, verified against FAA sources)', ()
       expect(q.explanation, q.id).toMatch(/good operating limits/)
       expect(q.explanation, q.id).toContain('j8(d)')
     }
+  })
+
+  it('every "hold <direction> ... on the NNN radial" stem agrees with the engine cardinal', () => {
+    // The TO/FROM drill grades this exact mapping with cardinalFromCourse, and
+    // it can generate any 10° radial — so a stem that calls the 160 radial
+    // "southeast" teaches the answer that drill marks wrong.
+    const stems = /Hold ([a-z]+) of the .*? on the (\d{2,3}) radial/g
+    const seen: string[] = []
+    for (const q of QUESTIONS) {
+      for (const [, word, deg] of q.question.matchAll(stems)) {
+        seen.push(q.id)
+        const cardinal = cardinalFromCourse(normalizeDeg(Number(deg)))
+        expect(LONG_CARDINAL[cardinal], `${q.id}: ${deg} radial`).toBe(word)
+      }
+    }
+    expect(seen.length).toBeGreaterThanOrEqual(5)
   })
 
   it('omitted-turn-direction explanation states the full JO/AIM conditional, not "only left"', () => {

@@ -295,3 +295,27 @@ geometry; timing-wind: j4, j8(c), j5; reports: 5-3-3 a1(f)/(g), i6 + P/CG + 91.1
   finishing on an entry question left a heading rose above the score. Regression
   test: "clears the HSI figure when the score report replaces the question" in
   `src/modules/written-test.test.ts`.
+- **Fixed: a question stem named a holding direction the app's own rule contradicts**
+  (`src/content/questions.ts`). `entry-radial-classic` quoted ATC as "Hold *southeast*
+  of the Modesto VOR on the 160 radial", but every other module derives the side with
+  `cardinalFromCourse`, which rounds the 160 radial to the nearest eight-point cardinal
+  — S, not SE. The TO/FROM micro-drill generates radials in 10° steps, so it can ask
+  this exact case and mark "SE" wrong. The stem now reads "south"; the entry answer was
+  unaffected (it comes from `determineEntry`). Regression test: "every 'hold <direction>
+  … on the NNN radial' stem agrees with the engine cardinal" in
+  `src/content/questions.test.ts`, which checks all six radial stems, not just this one.
+- **Fixed: the TO/FROM drill printed un-padded bearings beside padded ones**
+  (`src/modules/clearance-copy.ts`). The prompt and both explanation branches
+  interpolated `${degrees}°` raw while the derived course went through `courseText`,
+  so one sentence read "the hold sits out along the 20° radial … inbound course 200°".
+  Same root cause as the 0°-course entry above; `expectedText`'s holding-course row had
+  it too. Regression test: "prints every bearing three-digit, prompt and explanation
+  alike" in `src/modules/clearance-copy.test.ts` (500 seeds).
+- **Fixed: the wind lab suggested an outbound time the sim refuses to fly**
+  (`src/modules/wind-lab.ts`). `nextOutboundSeconds` clamped at ≥1 s but not at the
+  ≤600 s bound `flyCircuit` enforces, so a long leg flown with a large crab — which can
+  roll out already past the abeam line, reading `inboundSeconds` ≈ 0 and driving the AIM
+  j4 correction term maximally positive — produced advice of 706 s that the engine then
+  rejected with a `RangeError`. `MAX_OUTBOUND_SECONDS` is now exported from `sim.ts` and
+  the suggestion is clamped to it. Regression test: "never suggests an outbound time the
+  sim would reject" in `src/modules/wind-lab.test.ts`.

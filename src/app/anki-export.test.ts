@@ -132,6 +132,34 @@ describe('missesToCards', () => {
     expect(c.tags).toEqual(expect.arrayContaining(['miss', 'oral', 'IR.III.B.R1', 'IR.III.B.K2']))
   })
 
+  it('exports the learn-mode and exam-sim variants, not just the base drill ids', () => {
+    // entry-learn and written-exam are separate store keys matched by string
+    // here and in the dashboard (CLAUDE.md). Dropping either branch loses the
+    // cards silently — the export just comes back shorter.
+    const cards = missesToCards([
+      { ...entryMiss, drill: 'entry-learn' },
+      { ...writtenMiss, drill: 'written-exam' },
+    ])
+    expect(cards).toHaveLength(2)
+    expect(cards[0]!.tags).toEqual(expect.arrayContaining(['miss', 'entry-learn']))
+    expect(cards[0]!.front).toContain('Hold northeast of ECA VOR')
+    expect(cards[1]!.tags).toEqual(expect.arrayContaining(['miss', 'written-exam', 'speeds']))
+    expect(cards[1]!.back).toContain('200 KIAS')
+  })
+
+  it('ignores misses from drills that produce no cards', () => {
+    // wind-lab, clearance-copy and to-from snapshots are recorded but have no
+    // converter; they must be skipped, not crash or emit a blank card.
+    const cards = missesToCards([
+      { drill: 'wind-lab', at: 4, scenario: { seed: 1, numbers: {} } },
+      { drill: 'clearance-copy', at: 5, scenario: { seed: 2 } },
+      { drill: 'to-from', at: 6, scenario: { seed: 3 } },
+      entryMiss,
+    ])
+    expect(cards).toHaveLength(1)
+    expect(cards[0]!.tags).toContain('entry')
+  })
+
   it('renders the heading with the app-wide three-digit readout', () => {
     // The card and the drill must read the same: 040°, not 40°.
     const c = missesToCards([{ ...entryMiss, scenario: { ...(entryMiss.scenario as object), heading: 40 } }])[0]!

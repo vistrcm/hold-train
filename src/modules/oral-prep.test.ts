@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import { createStore, type Store } from '../app/store'
 import { ACS_ELEMENTS, ORAL_ITEMS, type OralItem } from '../content/oral'
 import { createOralPrep, groupByElement, oralPrepScreen, renderOralPrep } from './oral-prep'
@@ -158,6 +158,12 @@ describe('groupByElement', () => {
 })
 
 describe('renderOralPrep (jsdom)', () => {
+  // Each setup() appends to document.body; without this the panes accumulate
+  // across tests and a stale one can satisfy a later query.
+  afterEach(() => {
+    document.body.innerHTML = ''
+  })
+
   function setup(items: OralItem[] = TWO_ITEMS): { el: HTMLElement; store: Store } {
     const el = document.createElement('div')
     document.body.appendChild(el)
@@ -165,6 +171,15 @@ describe('renderOralPrep (jsdom)', () => {
     renderOralPrep(el, { store, items })
     return { el, store }
   }
+
+  it('refuses to render an empty bank instead of throwing mid-render', () => {
+    // renderSelfTest reads prep.item straight away, so an empty bank used to
+    // throw out of Screen.render and leave #app blank. Same up-front guard as
+    // createWrittenTest's empty question bank.
+    expect(() => createOralPrep({ items: [], store: testStore() })).toThrow(RangeError)
+    const el = document.createElement('div')
+    expect(() => renderOralPrep(el, { items: [], store: testStore() })).toThrow(/empty/)
+  })
 
   function click(el: HTMLElement, selector: string): void {
     const btn = el.querySelector<HTMLButtonElement>(selector)

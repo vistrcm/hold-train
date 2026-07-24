@@ -14,7 +14,7 @@ Holding-pattern trainer for the FAA instrument rating. Correctness beats feature
 - Audit ledger: `docs/content-audit.md` — record any content fix there with its regression test.
 
 ## TDD policy
-- Tests first, always: reference-case tests for engine and content modules, then implement until green. `npm test` (vitest) must pass before a task is done — no exceptions.
+- Tests first, always: reference-case tests for engine and content modules, then implement until green. `npm test` (vitest) **and** `npm run typecheck` (`tsc --noEmit`) must both pass before a task is done — no exceptions. Vitest strips types with esbuild and never type-checks, so a green test run does not mean the code compiles; `tsconfig.json` runs `strict` + `noUncheckedIndexedAccess` + `noUnused*`, which is easy to trip in test files the suite happily runs.
 - Content modules get validation tests (every item has source/ACS tag/answer; coverage per ACS element). UI modules get jsdom tests for logic (grading, state transitions), not pixel testing. No e2e framework.
 
 ## Priority tiers
@@ -27,4 +27,6 @@ Holding-pattern trainer for the FAA instrument rating. Correctness beats feature
 - Courses/headings live in [0, 360) inside the engine (360 rejected); display formatting (e.g., 0 shown as 360°) is the UI's job.
 - Screens register in `src/main.ts` (the route registry lives there, not `router.ts`); routes are `#/<path>` (the home screen links use the leading slash; the router accepts both forms).
 - localStorage schema is versioned (`{ v: 1, ... }` in `src/app/store.ts`); keep it backward compatible.
-- Drill ids (`entry`, `entry-learn`, `written`, `written-exam`, `oral`, `wind-lab`, `clearance-copy`, `to-from`) are the store's keys and are matched by string in two places: `ACTIVITY` in `src/modules/dashboard.ts` and `missesToCards` in `src/app/anki-export.ts`. A new drill that isn't added to both is silently invisible on the dashboard and exports no cards.
+- Display formatting of any bearing goes through `courseText` in `src/format.ts` — three digits, 0 shown as 360. Interpolating `${deg}°` directly is how "the 20° radial … inbound course 200°" ends up in one sentence.
+- Practice fixture names (`PUBLISHED_HOLDS`, `VOR_NAMES`, `NDB_NAMES` in `src/engine/clearance.ts`; `FIXES` in `src/modules/wind-lab.ts`) invent course, turn direction and leg length. A new name must be disjoint from `CHART_HOLDS` in `src/content/questions.ts` **and** from real waypoints (confirm no record at `opennav.com/waypoint/US/<NAME>`), and any rendered plate line stays labelled fictitious (`chartNote` in `src/modules/entry-drill.ts`). Guarded by tests in `clearance.test.ts` and `entry-drill.test.ts`.
+- Drill ids (`entry`, `entry-learn`, `written`, `written-exam`, `oral`, `wind-lab`, `clearance-copy`, `to-from`) are the store's keys and are matched by string in two places: `ACTIVITY` in `src/modules/dashboard.ts` and `missesToCards` in `src/app/anki-export.ts`. A new drill that isn't added to both is silently invisible on the dashboard and exports no cards. `dashboard.test.ts` drives every controller and asserts each key it writes appears on the dashboard — the coupling is runtime-only, so a source grep can't see it (`written-test.ts` records through `DRILL_IDS[mode]`).

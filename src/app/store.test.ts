@@ -281,9 +281,11 @@ describe('benchmarkReport', () => {
   })
 
   it('is not met before a full window of attempts', () => {
+    // speedMet included: the dashboard prints it on its own line, so two fast
+    // answers must not read as "95% under 15 s: yes".
     const report = benchmarkReport(statsFrom([result(true, 5), result(true, 5)]))
     expect(report.attempts).toBe(2)
-    expect(report).toMatchObject({ accuracyMet: false, met: false })
+    expect(report).toMatchObject({ accuracyMet: false, speedMet: false, met: false })
   })
 
   it('computes the median over the recent window (even count averages middle pair)', () => {
@@ -319,7 +321,10 @@ describe('miss retention', () => {
     // clearance-copy, to-from and wind-lab misses are recorded but produce no
     // Anki cards. Under a shared cap a long session on those silently emptied
     // the personalized deck of exactly the entry/written cards it exists for.
-    const store = createStore({ storage: memStorage(), now: () => 0 })
+    // Ticking clock: with a frozen one every `at` is equal and the ordering
+    // assertion below passes no matter how the trim reshuffles the array.
+    let t = 0
+    const store = createStore({ storage: memStorage(), now: () => (t += 1) })
     store.recordMiss('entry', { n: 'first entry miss' })
     for (let i = 0; i < MAX_MISSES_PER_DRILL + 50; i++) {
       store.recordMiss('clearance-copy', { n: i })
@@ -331,6 +336,7 @@ describe('miss retention', () => {
     )
     // Chronological order survives the per-drill trim.
     expect(misses[0]!.drill).toBe('entry')
+    expect(new Set(misses.map((m) => m.at)).size).toBe(misses.length)
     expect(misses.map((m) => m.at)).toEqual([...misses.map((m) => m.at)].sort((a, b) => a - b))
   })
 })

@@ -21,6 +21,7 @@ import type { TurnDirection } from '../engine/entry'
 import { angleDiff, normalizeDeg } from '../engine/geometry'
 import {
   HOLD_TAS_KT,
+  MAX_OUTBOUND_SECONDS,
   flyCircuit,
   textbookDecisions,
   type SimPoint,
@@ -166,11 +167,16 @@ export function createWindLab(options: WindLabOptions = {}): WindLabController {
       const correct = headingWithinAcs && crabWithinAcs && timingPlanOk && sim.completed
 
       const gs = groundSpeeds(hold.inboundCourse, wind, HOLD_TAS_KT)
-      const nextOutboundSeconds = Math.max(
-        1,
-        Math.round(
-          numbers.outboundSeconds +
-            ((TARGET_INBOUND_S - sim.inboundSeconds) * gs.inboundKt) / gs.outboundKt,
+      // Clamped to the sim's own accepted range: the suggestion is what the
+      // pilot types in next, so a value flyCircuit would reject is not advice.
+      const nextOutboundSeconds = Math.min(
+        MAX_OUTBOUND_SECONDS,
+        Math.max(
+          1,
+          Math.round(
+            numbers.outboundSeconds +
+              ((TARGET_INBOUND_S - sim.inboundSeconds) * gs.inboundKt) / gs.outboundKt,
+          ),
         ),
       )
 
