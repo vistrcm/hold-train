@@ -84,8 +84,13 @@ describe('CORE_DECK key facts (verified against FAA sources)', () => {
     expect(backMatching(/180°[\s\S]*70°[\s\S]*110°/)).toBeDefined()
   })
 
-  it('teardrop offset 30°', () => {
-    expect(backMatching(/30°/)).toBeDefined()
+  // A bare /30°/ also matches the bank-angle card ("or 30° bank"), so the
+  // teardrop fact could be dropped entirely with this test still green. Pin the
+  // offset to its context: outbound, on the holding side.
+  it('teardrop offset 30° from the outbound course, on the holding side', () => {
+    const card = backMatching(/offset 30°[\s\S]*outbound course[\s\S]*holding side/i)
+    expect(card).toBeDefined()
+    expect(card?.source).toContain('AIM 5-3-8')
   })
 
   it('triple drift outbound, with the double-drift field-technique caveat', () => {

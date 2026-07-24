@@ -388,6 +388,35 @@ describe('renderClearanceCopy', () => {
     expect(el.querySelector<HTMLElement>('.copy-next')!.hidden).toBe(false)
   })
 
+  // Number('') is 0, and 0 normalizes equal to a spoken 360 — so a pilot who
+  // never copied the course at all would score the field correct on any hold
+  // whose inbound course is 360. readCopiedClearance guards this; nothing tested it.
+  it('an untouched degrees field grades wrong, never as a lucky 360', () => {
+    renderClearanceCopy(el, { seed: SEED_STATED_COURSE, store: testStore() })
+    const scenario = generateCopyScenario(SEED_STATED_COURSE)
+    el.querySelector<HTMLButtonElement>('.copy-gotit')!.click()
+    fillForm(perfectCopy(scenario.expected))
+    el.querySelector<HTMLInputElement>('[data-field="degrees"]')!.value = ''
+    el.querySelector<HTMLButtonElement>('.copy-submit')!.click()
+
+    const row = el.querySelector<HTMLElement>('.copy-row.is-wrong')
+    expect(row, 'a blank holding course must be graded wrong').toBeTruthy()
+    expect(row!.textContent).toMatch(/course/i)
+  })
+
+  // The review prints the expected EFC as "1745Z", which is also how a pilot
+  // writes it on the kneeboard. Copying that back must not be graded wrong.
+  it('accepts the EFC written with the zulu suffix the review itself displays', () => {
+    renderClearanceCopy(el, { seed: SEED_STATED_COURSE, store: testStore() })
+    const scenario = generateCopyScenario(SEED_STATED_COURSE)
+    el.querySelector<HTMLButtonElement>('.copy-gotit')!.click()
+    fillForm(perfectCopy(scenario.expected))
+    el.querySelector<HTMLInputElement>('[data-field="efc"]')!.value = `${scenario.expected.efc}Z`
+    el.querySelector<HTMLButtonElement>('.copy-submit')!.click()
+
+    expect(el.querySelectorAll('.copy-row.is-correct')).toHaveLength(6)
+  })
+
   it('grades an "as published" copy, where course and legs are not spoken', () => {
     // A quarter of generated clearances take this branch: the form must accept
     // "published" for both course and leg and grade all six fields.

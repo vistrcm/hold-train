@@ -350,6 +350,21 @@ describe('gradeCopiedClearance', () => {
     expect(grade.fields.find((f) => f.field === 'efc')!.correct).toBe(false)
   })
 
+  // A pilot copies "EFC 1745Z" onto the kneeboard, and the drill's own review
+  // panel prints the expected value as "1745Z" — so the zulu suffix is what the
+  // app teaches. Grading it wrong marks back exactly what was displayed.
+  it('accepts a copied EFC with or without the zulu suffix', () => {
+    for (const efc of ['1745', '1745Z', '1745z', ' 1745Z ']) {
+      const grade = gradeCopiedClearance({ ...perfectCopy, efc }, vorTimed)
+      expect(grade.fields.find((f) => f.field === 'efc')!.correct, JSON.stringify(efc)).toBe(true)
+    }
+  })
+
+  it('still flags a wrong EFC that carries the zulu suffix', () => {
+    const grade = gradeCopiedClearance({ ...perfectCopy, efc: '1754Z' }, vorTimed)
+    expect(grade.fields.find((f) => f.field === 'efc')!.correct).toBe(false)
+  })
+
   it('treats missing course degrees as incorrect rather than throwing', () => {
     const grade = gradeCopiedClearance({ ...perfectCopy, courseDegrees: undefined }, vorTimed)
     expect(grade.fields.find((f) => f.field === 'holdingCourse')!.correct).toBe(false)

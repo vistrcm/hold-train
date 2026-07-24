@@ -9,6 +9,7 @@ import {
 } from '../engine/sim'
 import { groundSpeeds, inboundCrab, outboundHeading, outboundTimeSeconds } from '../engine/wind'
 import { CHART_HOLDS } from '../content/questions'
+import { PUBLISHED_HOLDS } from '../engine/clearance'
 import {
   ACS_SOURCE,
   FIXES,
@@ -112,6 +113,18 @@ describe('generateWindScenario', () => {
     const charted = new Set(CHART_HOLDS.map((h) => h.fix))
     for (const fix of FIXES) {
       expect(charted.has(fix), fix).toBe(false)
+    }
+  })
+
+  // Both lists invent course, turns and legs independently, so a shared name is
+  // the same defect pointed inward: the student meets ZORVU as 300°/right on the
+  // entry-drill practice plate and as some other course/turn here, and has no
+  // way to know which invented hold is which. Names must be disjoint across
+  // every fixture list, not just against real-world data.
+  it('no fixture collides with a practice hold used elsewhere in the app', () => {
+    const published = new Set(PUBLISHED_HOLDS.map((h) => h.fix))
+    for (const fix of FIXES) {
+      expect(published.has(fix), `${fix} is also a PUBLISHED_HOLDS fixture`).toBe(false)
     }
   })
 })
@@ -347,6 +360,44 @@ describe('renderWindLab (screen)', () => {
     expect(debrief).toContain('next circuit')
     expect(debrief).toContain('AIM 5-3-8')
     expect(store.loadState().drills['wind-lab']?.attempts).toBe(1)
+  })
+
+  // The non-holding side is the UNPROTECTED side — the whole reason the hold has
+  // a side at all. sim.ts signs inboundCrossTrackNm for exactly this (positive =
+  // holding side), so the debrief must not collapse the negative case to a
+  // neutral "0.8 NM off the fix" and hide which side the drift was toward.
+  it('names the unprotected side when the inbound crossing is off the holding side', () => {
+    const { el } = setup(5)
+    const good = textbookNumbers(5)
+    // +40° of outbound heading error walks the circuit across the course.
+    fill(el, { ...good, outboundHeading: (good.outboundHeading + 40) % 360 })
+    el.querySelector<HTMLButtonElement>('.lab-fly')!.click()
+    const debrief = el.querySelector('.lab-debrief')!.textContent!
+    expect(debrief).toMatch(/non-holding \(unprotected\) side of the fix/)
+  })
+
+  it('names the holding side when the inbound crossing is on it', () => {
+    const { el } = setup(5)
+    const good = textbookNumbers(5)
+    fill(el, { ...good, outboundHeading: (good.outboundHeading + 360 - 40) % 360 })
+    el.querySelector<HTMLButtonElement>('.lab-fly')!.click()
+    const debrief = el.querySelector('.lab-debrief')!.textContent!
+    expect(debrief).toMatch(/holding side of the fix/)
+    expect(debrief).not.toMatch(/non-holding/)
+  })
+
+  // A sign flip in crabText would swap every crab callout in the app with no
+  // other symptom: the numbers stay right and only the word is wrong.
+  it('labels crab direction by sign — right for positive, left for negative', () => {
+    const left = setup(5) // seed 5's computed crab is negative
+    fill(left.el, textbookNumbers(5))
+    left.el.querySelector<HTMLButtonElement>('.lab-fly')!.click()
+    expect(left.el.querySelector('.lab-debrief')!.textContent!).toMatch(/Inbound crab:[^,]*left/)
+
+    const right = setup(11) // seed 11's computed crab is positive
+    fill(right.el, textbookNumbers(11))
+    right.el.querySelector<HTMLButtonElement>('.lab-fly')!.click()
+    expect(right.el.querySelector('.lab-debrief')!.textContent!).toMatch(/Inbound crab:[^,]*right/)
   })
 
   it('blank inputs get the fill-in prompt, not a raw engine error', () => {

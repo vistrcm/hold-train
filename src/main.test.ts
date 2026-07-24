@@ -43,4 +43,17 @@ describe('route registry (main.ts)', () => {
   it('boots the router into the #app root', () => {
     expect(document.querySelector('#app')!.innerHTML).not.toBe('')
   })
+
+  // Every other UI test injects `{ store, seed }`, so the no-argument path each
+  // screen actually takes in the browser — real localStorage, real clock, seed
+  // from Date.now() — is otherwise never executed. A screen that throws there
+  // leaves the router's root blank with the whole suite green.
+  it('every registered screen renders from the real default path', () => {
+    for (const screen of screens) {
+      const el = document.createElement('div')
+      expect(() => screen.render(el), `${screen.path} threw`).not.toThrow()
+      expect(el.innerHTML.trim(), `${screen.path} rendered nothing`).not.toBe('')
+      expect(el.querySelector('h1'), `${screen.path} has no heading`).toBeTruthy()
+    }
+  })
 })

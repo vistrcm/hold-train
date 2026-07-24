@@ -17,15 +17,27 @@ const ENTRY_MISS_SOURCE = 'AIM 5-3-8 j3 (entry procedures)'
 
 // Tabs would split the field; newlines would split the card. Anki renders
 // HTML, so line breaks survive as <br>.
+//
+// Double quotes have to go too: Anki's text importer is an RFC4180 reader, so a
+// field that STARTS with `"` is read as a quoted field — the quotes are stripped
+// and an odd count swallows the following tab. The core deck quotes ATC
+// phraseology ('"Hold northeast of ABC as published" — ...'), which is exactly
+// that shape. &quot; renders as a plain quote on the card.
 function escapeField(text: string): string {
-  return text.replace(/\t/g, ' ').replace(/\r\n|\r|\n/g, '<br>')
+  return text
+    .replace(/\t/g, ' ')
+    .replace(/\r\n|\r|\n/g, '<br>')
+    .replace(/"/g, '&quot;')
 }
 
 export function serializeDeck(cards: readonly AnkiCard[]): string {
   return cards
     .map((c) => {
       const back = `${c.back}<br>— ${c.source}`
-      return `${escapeField(c.front)}\t${escapeField(back)}\t${c.tags.join(' ')}`
+      // Tags are space-separated in Anki's third column, so the join itself is
+      // the delimiter — escape each tag, don't escape the joined string.
+      const tags = c.tags.map(escapeField).join(' ')
+      return `${escapeField(c.front)}\t${escapeField(back)}\t${tags}`
     })
     .join('\n')
 }
@@ -143,12 +155,21 @@ export interface AnkiExportOptions {
 
 export function renderAnkiExport(el: HTMLElement, options: AnkiExportOptions = {}): void {
   const store = options.store ?? appStore
-  const missCards = missesToCards(store.loadState().misses)
+  const misses = store.loadState().misses
+  const missCards = missesToCards(misses)
 
+  // Telling a student who has only drilled the copy or wind lab "no misses
+  // recorded yet" contradicts the Progress screen they just came from and reads
+  // as lost data. Those drills are tracked; they just have no card converter yet.
   const missesBody =
-    missCards.length === 0
-      ? '<p class="anki-empty">No misses recorded yet — drill first; missed items become cards here.</p>'
-      : `<p>Cards rebuilt from your missed entry scenarios, written questions, and oral items.</p>`
+    missCards.length > 0
+      ? `<p>Cards rebuilt from your missed entry scenarios, written questions, and oral items.</p>`
+      : misses.length > 0
+        ? `<p class="anki-empty">Your ${misses.length} recorded miss${misses.length === 1 ? '' : 'es'}
+             are all from drills that do not export cards yet — clearance copy, the TO/FROM
+             micro-drill and the wind lab are tracked on the Progress screen only. Entry, written
+             and oral misses become cards here.</p>`
+        : '<p class="anki-empty">No misses recorded yet — drill first; missed items become cards here.</p>'
   el.innerHTML = `
     <h1>Anki Export</h1>
     <section>

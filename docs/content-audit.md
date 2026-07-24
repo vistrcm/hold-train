@@ -405,3 +405,50 @@ geometry; timing-wind: j4, j8(c), j5; reports: 5-3-3 a1(f)/(g), i6 + P/CG + 91.1
   appended before the click and both the removal and the revoke happen in a
   later task. Regression: the `downloadTsv` test now asserts the anchor is
   connected at click time and that the revoke has not fired until timers run.
+- **Fixed: the copy drill graded back the EFC exactly as it had displayed it**
+  (`src/engine/clearance.ts`). `gradeCopiedClearance` compared the copied EFC by
+  exact string (`user.efc.trim() === expected.efc.trim()`) against the bare
+  four-digit value, while the review panel printed the expected value as
+  `${expected.efc}Z` and the field is labelled "EFC (zulu)". A pilot who wrote
+  `1745Z` — the form that goes on a kneeboard, and the form the app itself had
+  just shown — was marked wrong on a correctly copied clearance. Grading now
+  normalizes an optional trailing Z on both sides. Regression tests: "accepts a
+  copied EFC with or without the zulu suffix" and "still flags a wrong EFC that
+  carries the zulu suffix" in `src/engine/clearance.test.ts`, plus "accepts the
+  EFC written with the zulu suffix the review itself displays" through the real
+  DOM in `src/modules/clearance-copy.test.ts`.
+- **Fixed: the wind-lab fixture rename collided with the other fixture list**
+  (`src/modules/wind-lab.ts`). The previous entry moved `FIXES` off the real
+  waypoints WINDY/DRIFT/TIMBR and onto `ZORVU, QUIBO, GUSTO, VAXNU, CRABB` — but
+  ZORVU, QUIBO and VAXNU are `PUBLISHED_HOLDS` fixtures in
+  `src/engine/clearance.ts`. Both lists invent course, turns and legs
+  independently, so ZORVU was a 300°/right 1-minute hold on the entry-drill
+  practice plate and some other invented hold in the wind lab, with nothing to
+  tell the student which was which. The guard tests checked real waypoints and
+  `CHART_HOLDS` but never the app's own other fixture list. `FIXES` is now
+  `KELVO, MORVA, GUSTO, PLIXA, CRABB` (each confirmed 2026-07-23 to render the
+  bare OpenNav shell rather than a `<NAME> waypoint | OpenNav` record).
+  Regression test: "no fixture collides with a practice hold used elsewhere in
+  the app" in `src/modules/wind-lab.test.ts`.
+- **Fixed: the wind-lab debrief hid which side a wide inbound crossed on**
+  (`src/modules/wind-lab.ts`). `sim.ts` signs `inboundCrossTrackNm` so positive
+  is the holding side, but the debrief rendered the negative case as "crossing
+  0.8 NM off the fix" — dropping the one fact that matters. The non-holding side
+  is the side with no protected airspace, so the case the wording softened was
+  precisely the safety-relevant one. Now "holding side of the fix" /
+  "non-holding (unprotected) side of the fix". Regression tests: "names the
+  unprotected side when the inbound crossing is off the holding side" and "names
+  the holding side when the inbound crossing is on it" in
+  `src/modules/wind-lab.test.ts`.
+- **Fixed: the Anki core deck lost its ATC phraseology quotes on import**
+  (`src/app/anki-export.ts`). `escapeField` neutralized tabs and newlines but not
+  double quotes, and Anki's text importer is an RFC4180 reader: a field that
+  *starts* with `"` is parsed as a quoted field, so the quotes are stripped and
+  an odd count swallows the following tab. The card
+  `'"Hold northeast of ABC as published" — what does ATC still owe you?'` is
+  exactly that shape, and the quotes are what mark it as spoken phraseology.
+  Quotes are now emitted as `&quot;`, which Anki renders as a plain quote, and
+  each tag is escaped individually. Regression tests: "escapes double quotes so
+  a quoted field is not eaten by the importer", "emits no raw double quote
+  anywhere in the real core deck" and "keeps the tag column free of tabs and
+  newlines" in `src/app/anki-export.test.ts`.

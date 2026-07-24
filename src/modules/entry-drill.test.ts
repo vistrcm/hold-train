@@ -273,6 +273,33 @@ describe('renderEntryDrill screen', () => {
     }
   })
 
+  // The plan-view picture of the entry is the thing an HSI cannot show — you
+  // cannot see a teardrop's 30° offset or a parallel's >180° reintercept on a
+  // compass rose. mapview builds and tests it; until it is rendered here the
+  // student never sees it.
+  it('feedback draws the plan view of the entry actually flown', () => {
+    const { el } = setup('cockpit')
+    const scenario = generateScenario(42)
+    expect(el.querySelector('.map-entry'), 'no entry path before answering').toBeNull()
+
+    answerButton(el, scenario.result.primary).click()
+    const group = el.querySelector('.map-entry')
+    expect(group).not.toBeNull()
+    expect(group!.classList.contains(`map-entry-${scenario.result.primary}`)).toBe(true)
+  })
+
+  it('a wrong answer illustrates the correct entry, not the one chosen', () => {
+    const { el } = setup('cockpit')
+    const scenario = generateScenario(42)
+    const wrong = ENTRIES.find(
+      (e) => e !== scenario.result.primary && !scenario.result.alternates.includes(e),
+    )!
+    answerButton(el, wrong).click()
+    const group = el.querySelector('.map-entry')!
+    expect(group.classList.contains(`map-entry-${scenario.result.primary}`)).toBe(true)
+    expect(group.classList.contains(`map-entry-${wrong}`)).toBe(false)
+  })
+
   it('learn mode shows thumb and sector aids before answering', () => {
     const { el } = setup('learn')
     expect(el.querySelector('.hsi-thumb')).not.toBeNull()

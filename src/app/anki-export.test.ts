@@ -3,7 +3,7 @@
 // state). Written before the implementation (TDD).
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { AnkiCard } from '../content/anki-deck'
+import { CORE_DECK, type AnkiCard } from '../content/anki-deck'
 import { createStore, type Miss, type Store } from './store'
 import { ENTRIES } from '../engine/entry'
 import { createEntryDrill } from '../modules/entry-drill'
@@ -60,6 +60,34 @@ describe('serializeDeck', () => {
   it('joins multiple cards with newlines', () => {
     const tsv = serializeDeck([card, { ...card, front: 'Second' }])
     expect(tsv.split('\n')).toHaveLength(2)
+  })
+
+  // Anki's text importer is an RFC4180 reader: a field that STARTS with a double
+  // quote is parsed as a quoted field, so the quotes vanish and an odd count
+  // swallows the following delimiter. The core deck quotes ATC phraseology
+  // ('"Hold northeast of ABC as published" — ...'), which is exactly that shape.
+  // Anki renders HTML, so &quot; displays as a plain quote on the card.
+  it('escapes double quotes so a quoted field is not eaten by the importer', () => {
+    const quoted: AnkiCard = {
+      front: '"Hold as published" — what else?',
+      back: 'Only direction and "as published".',
+      source: 's',
+      tags: ['t'],
+    }
+    const line = serializeDeck([quoted])
+    expect(line).not.toContain('"')
+    expect(line.split('\t')).toHaveLength(3)
+    expect(line.split('\t')[0]).toBe('&quot;Hold as published&quot; — what else?')
+  })
+
+  it('emits no raw double quote anywhere in the real core deck', () => {
+    expect(serializeDeck(CORE_DECK)).not.toContain('"')
+  })
+
+  it('keeps the tag column free of tabs and newlines', () => {
+    const line = serializeDeck([{ ...card, tags: ['a\tb', 'c\nd'] }])
+    expect(line.split('\n')).toHaveLength(1)
+    expect(line.split('\t')).toHaveLength(3)
   })
 })
 
@@ -271,6 +299,10 @@ describe('downloadTsv', () => {
   })
   afterEach(() => {
     vi.restoreAllMocks()
+    // restoreAllMocks does NOT undo useFakeTimers. A failing assertion below
+    // would otherwise skip the in-test restore and leave every later test in
+    // this file running on a frozen clock.
+    vi.useRealTimers()
   })
 
   it('creates an object URL, clicks a download link, and revokes the URL', () => {
@@ -369,5 +401,27 @@ describe('anki export screen', () => {
     const missBtn = el.querySelector<HTMLButtonElement>('.anki-misses')
     expect(missBtn?.disabled).toBe(true)
     expect(el.textContent).toMatch(/no misses/i)
+  })
+
+  // clearance-copy, to-from and wind-lab record misses the dashboard shows but
+  // missesToCards has no converter for (a documented deferral). Telling that
+  // student "no misses recorded yet" contradicts the Progress screen they just
+  // came from and reads as lost data.
+  it('names the drills that are tracked but not exportable rather than claiming no misses', () => {
+    const backing = new Map<string, string>()
+    store = createStore({
+      storage: {
+        getItem: (k) => backing.get(k) ?? null,
+        setItem: (k, v) => backing.set(k, v),
+      },
+    })
+    store.recordMiss('wind-lab', { seed: 1 })
+    store.recordMiss('clearance-copy', { seed: 2 })
+    renderAnkiExport(el, { store })
+
+    expect(el.querySelector<HTMLButtonElement>('.anki-misses')?.disabled).toBe(true)
+    expect(el.textContent).not.toMatch(/no misses recorded yet/i)
+    expect(el.textContent).toMatch(/not.*export/i)
+    expect(el.textContent).toMatch(/wind.lab/i)
   })
 })

@@ -370,6 +370,14 @@ function gradeTurnDirection(user: CopiedClearance, expected: ClearanceFields): F
   return { field, correct: user.turnDirection === expected.turnDirection }
 }
 
+// A copied EFC is the same clearance whether or not the pilot wrote the zulu
+// suffix — "EFC 1745Z" is how it goes on the kneeboard, and how the copy
+// drill's own review panel prints the expected value. Grading the bare form
+// only would mark back exactly what the app displayed.
+function normalizeEfc(text: string): string {
+  return text.trim().toUpperCase().replace(/Z$/, '')
+}
+
 /** Grades a copied clearance field by field against what was actually said. */
 export function gradeCopiedClearance(
   user: CopiedClearance,
@@ -384,7 +392,7 @@ export function gradeCopiedClearance(
     gradeHoldingCourse(user, expected),
     gradeLegLength(user, expected),
     gradeTurnDirection(user, expected),
-    { field: 'efc', correct: user.efc.trim() === expected.efc.trim() },
+    { field: 'efc', correct: normalizeEfc(user.efc) === normalizeEfc(expected.efc) },
   ]
   return { allCorrect: fields.every((f) => f.correct), fields }
 }

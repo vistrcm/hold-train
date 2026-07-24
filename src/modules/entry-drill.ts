@@ -25,6 +25,7 @@ import {
   type EntryResult,
 } from '../engine/entry'
 import { renderHSI, type HSIProps } from '../ui/hsi'
+import { renderMap } from '../ui/mapview'
 import { courseText } from '../format'
 
 export type DrillMode = 'learn' | 'cockpit'
@@ -222,6 +223,7 @@ export function renderEntryDrill(el: HTMLElement, options: EntryDrillOptions = {
         ).join('')}
       </div>
       <div class="entry-feedback" aria-live="polite"></div>
+      <div class="entry-map"></div>
       <button class="entry-next" hidden>Next</button>
       <p class="entry-stats"></p>
     </section>
@@ -230,6 +232,7 @@ export function renderEntryDrill(el: HTMLElement, options: EntryDrillOptions = {
   const clearanceEl = el.querySelector<HTMLElement>('.entry-clearance')!
   const chartEl = el.querySelector<HTMLElement>('.entry-chart')!
   const hsiEl = el.querySelector<HTMLElement>('.entry-hsi')!
+  const mapEl = el.querySelector<HTMLElement>('.entry-map')!
   const feedbackEl = el.querySelector<HTMLElement>('.entry-feedback')!
   const nextBtn = el.querySelector<HTMLButtonElement>('.entry-next')!
   const statsEl = el.querySelector<HTMLElement>('.entry-stats')!
@@ -264,6 +267,8 @@ export function renderEntryDrill(el: HTMLElement, options: EntryDrillOptions = {
     chartEl.textContent = note ?? ''
     chartEl.hidden = note === undefined
     drawHSI(false)
+    // The plan view answers the question, so it only appears with the feedback.
+    mapEl.innerHTML = ''
     feedbackEl.textContent = ''
     feedbackEl.className = 'entry-feedback'
     nextBtn.hidden = true
@@ -278,6 +283,10 @@ export function renderEntryDrill(el: HTMLElement, options: EntryDrillOptions = {
     // Name the entry being flown — the pilot's own when it was accepted, the
     // primary otherwise — and list the remaining accepted entries as alternates.
     const flown = fb.correct ? fb.chosen : fb.result.primary
+    // North-up plan view of the entry being flown. The HSI cannot show a
+    // teardrop's 30° offset leg or a parallel's >180° reintercept — those are
+    // shapes on the ground, not needle positions.
+    renderMap(mapEl, { holdSpec: drill.scenario.holdSpec, entryPath: flown })
     const others = [fb.result.primary, ...fb.result.alternates]
       .filter((e) => e !== flown)
       .map((e) => ENTRY_LABELS[e])

@@ -46,9 +46,14 @@ const TARGET_INBOUND_S = 60
  * The scenario invents course, turns and legs for whichever name is drawn, so a
  * name must return no waypoint record at opennav.com/waypoint/US/<NAME>. The
  * earlier list failed that: WINDY is a fix at Newman, CA — beside KTCY — and
- * DRIFT and TIMBR are real too. Guarded by tests in wind-lab.test.ts.
+ * DRIFT and TIMBR are real too.
+ *
+ * Names must also be disjoint from every OTHER fixture list, which the first
+ * rename missed: ZORVU, QUIBO and VAXNU are PUBLISHED_HOLDS fixtures, so the
+ * same name carried one invented hold on the entry-drill practice plate and a
+ * different one here. Guarded by tests in wind-lab.test.ts.
  */
-export const FIXES = ['ZORVU', 'QUIBO', 'GUSTO', 'VAXNU', 'CRABB'] as const
+export const FIXES = ['KELVO', 'MORVA', 'GUSTO', 'PLIXA', 'CRABB'] as const
 
 export interface WindLabHold {
   fix: string
@@ -327,8 +332,11 @@ export function renderWindLab(el: HTMLElement, options: WindLabOptions = {}): vo
           .join('; ')
     const inbound = d.sim.completed
       ? `${Math.round(d.sim.inboundSeconds)} s (target ${TARGET_INBOUND_S} s), ` +
+        // Name the side. Drifting to the NON-holding side is the safety-relevant
+        // error — that is the side with no protected airspace — so it is exactly
+        // the case the debrief must not soften into a neutral "off the fix".
         `crossing ${Math.abs(Math.round(d.sim.inboundCrossTrackNm * 100) / 100)} NM ` +
-        `${d.sim.inboundCrossTrackNm >= 0 ? 'holding-side of' : 'off'} the fix`
+        `${d.sim.inboundCrossTrackNm >= 0 ? 'holding side of' : 'non-holding (unprotected) side of'} the fix`
       : 'never reached the fix'
 
     debriefEl.className = `lab-debrief ${d.correct ? 'is-correct' : 'is-wrong'}`
