@@ -319,3 +319,21 @@ geometry; timing-wind: j4, j8(c), j5; reports: 5-3-3 a1(f)/(g), i6 + P/CG + 91.1
   rejected with a `RangeError`. `MAX_OUTBOUND_SECONDS` is now exported from `sim.ts` and
   the suggestion is clamped to it. Regression test: "never suggests an outbound time the
   sim would reject" in `src/modules/wind-lab.test.ts`.
+- **Fixed: the wind lab called the ground-speed-ratio time "the rule", contradicting
+  the app's own written bank** (`src/modules/wind-lab.ts`). The lab grades the pilot's
+  *first-circuit* outbound time against `outboundTimeSeconds` ±10 s and labelled that
+  number "rule" in both the verdict line and the debrief row. But AIM 5-3-8 j4 — which
+  `timing-adjust-outbound` in `src/content/questions.ts` teaches, and which `wind.ts:11-13`
+  already flagged in a source comment as *not* an AIM rule — has you fly the **initial**
+  outbound leg at 1 minute and adjust only the subsequent ones. Nothing on screen stated
+  that the lab was instead asking for the ratio that yields a 60 s inbound, so a student
+  entering 60 s (the correct written-test answer) was told "yours 60 s, rule 34 s". Measured:
+  21 of the first 40 seeds put the ratio more than 10 s from 60 — seed 1 (course 000, wind
+  350@25) targets 34.2 s, seed 7 targets 74.5 s — because wind speeds are drawn 5–25 kt and
+  any along-course component over ~8 kt does it. The screen now states the ask in the input
+  label and a `.lab-ask` paragraph carrying the j4 caveat, and both the verdict and the
+  debrief row say "ground-speed ratio" rather than "rule". Grading is unchanged: with the
+  question stated, the ratio is the right answer to it. Regression tests: "states what
+  outbound time it asks for and carries the AIM j4 caveat", "never presents the
+  ground-speed-ratio time as \"the rule\"", and "grades 60 s as a miss only against a stated
+  ratio ask, and says so" in `src/modules/wind-lab.test.ts`.

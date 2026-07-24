@@ -249,6 +249,10 @@ export function renderWindLab(el: HTMLElement, options: WindLabOptions = {}): vo
       <p class="lab-scenario"></p>
       <p class="lab-hint">Predict your numbers, then fly the circuit. Solid track = your
         decisions; dashed = the textbook triple-drift circuit.</p>
+      <p class="lab-ask">Outbound time asked for here is the ground-speed ratio that makes the
+        <strong>inbound leg 60 s</strong> in this wind — not the leg you would actually fly first.
+        In the aeroplane you fly the first outbound leg at 1 minute and adjust the
+        <em>subsequent</em> ones (<cite>${TIMING_SOURCE}</cite>).</p>
       <div class="lab-form">
         <label>Outbound heading °
           <input class="lab-input-heading" type="number" inputmode="numeric" min="0" max="360" step="1">
@@ -256,7 +260,7 @@ export function renderWindLab(el: HTMLElement, options: WindLabOptions = {}): vo
         <label>Inbound crab ° (+ right / − left)
           <input class="lab-input-crab" type="number" inputmode="numeric" min="-45" max="45" step="1">
         </label>
-        <label>Outbound time s
+        <label>Outbound time s (for a 60 s inbound)
           <input class="lab-input-time" type="number" inputmode="numeric" min="1" max="600" step="1">
         </label>
       </div>
@@ -295,7 +299,9 @@ export function renderWindLab(el: HTMLElement, options: WindLabOptions = {}): vo
       : [
           d.headingWithinAcs ? '' : 'outbound heading outside ACS ±10°',
           d.crabWithinAcs ? '' : 'inbound crab off by more than 10°',
-          d.timingPlanOk ? '' : 'outbound time plan more than 10 s off the rule',
+          d.timingPlanOk
+            ? ''
+            : 'outbound time plan more than 10 s off the ground-speed ratio for a 60 s inbound',
           d.sim.completed ? '' : 'the circuit never made it back to the fix',
         ]
           .filter(Boolean)
@@ -314,8 +320,9 @@ export function renderWindLab(el: HTMLElement, options: WindLabOptions = {}): vo
           ${courseText(d.target.outboundHeading)} (Δ ${Math.round(Math.abs(d.headingErrorDeg))}°,
           triple drift — <cite>${d.sources.wind}</cite>; tolerance <cite>${d.sources.acs}</cite>)</li>
         <li>Inbound crab: yours ${crabText(d.numbers.crab)}, computed ${crabText(d.target.crab)}</li>
-        <li>Outbound time: yours ${Math.round(d.numbers.outboundSeconds)} s, rule
-          ${Math.round(d.target.outboundSeconds)} s</li>
+        <li>Outbound time: yours ${Math.round(d.numbers.outboundSeconds)} s, ground-speed ratio
+          ${Math.round(d.target.outboundSeconds)} s (AIM j4 has you fly the first outbound leg at
+          1 minute, then adjust the next one)</li>
         <li>Inbound leg: ${inbound}</li>
       </ul>
       <p class="lab-suggest">Adjust: next circuit fly ${d.nextOutboundSeconds} s outbound

@@ -317,6 +317,43 @@ describe('renderWindLab (screen)', () => {
     expect(el.querySelector('.lab-debrief')!.textContent).toBe('')
   })
 
+  // The graded outbound time is the ground-speed-ratio value, which is NOT the
+  // AIM j4 rule — j4 has you fly the FIRST outbound at 1 minute, then adjust
+  // (see `timing-adjust-outbound` in the written bank). For 21 of the first 40
+  // seeds that ratio is more than 10 s from 60, so a student answering the
+  // written bank's rule here is marked wrong. The screen must state the ask and
+  // carry the j4 caveat rather than calling the ratio "the rule".
+  it('states what outbound time it asks for and carries the AIM j4 caveat', () => {
+    const { el } = setup(5)
+    const prompt = el.textContent!
+    expect(prompt).toMatch(/60 s inbound|inbound leg 60 s|60 s inbound leg/i)
+    expect(prompt).toMatch(/first outbound leg .*1 minute|initial outbound.*1 minute/i)
+    expect(prompt).toMatch(/AIM 5-3-8 j4/)
+  })
+
+  it('never presents the ground-speed-ratio time as "the rule"', () => {
+    const { el } = setup(5)
+    // a wrong-by-plan flight, so the timing verdict line renders
+    fill(el, { ...textbookNumbers(5), outboundSeconds: 5 })
+    el.querySelector<HTMLButtonElement>('.lab-fly')!.click()
+    const debrief = el.querySelector('.lab-debrief')!.textContent!
+    expect(debrief).toMatch(/outbound time/i)
+    expect(debrief).not.toMatch(/\brule\b/i)
+  })
+
+  it('grades 60 s as a miss only against a stated ratio ask, and says so', () => {
+    // seed 1: course 000, wind 350@25 -> ratio target 34.2 s, so 60 s is >10 s off
+    const s = generateWindScenario(1)
+    expect(Math.abs(60 - s.target.outboundSeconds)).toBeGreaterThan(10)
+    const el = document.createElement('div')
+    renderWindLab(el, { seed: 1, store: testStore() })
+    fill(el, { ...textbookNumbers(1), outboundSeconds: 60 })
+    el.querySelector<HTMLButtonElement>('.lab-fly')!.click()
+    const debrief = el.querySelector('.lab-debrief')!.textContent!
+    // the student is told WHY 60 is not the answer to this question
+    expect(debrief).toMatch(/ground-speed ratio|ratio/i)
+  })
+
   it('registers as a routed screen', () => {
     expect(windLabScreen.path).toBe('wind-lab')
     expect(typeof windLabScreen.render).toBe('function')
