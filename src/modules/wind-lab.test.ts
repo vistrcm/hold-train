@@ -8,13 +8,16 @@ import {
   textbookDecisions,
 } from '../engine/sim'
 import { groundSpeeds, inboundCrab, outboundHeading, outboundTimeSeconds } from '../engine/wind'
+import { CHART_HOLDS } from '../content/questions'
 import {
   ACS_SOURCE,
+  FIXES,
   createWindLab,
   generateWindScenario,
   renderWindLab,
   windLabScreen,
   type PilotNumbers,
+  type WindLabDebrief,
 } from './wind-lab'
 
 /** In-memory store so tests never touch jsdom localStorage. */
@@ -36,6 +39,16 @@ function textbookNumbers(seed: number): PilotNumbers {
   const s = generateWindScenario(seed)
   const d = textbookDecisions(s.hold, s.wind)
   return { outboundHeading: d.outboundHeading, crab: d.inboundCrab, outboundSeconds: d.outboundSeconds }
+}
+
+/**
+ * The adjustment is only withheld on an incomplete circuit, so asserting the
+ * circuit closed is what earns the non-null — the tests below all fly one.
+ */
+function suggestion(d: WindLabDebrief): number {
+  expect(d.sim.completed).toBe(true)
+  expect(d.nextOutboundSeconds).not.toBeNull()
+  return d.nextOutboundSeconds as number
 }
 
 describe('generateWindScenario', () => {
@@ -78,6 +91,28 @@ describe('generateWindScenario', () => {
 
   it('rejects a non-finite seed', () => {
     expect(() => generateWindScenario(NaN)).toThrow(RangeError)
+  })
+
+  // Same defect class as the CEDES/SUNOL/TRACY fix in docs/content-audit.md, at
+  // the one fixture list that had no guard. generateWindScenario invents the
+  // course, turn direction and legs; if the name is a fix the student actually
+  // flies, repeated drilling memorizes invented data for a real hold. WINDY is
+  // a real waypoint at Newman, CA — beside KTCY, this student's home field.
+  it('no fixture reuses a real waypoint name', () => {
+    // Verified against opennav.com/waypoint/US/<NAME> on 2026-07-23: WINDY
+    // (Newman, CA), DRIFT and TIMBR (Timber, OR) return waypoint records; the
+    // names now in FIXES return none.
+    const real = ['WINDY', 'DRIFT', 'TIMBR', 'CEDES', 'SUNOL', 'TRACY', 'JEMKO']
+    for (const fix of FIXES) {
+      expect(real, `fixture ${fix}`).not.toContain(fix)
+    }
+  })
+
+  it('no fixture collides with a hold charted in the written bank', () => {
+    const charted = new Set(CHART_HOLDS.map((h) => h.fix))
+    for (const fix of FIXES) {
+      expect(charted.has(fix), fix).toBe(false)
+    }
   })
 })
 
@@ -135,7 +170,7 @@ describe('createWindLab fly → debrief', () => {
     // by the ground-speed ratio. (That the number actually works is the next
     // test — it flies the suggestion and checks the inbound closes to 60 s.)
     const gs = groundSpeeds(s.hold.inboundCourse, s.wind, HOLD_TAS_KT)
-    const correction = d.nextOutboundSeconds - numbers.outboundSeconds
+    const correction = suggestion(d) - numbers.outboundSeconds
     expect(Math.sign(correction)).toBe(Math.sign(60 - d.sim.inboundSeconds))
     expect(Math.abs(correction)).toBeCloseTo(
       (Math.abs(60 - d.sim.inboundSeconds) * gs.inboundKt) / gs.outboundKt,
@@ -151,9 +186,10 @@ describe('createWindLab fly → debrief', () => {
     const lab = createWindLab({ seed: 76, store: testStore() })
     const d = lab.fly({ outboundHeading: 0, crab: -45, outboundSeconds: 600 })
     expect(d.sim.inboundSeconds).toBeLessThan(1)
-    expect(d.nextOutboundSeconds).toBeGreaterThanOrEqual(1)
-    expect(d.nextOutboundSeconds).toBeLessThanOrEqual(MAX_OUTBOUND_SECONDS)
-    expect(() => lab.fly({ ...d.numbers, outboundSeconds: d.nextOutboundSeconds })).not.toThrow()
+    const next = suggestion(d)
+    expect(next).toBeGreaterThanOrEqual(1)
+    expect(next).toBeLessThanOrEqual(MAX_OUTBOUND_SECONDS)
+    expect(() => lab.fly({ ...d.numbers, outboundSeconds: next })).not.toThrow()
   })
 
   it('debriefs a circuit that never made it back to the fix', () => {
@@ -174,13 +210,27 @@ describe('createWindLab fly → debrief', () => {
     const debrief = el.querySelector<HTMLElement>('.lab-debrief')!
     expect(debrief.textContent).toContain('never made it back to the fix')
     expect(debrief.textContent).toContain('never reached the fix')
+    // No inbound leg was flown, so there is no inbound time to correct from.
+    // Printing a concrete "fly N s outbound" here hands the pilot a number
+    // derived from where the sim gave up, not from a measured circuit.
+    expect(debrief.textContent).not.toMatch(/next circuit fly \d/)
+  })
+
+  it('offers no next-circuit time when the circuit never reached the fix', () => {
+    // sim.inboundSeconds on an incomplete circuit is MAX_SIM_SECONDS minus the
+    // turn and outbound time — a truncation artifact. The AIM j4 adjustment
+    // scales the *inbound* error, so it has nothing to work from here.
+    const lab = createWindLab({ seed: 1, store: testStore() })
+    const d = lab.fly({ ...textbookNumbers(1), outboundSeconds: 600 })
+    expect(d.sim.completed).toBe(false)
+    expect(d.nextOutboundSeconds).toBeNull()
   })
 
   it('flying the suggested time next circuit closes the inbound to ~60 s', () => {
     const lab = createWindLab({ seed: 13, store: testStore() })
     const numbers = textbookNumbers(13)
     const first = lab.fly(numbers)
-    const second = lab.fly({ ...numbers, outboundSeconds: first.nextOutboundSeconds })
+    const second = lab.fly({ ...numbers, outboundSeconds: suggestion(first) })
     expect(Math.abs(second.sim.inboundSeconds - 60)).toBeLessThanOrEqual(3)
   })
 
@@ -258,6 +308,18 @@ describe('renderWindLab (screen)', () => {
     el.querySelector<HTMLInputElement>('.lab-input-crab')!.value = String(numbers.crab)
     el.querySelector<HTMLInputElement>('.lab-input-time')!.value = String(numbers.outboundSeconds)
   }
+
+  // The scenario line states course, turns and legs for a named fix and the map
+  // draws it north-up like a plate, but every one of those numbers is invented.
+  // entry-drill's chartNote labels the same shape fictitious; this one must too.
+  it('labels the scenario line as a practice fixture, not charted data', () => {
+    for (const seed of [0, 5, 17, 42]) {
+      const { el } = setup(seed)
+      const line = el.querySelector<HTMLElement>('.lab-scenario')!.textContent ?? ''
+      expect(line, `seed ${seed}`).toMatch(/practice fixture/i)
+      expect(line, `seed ${seed}`).toMatch(/fictitious/i)
+    }
+  })
 
   it('shows the scenario without leaking the target numbers', () => {
     const { el } = setup(5)

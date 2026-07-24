@@ -366,3 +366,42 @@ geometry; timing-wind: j4, j8(c), j5; reports: 5-3-3 a1(f)/(g), i6 + P/CG + 91.1
   leg is flown away/toward" — and are unchanged.) Regression test: "pairs the DME
   worked examples with the AIM inbound-course labels" in
   `src/content/lessons.test.ts`.
+- **Fixed: the wind lab drilled invented holds at three real waypoints**
+  (`src/modules/wind-lab.ts`). `FIXES` was `WINDY, DRIFT, GUSTO, TIMBR, CRABB`;
+  verified against `opennav.com/waypoint/US/<NAME>` on 2026-07-23, **WINDY**
+  (Newman, CA — beside KTCY, this student's home field), **DRIFT** and **TIMBR**
+  (Timber, OR) are real US waypoints. `generateWindScenario` invents the inbound
+  course, turn direction and legs for whichever name it draws, and the scenario
+  line rendered them as plain fact — "Hold at WINDY: inbound course 360°, right
+  turns, 1-minute legs" — next to a north-up racetrack drawn like a plate, with
+  no fictitious label. Same defect class as the CEDES/SUNOL/TRACY fix above, at
+  the one fixture list with no guard test: the existing guards cover
+  `PUBLISHED_HOLDS` and entry-drill's `chartNote` only. `FIXES` is now
+  `ZORVU, QUIBO, GUSTO, VAXNU, CRABB` (each confirmed to return no waypoint
+  record) and is exported so it can be tested; the scenario line now opens
+  "Practice fixture (fictitious fix) — …", mirroring `chartNote`. Regression
+  tests: "no fixture reuses a real waypoint name", "no fixture collides with a
+  hold charted in the written bank" and "labels the scenario line as a practice
+  fixture, not charted data" in `src/modules/wind-lab.test.ts`.
+- **Fixed: the wind lab advised a next-circuit time off a circuit that never
+  closed** (`src/modules/wind-lab.ts`). `nextOutboundSeconds` applied the AIM
+  5-3-8 j4 ground-speed-ratio adjustment to `sim.inboundSeconds`
+  unconditionally, but on `sim.completed === false` that value is the sim's time
+  limit minus the turn and outbound legs — an artifact of where the sim gave up,
+  not a measured inbound. The debrief printed "the circuit never made it back to
+  the fix", "Inbound leg: never reached the fix", and then "Adjust: next circuit
+  fly 532 s outbound" from that artifact. The field is now `number | null`, null
+  on an incomplete circuit, and the UI says there is no inbound time to correct
+  from and to re-fly with a shorter outbound leg. Regression tests: "offers no
+  next-circuit time when the circuit never reached the fix" and the extended
+  "debriefs a circuit that never made it back to the fix" in
+  `src/modules/wind-lab.test.ts`.
+- **Fixed: Anki downloads could silently produce no file**
+  (`src/app/anki-export.ts`). `downloadTsv` called `URL.revokeObjectURL(url)` in
+  the same synchronous task as `a.click()`, on an anchor never inserted into the
+  document. `click()` only *queues* the navigation that resolves the blob URL,
+  so the revoke can remove the entry before the download starts; a detached
+  anchor's activation is also a no-op in some browsers. The anchor is now
+  appended before the click and both the removal and the revoke happen in a
+  later task. Regression: the `downloadTsv` test now asserts the anchor is
+  connected at click time and that the revoke has not fired until timers run.

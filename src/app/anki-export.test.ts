@@ -274,16 +274,27 @@ describe('downloadTsv', () => {
   })
 
   it('creates an object URL, clicks a download link, and revokes the URL', () => {
+    vi.useFakeTimers()
     const click = vi
       .spyOn(HTMLAnchorElement.prototype, 'click')
       .mockImplementation(function (this: HTMLAnchorElement) {
         expect(this.download).toBe('hold-train-core.tsv')
         expect(this.href).toContain('blob:test-url')
+        // The anchor has to be in the document when it is activated: a
+        // detached anchor's navigation is a no-op in some browsers.
+        expect(this.isConnected).toBe(true)
       })
     downloadTsv('hold-train-core.tsv', 'front\tback\ttags')
     expect(URL.createObjectURL).toHaveBeenCalledOnce()
     expect(click).toHaveBeenCalledOnce()
+    // click() only *queues* the navigation that reads the blob URL. Revoking in
+    // the same task can pull the URL out from under it, and the download
+    // silently yields nothing.
+    expect(URL.revokeObjectURL).not.toHaveBeenCalled()
+    vi.runAllTimers()
     expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:test-url')
+    expect(document.querySelector('a[download]')).toBeNull()
+    vi.useRealTimers()
   })
 })
 

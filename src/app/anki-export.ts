@@ -126,8 +126,15 @@ export function downloadTsv(filename: string, tsv: string): void {
   const a = document.createElement('a')
   a.href = url
   a.download = filename
+  // click() only queues the navigation that reads the blob URL, and a detached
+  // anchor's activation is a no-op in some browsers. Attach it, then tear down
+  // in a later task so the queued fetch still resolves the URL.
+  document.body.appendChild(a)
   a.click()
-  URL.revokeObjectURL(url)
+  setTimeout(() => {
+    a.remove()
+    URL.revokeObjectURL(url)
+  }, 0)
 }
 
 export interface AnkiExportOptions {

@@ -40,8 +40,15 @@ const HEADING_TOLERANCE_DEG = 10
 const TIMING_PLAN_TOLERANCE_S = 10
 const TARGET_INBOUND_S = 60
 
-/** Practice fixtures — not real fixes. */
-const FIXES = ['WINDY', 'DRIFT', 'GUSTO', 'TIMBR', 'CRABB'] as const
+/**
+ * Practice fixtures — not real fixes.
+ *
+ * The scenario invents course, turns and legs for whichever name is drawn, so a
+ * name must return no waypoint record at opennav.com/waypoint/US/<NAME>. The
+ * earlier list failed that: WINDY is a fix at Newman, CA — beside KTCY — and
+ * DRIFT and TIMBR are real too. Guarded by tests in wind-lab.test.ts.
+ */
+export const FIXES = ['ZORVU', 'QUIBO', 'GUSTO', 'VAXNU', 'CRABB'] as const
 
 export interface WindLabHold {
   fix: string
@@ -82,8 +89,12 @@ export interface WindLabDebrief {
   crabWithinAcs: boolean
   timingPlanOk: boolean
   correct: boolean
-  /** Exact AIM j4 adjustment for the next circuit, whole seconds, ≥1. */
-  nextOutboundSeconds: number
+  /**
+   * Exact AIM j4 adjustment for the next circuit, whole seconds, ≥1 — or null
+   * when the circuit never reached the fix. The adjustment scales the *inbound*
+   * error, and an incomplete circuit has no inbound leg to measure.
+   */
+  nextOutboundSeconds: number | null
   sources: { wind: string; timing: string; acs: string }
 }
 
@@ -169,16 +180,21 @@ export function createWindLab(options: WindLabOptions = {}): WindLabController {
       const gs = groundSpeeds(hold.inboundCourse, wind, HOLD_TAS_KT)
       // Clamped to the sim's own accepted range: the suggestion is what the
       // pilot types in next, so a value flyCircuit would reject is not advice.
-      const nextOutboundSeconds = Math.min(
-        MAX_OUTBOUND_SECONDS,
-        Math.max(
-          1,
-          Math.round(
-            numbers.outboundSeconds +
-              ((TARGET_INBOUND_S - sim.inboundSeconds) * gs.inboundKt) / gs.outboundKt,
-          ),
-        ),
-      )
+      // Withheld entirely on an incomplete circuit — there sim.inboundSeconds is
+      // the sim's time limit minus the turn and outbound legs, an artifact of
+      // where it gave up rather than a measured inbound.
+      const nextOutboundSeconds = sim.completed
+        ? Math.min(
+            MAX_OUTBOUND_SECONDS,
+            Math.max(
+              1,
+              Math.round(
+                numbers.outboundSeconds +
+                  ((TARGET_INBOUND_S - sim.inboundSeconds) * gs.inboundKt) / gs.outboundKt,
+              ),
+            ),
+          )
+        : null
 
       if (!scored) {
         scored = true
@@ -280,9 +296,12 @@ export function renderWindLab(el: HTMLElement, options: WindLabOptions = {}): vo
 
   function showScenario(): void {
     const { hold, wind } = lab.scenario
+    // Labelled fictitious for the same reason as entry-drill's chartNote: the
+    // course, turns and legs are invented, and the map draws them north-up like
+    // a plate. Only the wind triangle is being taught here, never the hold.
     scenarioEl.textContent =
-      `Hold at ${hold.fix}: inbound course ${courseText(hold.inboundCourse)}, ` +
-      `${hold.turnDirection} turns, 1-minute legs. ` +
+      `Practice fixture (fictitious fix) — hold at ${hold.fix}: inbound course ` +
+      `${courseText(hold.inboundCourse)}, ${hold.turnDirection} turns, 1-minute legs. ` +
       `Wind ${courseText(wind.directionFrom)} at ${wind.speedKt} kt, TAS ${HOLD_TAS_KT} kt.`
     renderMap(mapEl, { holdSpec: lab.scenario.hold })
     debriefEl.textContent = ''
@@ -325,8 +344,14 @@ export function renderWindLab(el: HTMLElement, options: WindLabOptions = {}): vo
           1 minute, then adjust the next one)</li>
         <li>Inbound leg: ${inbound}</li>
       </ul>
-      <p class="lab-suggest">Adjust: next circuit fly ${d.nextOutboundSeconds} s outbound
-        (<cite>${d.sources.timing}</cite>).</p>
+      ${
+        d.nextOutboundSeconds === null
+          ? `<p class="lab-suggest">No adjustment to give: the circuit never closed on the fix,
+               so there is no inbound time to correct from. Re-fly it with a shorter outbound leg
+               (<cite>${d.sources.timing}</cite>).</p>`
+          : `<p class="lab-suggest">Adjust: next circuit fly ${d.nextOutboundSeconds} s outbound
+               (<cite>${d.sources.timing}</cite>).</p>`
+      }
     `
   }
 
