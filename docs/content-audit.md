@@ -452,3 +452,40 @@ geometry; timing-wind: j4, j8(c), j5; reports: 5-3-3 a1(f)/(g), i6 + P/CG + 91.1
   a quoted field is not eaten by the importer", "emits no raw double quote
   anywhere in the real core deck" and "keeps the tag column free of tabs and
   newlines" in `src/app/anki-export.test.ts`.
+
+## Post-completion review fix — 2026-07-23 (codex review iteration)
+
+- **Fixed: a charted hold's turns had no "per chart" copy and forced an arbitrary
+  guess** (`src/engine/clearance.ts`, `src/modules/clearance-copy.ts`).
+  `gradeLegLength` requires the student to copy a charted leg as `'published'`
+  (`correct: user.leg === 'published'`), but `gradeTurnDirection` returned
+  `correct: true` for *any* turn on the same charted hold — the one "as published"
+  field with no matching form option and no real answer. The copy form (radios
+  Right/Left only) then forced the student to pick a turn to submit at all, and the
+  missing-turn error read "silence from ATC still means one of them" — the omitted-
+  direction rule, which is exactly *not* how a charted hold's turns are set (they
+  come from the plate, JO 7110.65BB 4-6-4 / 4-6-1). `CopiedClearance.turnDirection`
+  now carries a `'published'` sentinel mirroring `leg`; the form has a "Per chart"
+  turn radio; `gradeTurnDirection` grades a charted hold `correct` only when the
+  student copies "per chart"; the error text now names both rules. Regression tests:
+  "grades an 'as published' copy, requiring 'per chart' for course, leg, and turns"
+  in `src/engine/clearance.test.ts`, and "'as published' requires 'per chart' turns;
+  a guessed left/right is wrong" / "'as published' copied with 'per chart' turns
+  grades clean" in `src/modules/clearance-copy.test.ts`.
+- **Fixed: the leg-value field handed over the unstated-leg rule for free**
+  (`src/modules/clearance-copy.ts`). The input pre-filled `value="1"` while the
+  engine resolves an unstated leg to the standard 1-minute inbound (AIM 5-3-8 j4),
+  so a student who never touched the field scored the omitted-field rule correct
+  without applying it — the same free-credit failure the deliberately-unchecked
+  turn radios avoid. The default is removed; an untouched leg now grades wrong.
+  Regression test: "an untouched leg value grades wrong on an unstated-leg hold"
+  in `src/modules/clearance-copy.test.ts`.
+- **Fixed: a backward system clock could wedge a drill** (`src/app/store.ts`).
+  Controllers set `answered = true`, then compute `timeSeconds` from a `Date.now()`
+  delta and call `recordDrillResult`; the store rejected negative times with a
+  `RangeError`, which a backward clock adjustment mid-scenario would trip, throwing
+  out of the click handler and leaving the screen frozen with no way to advance.
+  A non-finite time is still a programming error and throws; a negative time is now
+  clamped to 0. Regression tests: "clamps a negative time to 0 rather than throwing
+  (backward clock skew)" and "rejects non-finite times as programming errors" in
+  `src/app/store.test.ts`.

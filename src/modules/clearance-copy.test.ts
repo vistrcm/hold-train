@@ -51,7 +51,12 @@ function perfectCopy(expected: ClearanceFields): CopiedClearance {
     fix: expected.fix,
     courseKind: expected.courseKind,
     leg: expected.leg === 'unstated' ? { unit: 'min', value: 1 } : expected.leg,
-    turnDirection: expected.turnDirection === 'left' ? 'left' : 'right',
+    turnDirection:
+      expected.fixKind === 'charted'
+        ? 'published'
+        : expected.turnDirection === 'left'
+          ? 'left'
+          : 'right',
     efc: expected.efc,
   }
   if (expected.courseDegrees !== undefined) {
@@ -65,6 +70,7 @@ const SEED_UNSTATED_TURNS = findSeed(
 )
 const SEED_PUBLISHED = findSeed((f) => f.courseKind === 'published')
 const SEED_STATED_COURSE = findSeed((f) => f.courseDegrees !== undefined)
+const SEED_UNSTATED_LEG = findSeed((f) => f.leg === 'unstated')
 
 describe('generateCopyScenario', () => {
   it('is deterministic and wraps the engine generator', () => {
@@ -139,11 +145,18 @@ describe('createClearanceCopyDrill', () => {
     expect(turns?.trap).toBe(true)
   })
 
-  it('"as published" grades only present fields: any turn choice accepted', () => {
+  it('"as published" requires "per chart" turns; a guessed left/right is wrong', () => {
     const drill = createClearanceCopyDrill({ seed: SEED_PUBLISHED, store: testStore() })
     expect(drill.scenario.expected.courseKind).toBe('published')
     const user = { ...perfectCopy(drill.scenario.expected), turnDirection: 'left' as const }
     const fb = drill.submit(user)
+    expect(fb.correct).toBe(false)
+    expect(fb.grade.fields.find((f) => f.field === 'turnDirection')?.correct).toBe(false)
+  })
+
+  it('"as published" copied with "per chart" turns grades clean', () => {
+    const drill = createClearanceCopyDrill({ seed: SEED_PUBLISHED, store: testStore() })
+    const fb = drill.submit(perfectCopy(drill.scenario.expected))
     expect(fb.correct).toBe(true)
     expect(fb.grade.fields.find((f) => f.field === 'turnDirection')?.correct).toBe(true)
   })
@@ -402,6 +415,22 @@ describe('renderClearanceCopy', () => {
     const row = el.querySelector<HTMLElement>('.copy-row.is-wrong')
     expect(row, 'a blank holding course must be graded wrong').toBeTruthy()
     expect(row!.textContent).toMatch(/course/i)
+  })
+
+  // The leg-value field starts blank, not pre-filled to "1": an unstated leg
+  // resolves to the standard 1-minute inbound (AIM 5-3-8 j4), and a default of 1
+  // would hand that rule over for free instead of testing it.
+  it('an untouched leg value grades wrong on an unstated-leg hold', () => {
+    renderClearanceCopy(el, { seed: SEED_UNSTATED_LEG, store: testStore() })
+    const scenario = generateCopyScenario(SEED_UNSTATED_LEG)
+    expect(scenario.expected.leg).toBe('unstated')
+    el.querySelector<HTMLButtonElement>('.copy-gotit')!.click()
+    fillForm(perfectCopy(scenario.expected))
+    el.querySelector<HTMLInputElement>('[data-field="legValue"]')!.value = ''
+    el.querySelector<HTMLButtonElement>('.copy-submit')!.click()
+
+    const legRow = el.querySelector<HTMLElement>('.copy-row[data-field="legLength"]')!
+    expect(legRow.classList.contains('is-wrong')).toBe(true)
   })
 
   // The review prints the expected EFC as "1745Z", which is also how a pilot

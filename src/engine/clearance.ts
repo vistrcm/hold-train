@@ -72,7 +72,9 @@ export interface CopiedClearance {
   courseKind: CourseKind
   courseDegrees?: number
   leg: LegSpec | 'published'
-  turnDirection: TurnDirection
+  // 'published' is the affirmative "per chart" copy for a charted hold, mirroring
+  // leg. A charted hold's turns come from the plate, not from ATC's omission rule.
+  turnDirection: TurnDirection | 'published'
   efc: string
 }
 
@@ -351,10 +353,12 @@ function gradeLegLength(user: CopiedClearance, expected: ClearanceFields): Field
 function gradeTurnDirection(user: CopiedClearance, expected: ClearanceFields): FieldGrade {
   const field: GradedField = 'turnDirection'
   if (expected.fixKind === 'charted') {
+    // Symmetry with the leg field: a charted hold's turns are on the plate, so
+    // the correct copy is "per chart", not a guessed left/right.
     return {
       field,
-      correct: true,
-      note: 'Turn direction comes from the published pattern on the chart.',
+      correct: user.turnDirection === 'published',
+      note: 'Turn direction comes from the published pattern on the chart — copy it as "per chart".',
     }
   }
   if (expected.turnDirection === 'unstated') {

@@ -375,11 +375,12 @@ function renderCopyMode(pane: HTMLElement, options: CopyDrillOptions): void {
           <option value="published">as published</option>
         </select>
       </label>
-      <label>Leg value <input data-field="legValue" type="number" inputmode="numeric" value="1"></label>
+      <label>Leg value <input data-field="legValue" type="number" inputmode="numeric"></label>
       <fieldset>
         <legend>Turns</legend>
         <label><input type="radio" name="turn" value="right"> Right</label>
         <label><input type="radio" name="turn" value="left"> Left</label>
+        <label><input type="radio" name="turn" value="published"> Per chart</label>
       </fieldset>
       <label>EFC (zulu) <input data-field="efc" inputmode="numeric" autocomplete="off"></label>
       <p class="copy-error" aria-live="polite"></p>
@@ -463,7 +464,8 @@ function renderCopyMode(pane: HTMLElement, options: CopyDrillOptions): void {
   submitBtn.addEventListener('click', () => {
     const user = readCopiedClearance(form)
     if (user === null) {
-      errorEl.textContent = 'Pick a turn direction — silence from ATC still means one of them.'
+      errorEl.textContent =
+        'Pick a turn direction — ATC silence means right turns, a charted hold means per chart.'
       return
     }
     errorEl.textContent = ''

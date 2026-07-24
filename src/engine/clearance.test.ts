@@ -321,7 +321,7 @@ describe('gradeCopiedClearance', () => {
     expect(wrong.fields.find((x) => x.field === 'legLength')!.correct).toBe(false)
   })
 
-  it('grades an "as published" copy on the stated fields only', () => {
+  it('grades an "as published" copy, requiring "per chart" for course, leg, and turns', () => {
     const published: ClearanceFields = {
       direction: 'E',
       fix: 'CEDES',
@@ -331,18 +331,21 @@ describe('gradeCopiedClearance', () => {
       turnDirection: 'unstated',
       efc: '1630',
     }
-    const grade = gradeCopiedClearance(
-      {
-        direction: 'E',
-        fix: 'CEDES',
-        courseKind: 'published',
-        leg: 'published',
-        turnDirection: 'right',
-        efc: '1630',
-      },
-      published,
-    )
-    expect(grade.allCorrect).toBe(true)
+    const perChart: CopiedClearance = {
+      direction: 'E',
+      fix: 'CEDES',
+      courseKind: 'published',
+      leg: 'published',
+      turnDirection: 'published',
+      efc: '1630',
+    }
+    expect(gradeCopiedClearance(perChart, published).allCorrect).toBe(true)
+
+    // A charted hold's turns are on the plate: guessing left/right is not the
+    // copy, so it grades wrong (symmetry with the leg field).
+    const guessed = gradeCopiedClearance({ ...perChart, turnDirection: 'right' }, published)
+    expect(guessed.fields.find((f) => f.field === 'turnDirection')!.correct).toBe(false)
+    expect(guessed.allCorrect).toBe(false)
   })
 
   it('flags a wrong EFC', () => {

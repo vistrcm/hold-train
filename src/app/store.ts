@@ -166,9 +166,16 @@ export function createStore(options: StoreOptions = {}): Store {
   }
 
   function recordDrillResult(drill: string, result: DrillResult): AppState {
-    if (!Number.isFinite(result.timeSeconds) || result.timeSeconds < 0) {
-      throw new RangeError(`timeSeconds must be a non-negative number, got ${result.timeSeconds}`)
+    // A non-finite time is a programming error (uninitialised math, swapped
+    // args) and must surface. A negative time is not: controllers derive it from
+    // Date.now() deltas, so a backward system-clock adjustment mid-scenario can
+    // legitimately produce one. Clamp it to 0 rather than throw — throwing here
+    // escapes the drill's click handler and wedges the screen after it has
+    // already flipped to `answered`.
+    if (!Number.isFinite(result.timeSeconds)) {
+      throw new RangeError(`timeSeconds must be a finite number, got ${result.timeSeconds}`)
     }
+    const timeSeconds = Math.max(0, result.timeSeconds)
     const state = loadState()
     const stats = state.drills[drill] ?? {
       attempts: 0,
@@ -178,8 +185,8 @@ export function createStore(options: StoreOptions = {}): Store {
     }
     stats.attempts += 1
     stats.correct += result.correct ? 1 : 0
-    stats.totalTimeSeconds += result.timeSeconds
-    stats.recent = [...stats.recent, { ...result }].slice(-RECENT_WINDOW)
+    stats.totalTimeSeconds += timeSeconds
+    stats.recent = [...stats.recent, { ...result, timeSeconds }].slice(-RECENT_WINDOW)
     state.drills[drill] = stats
     saveState(state)
     return state

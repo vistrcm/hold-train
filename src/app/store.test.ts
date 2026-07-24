@@ -180,9 +180,19 @@ describe('recordDrillResult', () => {
     expect(stats?.recent[RECENT_WINDOW - 1]?.timeSeconds).toBe(RECENT_WINDOW + 4)
   })
 
-  it('rejects negative or non-finite times', () => {
-    expect(() => store.recordDrillResult('entry', result(true, -1))).toThrow(RangeError)
+  it('rejects non-finite times as programming errors', () => {
     expect(() => store.recordDrillResult('entry', result(true, NaN))).toThrow(RangeError)
+    expect(() => store.recordDrillResult('entry', result(true, Infinity))).toThrow(RangeError)
+  })
+
+  it('clamps a negative time to 0 rather than throwing (backward clock skew)', () => {
+    // Controllers derive time from Date.now() deltas; a backward clock jump can
+    // hand this a negative. Throwing would escape the drill's click handler and
+    // wedge the screen, so the store absorbs it.
+    const state = store.recordDrillResult('entry', result(true, -1))
+    const stats = state.drills['entry']
+    expect(stats?.totalTimeSeconds).toBe(0)
+    expect(stats?.recent[0]?.timeSeconds).toBe(0)
   })
 })
 
