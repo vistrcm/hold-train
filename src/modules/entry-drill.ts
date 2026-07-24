@@ -172,7 +172,9 @@ export function createEntryDrill(options: EntryDrillOptions = {}): EntryDrillCon
         correct,
         chosen,
         result: scenario.result,
-        guidance: entryGuidance(scenario.result.primary, scenario.holdSpec),
+        // A ±5° alternate is a correct answer, so fly what the pilot picked —
+        // the primary's script would describe a different pattern (AIM 5-3-8 j8(d)).
+        guidance: entryGuidance(correct ? chosen : scenario.result.primary, scenario.holdSpec),
         timeSeconds,
         overTarget: timeSeconds > COCKPIT_TARGET_SECONDS,
       }
@@ -273,14 +275,19 @@ export function renderEntryDrill(el: HTMLElement, options: EntryDrillOptions = {
 
   function showFeedback(fb: AnswerFeedback): void {
     drawHSI(true)
-    const primary = ENTRY_LABELS[fb.result.primary]
-    const alternates = fb.result.alternates.map((a) => ENTRY_LABELS[a]).join(' or ')
-    const alternateNote = alternates
-      ? ` ${alternates} also acceptable — within 5° of a sector boundary.`
+    // Name the entry being flown — the pilot's own when it was accepted, the
+    // primary otherwise — and list the remaining accepted entries as alternates.
+    const flown = fb.correct ? fb.chosen : fb.result.primary
+    const others = [fb.result.primary, ...fb.result.alternates]
+      .filter((e) => e !== flown)
+      .map((e) => ENTRY_LABELS[e])
+      .join(' or ')
+    const alternateNote = others
+      ? ` ${others} also acceptable — within 5° of a sector boundary.`
       : ''
     const verdict = fb.correct
-      ? `Correct — ${primary} entry.${alternateNote}`
-      : `Not quite — you chose ${ENTRY_LABELS[fb.chosen]}; correct answer: ${primary}.${alternateNote}`
+      ? `Correct — ${ENTRY_LABELS[flown]} entry.${alternateNote}`
+      : `Not quite — you chose ${ENTRY_LABELS[fb.chosen]}; correct answer: ${ENTRY_LABELS[flown]}.${alternateNote}`
     const g = fb.guidance
     const timing =
       `Answered in ${fb.timeSeconds.toFixed(1)} s` +

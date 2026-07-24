@@ -41,6 +41,26 @@ describe('lesson shape and sources', () => {
     }
   })
 
+  // AIM 5-3-8 j5 captions its two DME figures by the INBOUND course:
+  // "Inbound Toward NAVAID" is the 10 NM fix with 5 NM legs ending at 15 DME;
+  // "Inbound Leg Away from NAVAID" is the 28 NM fix with 8 NM legs ending at
+  // 20 DME. Labelling them the other way round teaches the figure titles
+  // backwards, which is how a student misreads the plate on the checkride.
+  it('pairs the DME worked examples with the AIM inbound-course labels', () => {
+    const lesson = LESSONS.find((l) => l.id === 'timing-wind')!
+    const dme = lesson.paragraphs.find((p) => p.text.includes('DME'))
+    expect(dme).toBeDefined()
+    const [towardHalf = '', awayHalf = ''] = dme!.text.split(';')
+
+    expect(towardHalf).toContain('toward')
+    expect(towardHalf).toContain('10 DME')
+    expect(towardHalf).toContain('15 DME')
+
+    expect(awayHalf).toContain('away')
+    expect(awayHalf).toContain('28 DME')
+    expect(awayHalf).toContain('20 DME')
+  })
+
   // Drill links are validated against the REAL route registry in
   // src/main.test.ts — a hand-copied path list here would go stale silently.
 })

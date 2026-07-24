@@ -15,6 +15,9 @@ import { courseText } from '../format'
 /** First seed whose generated clearance is a charted "as published" hold. */
 const CHARTED_SEED = 4
 
+/** Seed whose heading lands within 5° of a sector boundary: primary parallel, alternate direct. */
+const DUAL_KEYED_SEED = 3
+
 /** In-memory store so tests never touch jsdom localStorage. */
 function testStore(): Store {
   return createStore({ storage: undefined, now: () => 1234 })
@@ -207,6 +210,26 @@ describe('createEntryDrill controller', () => {
     expect(fb.guidance.source).toContain('AIM 5-3-8')
   })
 
+  // A ±5° alternate is a correct answer (AIM 5-3-8 j8(d)), so the "fly it"
+  // instructions must describe the entry the pilot actually chose. Handing a
+  // pilot who correctly answered Direct the parallel's turn-through-180° script
+  // is negative training at the one heading where the choice is subtlest.
+  it('guides the chosen entry, not the primary, when a ±5° alternate is answered', () => {
+    const drill = createEntryDrill({
+      mode: 'learn',
+      seed: DUAL_KEYED_SEED,
+      store: testStore(),
+      now: () => 0,
+    })
+    const { result } = drill.scenario
+    expect(result.primary).toBe('parallel')
+    expect(result.alternates).toContain('direct')
+
+    const fb = drill.answer('direct')
+    expect(fb.correct).toBe(true)
+    expect(fb.guidance.entry).toBe('direct')
+  })
+
   it('benchmark() scores the stored cockpit window (18/20 <10 s; 95% <15 s)', () => {
     const store = testStore()
     const clock = fakeClock()
@@ -273,6 +296,17 @@ describe('renderEntryDrill screen', () => {
     for (const entry of ENTRIES) {
       expect(answerButton(el, entry).disabled).toBe(true)
     }
+  })
+
+  it('correct ±5° alternate: the verdict names what the pilot chose, not the primary', () => {
+    const { el } = setup('learn', DUAL_KEYED_SEED)
+    answerButton(el, 'direct').click()
+
+    const verdict = el.querySelector('.entry-verdict')!.textContent!
+    expect(verdict).toContain('Correct — Direct entry')
+    expect(verdict).toContain('Parallel also acceptable')
+    // The parallel's signature instruction must not be attached to a direct entry.
+    expect(el.querySelector('.entry-guidance')!.textContent).not.toContain('more than 180°')
   })
 
   it('wrong answer: names the expected entry and records the miss', () => {

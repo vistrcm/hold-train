@@ -337,3 +337,32 @@ geometry; timing-wind: j4, j8(c), j5; reports: 5-3-3 a1(f)/(g), i6 + P/CG + 91.1
   outbound time it asks for and carries the AIM j4 caveat", "never presents the
   ground-speed-ratio time as \"the rule\"", and "grades 60 s as a miss only against a stated
   ratio ask, and says so" in `src/modules/wind-lab.test.ts`.
+- **Fixed: a correct ±5° alternate answer was told to fly the *other* entry**
+  (`src/modules/entry-drill.ts`). `gradeEntryAnswer` accepts any near-boundary
+  alternate per AIM 5-3-8 j8(d), but both the verdict line and the "Fly it:"
+  instructions were hard-wired to `result.primary`. On seed 3 (primary parallel,
+  alternate direct) a student who clicked **Direct** read "Correct — Parallel
+  entry. Direct also acceptable" and was then handed the parallel's script,
+  including "turn through more than 180°" — flying that from a direct-entry
+  heading leaves the protected side. The verdict and guidance now name the entry
+  actually flown (the pilot's own when accepted, the primary otherwise) and list
+  the remaining accepted entries as alternates; wrong answers read exactly as
+  before. Grading is unchanged. Regression tests: "guides the chosen entry, not
+  the primary, when a ±5° alternate is answered" and "correct ±5° alternate: the
+  verdict names what the pilot chose, not the primary" in
+  `src/modules/entry-drill.test.ts`.
+- **Fixed: the DME lesson labelled the AIM's worked examples backwards**
+  (`src/content/lessons.ts`). AIM 5-3-8 j5 captions its two figures by the
+  **inbound** course — "Inbound Toward NAVAID" is the 10 NM fix with 5 NM legs
+  ending at 15 DME, "Inbound Leg Away from NAVAID" is the 28 NM fix with 8 NM
+  legs ending at 20 DME (verified against the AIM HTML on faa.gov). The lesson
+  said "holding *away* … 10 DME … ends at 15 DME; holding *toward* … 28 DME …
+  20 DME", inverting the labels on the two examples a student memorizes, while
+  `dmeOutboundEnd`'s own `inbound: 'toward' | 'away'` parameter and
+  `wind.test.ts` use the AIM convention. The numbers were always right; only the
+  labels were flipped. The paragraph now states the convention explicitly and
+  names both leg directions. (`timing-dme-away`/`timing-dme-toward` in
+  `src/content/questions.ts` were already unambiguous — they say "the *outbound*
+  leg is flown away/toward" — and are unchanged.) Regression test: "pairs the DME
+  worked examples with the AIM inbound-course labels" in
+  `src/content/lessons.test.ts`.

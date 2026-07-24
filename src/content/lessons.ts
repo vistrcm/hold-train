@@ -106,7 +106,7 @@ export const LESSONS: readonly Lesson[] = [
         source: 'AIM 5-3-8 j8(c) (triple the inbound drift correction outbound)',
       },
       {
-        text: 'DME/ATD legs end on distance, not time. Holding away from the station with the fix at 10 DME and 5 NM legs, the outbound leg ends at 15 DME; holding toward the station with the fix at 28 DME and 8 NM legs, the outbound leg ends at 20 DME.',
+        text: 'DME/ATD legs end on distance, not time. Read the AIM figures by the inbound course: inbound toward the NAVAID with the fix at 10 DME and 5 NM legs, the outbound leg runs away from the station and ends at 15 DME; inbound away from the NAVAID with the fix at 28 DME and 8 NM legs, the outbound leg runs back toward the station and ends at 20 DME.',
         source: 'AIM 5-3-8 j5 (DME/ATD holding, worked examples)',
       },
     ],
