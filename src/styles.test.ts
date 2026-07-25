@@ -4,7 +4,7 @@ import { describe, it, expect } from 'vitest'
 // browser silently breaks and no DOM test can see. `?raw` is Vite's own
 // loader — no @types/node, no new dependency.
 import CSS from './styles.css?raw'
-import { COLOUR_LITERAL, contrastRatio } from './contrast'
+import { COLOUR_LITERAL, CSS_NAMED_COLOURS, contrastRatio } from './contrast'
 
 /** What a colour does decides its threshold: SC 1.4.3 asks 4.5:1 of text,
  * SC 1.4.11 asks 3:1 of a graphical object. `backdrop` names the two surfaces
@@ -33,16 +33,41 @@ function rootBlock(css: string): string {
   return match[1]
 }
 
-/** `--name: #value` pairs declared in `:root`, the only colours in the app's
- * stylesheet once the no-stray-hex rule below holds. */
-function palette(css: string): Map<string, string> {
+/** Every `--name: value` pair declared in `:root`, colour or not — the type
+ * scale and `--touch` live there too. Harvested generically rather than by
+ * matching `#`: a regex that only sees hex silently drops `--warn: orange` from
+ * the palette, and a value nothing harvests is a value nothing classifies and
+ * nothing measures. */
+function rootProps(css: string): Map<string, string> {
   const found = new Map<string, string>()
-  for (const [, name, value] of rootBlock(css).matchAll(
-    /(--[\w-]+):\s*(#[0-9a-fA-F]{3,8})\s*;/g,
-  )) {
-    found.set(name!, value!)
+  for (const [, name, value] of rootBlock(css).matchAll(/(--[\w-]+):\s*([^;]+);/g)) {
+    found.set(name!, value!.trim())
   }
   return found
+}
+
+/** A `:root` value that carries no colour: a length or a bare number. */
+const SCALE = /^-?[\d.]+(?:px|rem|em|ch|%|s|ms)?$/
+
+const HEX = /^#[0-9a-fA-F]{3,8}$/
+
+/** The `--name: #value` pairs, the only colours in the app's stylesheet once
+ * the two rules below hold. */
+function palette(css: string): Map<string, string> {
+  return new Map([...rootProps(css)].filter(([, value]) => HEX.test(value)))
+}
+
+/** Declaration values outside `:root`, with comments and quoted strings removed
+ * so prose and font names cannot be mistaken for a paint. Property names are
+ * excluded — only what sits right of the colon is scanned. */
+function declarationValues(css: string): Array<readonly [string, string]> {
+  const code = css.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/'[^']*'|"[^"]*"/g, ' ')
+  const outside = code.replace(rootBlock(code), ' ')
+  // A plain ident then `:` then a value terminated by `;` — selectors such as
+  // `p:first-child {` or `input:not([type=])` end in `{` or `,` and never match.
+  return [...outside.matchAll(/([\w-]+)\s*:\s*([^;{}]+);/g)].map(
+    ([, prop, value]) => [prop!, value!] as const,
+  )
 }
 
 describe('styles.css', () => {
@@ -96,6 +121,37 @@ describe('styles.css', () => {
     expect(root.match(COLOUR_LITERAL)?.length ?? 0).toBeGreaterThanOrEqual(7)
     const outside = CSS.replace(root, '').match(COLOUR_LITERAL) ?? []
     expect(outside).toEqual([])
+  })
+
+  // The third notation, and the one the scan above is blind to by construction:
+  // `COLOUR_LITERAL` omits named colours because matching bare words against
+  // TypeScript prose is all false positives. In CSS a declaration value is a
+  // bounded grammar, so the same word can be matched safely — `color: crimson`
+  // used to pass every guard in this file.
+  it('paints with no named colour outside :root', () => {
+    const values = declarationValues(CSS)
+    // Non-vacuous: a harvest that matched nothing — one stray character in the
+    // declaration regex does it — passes this for any stylesheet at all.
+    expect(values.length, 'declaration harvest found nothing').toBeGreaterThan(50)
+    expect(values.some(([prop]) => prop === 'background')).toBe(true)
+
+    const strays: string[] = []
+    for (const [prop, value] of values) {
+      for (const word of value.toLowerCase().match(/[a-z]+/g) ?? []) {
+        if (CSS_NAMED_COLOURS.has(word)) strays.push(`${prop}: ${value.trim()}`)
+      }
+    }
+    expect(strays, 'route colours through a var(--x) declared in :root').toEqual([])
+  })
+
+  // A `:root` colour the harvest cannot read is a colour the role table cannot
+  // classify and the oracle cannot measure — it would ship with zero assertions
+  // exactly like an unlisted role. `contrastRatio` reads hex, so hex it is.
+  it('declares every :root colour as a hex the oracle can read', () => {
+    const unreadable = [...rootProps(CSS)]
+      .filter(([, value]) => !HEX.test(value) && !SCALE.test(value))
+      .map(([name, value]) => `${name}: ${value}`)
+    expect(unreadable, 'a :root value must be a #hex colour or a length').toEqual([])
   })
 
   // The contrast test below can only judge roles it is told about, so the role

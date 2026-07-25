@@ -91,3 +91,43 @@ export function blend(fg: string, bg: string, alpha: number): string {
  */
 export const COLOUR_LITERAL =
   /#(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{4}|[0-9a-fA-F]{3})(?![0-9a-zA-Z_-])|\b(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch|color|color-mix)\(/g
+
+/**
+ * The CSS named colours, per CSS Color Module Level 4 §6.1
+ * (https://www.w3.org/TR/css-color-4/#named-colors).
+ *
+ * The third notation, and the one `COLOUR_LITERAL` deliberately cannot see. The
+ * reason it cannot — matching bare words against prose and identifiers is all
+ * false positives — is a property of TypeScript source, not of CSS: a CSS
+ * declaration value is a bounded grammar, so there the word can be matched
+ * safely and the hole closed rather than worked around. (The SVG modules close
+ * it a third way, by constraining `fill=`/`stroke=` attribute values.) Without
+ * this, `color: crimson` was a free way back into the stylesheet.
+ *
+ * Spec-closed data: unlike a hand-listed set of roles, this list does not grow
+ * with the app, so it cannot fall behind what ships.
+ *
+ * `transparent` and `currentcolor` are absent on purpose — neither introduces a
+ * colour of its own, so neither is something the oracle needs to measure.
+ */
+export const CSS_NAMED_COLOURS: ReadonlySet<string> = new Set(
+  `aliceblue antiquewhite aqua aquamarine azure beige bisque black blanchedalmond blue
+   blueviolet brown burlywood cadetblue chartreuse chocolate coral cornflowerblue cornsilk
+   crimson cyan darkblue darkcyan darkgoldenrod darkgray darkgreen darkgrey darkkhaki
+   darkmagenta darkolivegreen darkorange darkorchid darkred darksalmon darkseagreen
+   darkslateblue darkslategray darkslategrey darkturquoise darkviolet deeppink deepskyblue
+   dimgray dimgrey dodgerblue firebrick floralwhite forestgreen fuchsia gainsboro ghostwhite
+   gold goldenrod gray green greenyellow grey honeydew hotpink indianred indigo ivory khaki
+   lavender lavenderblush lawngreen lemonchiffon lightblue lightcoral lightcyan
+   lightgoldenrodyellow lightgray lightgreen lightgrey lightpink lightsalmon lightseagreen
+   lightskyblue lightslategray lightslategrey lightsteelblue lightyellow lime limegreen linen
+   magenta maroon mediumaquamarine mediumblue mediumorchid mediumpurple mediumseagreen
+   mediumslateblue mediumspringgreen mediumturquoise mediumvioletred midnightblue mintcream
+   mistyrose moccasin navajowhite navy oldlace olive olivedrab orange orangered orchid
+   palegoldenrod palegreen paleturquoise palevioletred papayawhip peachpuff peru pink plum
+   powderblue purple rebeccapurple red rosybrown royalblue saddlebrown salmon sandybrown
+   seagreen seashell sienna silver skyblue slateblue slategray slategrey snow springgreen
+   steelblue tan teal thistle tomato turquoise violet wheat white whitesmoke yellow yellowgreen`
+    .trim()
+    .split(/\s+/),
+)

@@ -105,9 +105,12 @@ describe('instrument palette', () => {
     expect(failures).toEqual([])
   })
 
-  // `PALETTE.face` says in a comment that it matches `--surface`; the SVG sits
-  // inside a `--surface` card, so a mismatch shows as a visible seam and, worse,
-  // silently changes what every ratio above was measured against.
+  // `PALETTE.face` says in a comment that it matches `--surface`, and a comment
+  // is not an assertion: a drift here silently changes what every ratio above
+  // was measured against. (The face is not a card — `.hsi`/`.mapview` carry no
+  // background rule, so the white rose sits straight on the `--bg` page at
+  // 1.13:1 and the bezel stroke is what supplies its edge, measured on `--bg`
+  // at the graphic tier above.)
   it('keeps the instrument face equal to the stylesheet surface', () => {
     expect(PALETTE.face).toBe(styleColour('--surface'))
   })
@@ -210,6 +213,33 @@ describe('instrument source', () => {
       }
     }
     expect(strays).toEqual([])
+  })
+
+  // Same rule one level down: an alpha is not a colour, but it decides what
+  // colour actually reaches the eye, so it has to be visible to the composite
+  // tests above. A hand-written `fill-opacity="0.5"` is an alpha those tests
+  // cannot see and therefore silently certify at `OVERLAY_ALPHA`'s value — the
+  // whole defect `OVERLAY_ALPHA` exists to prevent, left half-closed because the
+  // boundary check only banned `stroke-opacity`.
+  it('takes every alpha from OVERLAY_ALPHA', () => {
+    const strays: string[] = []
+    for (const [name, source] of modules) {
+      for (const [, attr, value] of source.matchAll(/([\w-]*opacity)="([^"]*)"/g)) {
+        if (value!.includes('${OVERLAY_ALPHA.')) continue
+        strays.push(`${name}: ${attr}="${value}"`)
+      }
+    }
+    expect(strays, 'declare the alpha in OVERLAY_ALPHA so the suite composites it').toEqual([])
+  })
+
+  // And the exhaustiveness half: a third alpha added to OVERLAY_ALPHA and used
+  // on a mark would satisfy the guard above while no test composited it. Listed
+  // here rather than inferred, for the same reason `TIERS` is.
+  it('composites every alpha it declares', () => {
+    const measured = ['sectorFill', 'thumbBand']
+    expect(Object.keys(OVERLAY_ALPHA).sort(), 'add a composited assertion for these').toEqual(
+      measured.sort(),
+    )
   })
 })
 
