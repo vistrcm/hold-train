@@ -106,12 +106,22 @@ palette.
 - Create: `src/ui/palette.ts`, `src/ui/palette.test.ts`
 - Modify: `src/ui/hsi.ts`, `src/ui/mapview.ts`
 
-- [ ] write `src/ui/palette.test.ts` first: every entry color and ink color in the palette clears 4.5:1 against `PALETTE.face` when it renders text (labels, heading readout) and 3.0:1 when it renders a line or shape (ticks, bezel, racetrack, entry paths, wind vector); assert the entry-color keys are exactly `direct | teardrop | parallel`
-- [ ] add a source-text assertion in the same file, using the `?raw` idiom already used for `styles.css` and `README.md`: importing `../ui/hsi.ts?raw` and `../ui/mapview.ts?raw`, assert neither contains a `#rrggbb` literal — the palette import is now the only way a color enters an instrument. Include a non-empty length guard so the assertion cannot pass vacuously
-- [ ] create `src/ui/palette.ts` exporting a single frozen `PALETTE` (`face`, `bezel`, `ink`, `inkDim`, `entry: {direct, teardrop, parallel}`, `cdi`, `readout`) with the verified values from the Overview
-- [ ] replace `SECTOR_COLORS` in `hsi.ts` and `ENTRY_COLORS` in `mapview.ts` with `PALETTE.entry`, and substitute every remaining literal in both files
-- [ ] verify the existing `hsi.test.ts` and `mapview.test.ts` geometry assertions still pass untouched — the change is color-only, so any failure there means a template string was broken
-- [ ] run `npm test` and `npm run typecheck` — both must pass before Task 4
+- [x] write `src/ui/palette.test.ts` first: every entry color and ink color in the palette clears 4.5:1 against `PALETTE.face` when it renders text (labels, heading readout) and 3.0:1 when it renders a line or shape (ticks, bezel, racetrack, entry paths, wind vector); assert the entry-color keys are exactly `direct | teardrop | parallel`
+- [x] add a source-text assertion in the same file, using the `?raw` idiom already used for `styles.css` and `README.md`: importing `../ui/hsi.ts?raw` and `../ui/mapview.ts?raw`, assert neither contains a `#rrggbb` literal — the palette import is now the only way a color enters an instrument. Include a non-empty length guard so the assertion cannot pass vacuously
+- [x] create `src/ui/palette.ts` exporting a single frozen `PALETTE` (`face`, `bezel`, `ink`, `inkDim`, `entry: {direct, teardrop, parallel}`, `cdi`, `readout`) with the verified values from the Overview
+- [x] replace `SECTOR_COLORS` in `hsi.ts` and `ENTRY_COLORS` in `mapview.ts` with `PALETTE.entry`, and substitute every remaining literal in both files
+- [x] verify the existing `hsi.test.ts` and `mapview.test.ts` geometry assertions still pass untouched — the change is color-only, so any failure there means a template string was broken
+- [x] run `npm test` and `npm run typecheck` — both must pass before Task 4
+
+Two things the checklist did not anticipate. First, the map's north arrow drew its
+`N` *letter* in the dim graphic colour; at `#7d8894` that is 3.61:1 text, which
+fails SC 1.4.3. The arrow and line stay `inkDim`, the letter moved to `ink`, so
+`inkDim` is now purely a line colour and the test can hold it to the 3:1 tier
+honestly. Second, the source-text assertion also requires each module to contain
+`from './palette'`: "no hex literals" alone passes for a file that renders no
+colour at all. `hsi.ts?raw` and `mapview.ts?raw` resolve without touching
+`vite.config.ts` — `test.css.include` gates CSS only, and `?raw` on a `.ts` file
+is handled by Vite's asset plugin before the TS transform.
 
 ### Task 4: Verify acceptance criteria
 

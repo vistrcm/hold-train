@@ -3,7 +3,8 @@
 // entry-path illustrations (teardrop 30° offset toward the holding side;
 // parallel on the non-holding side with a >180° pattern-direction reintercept).
 // Entry directions come from entryGuidance — the engine is the oracle.
-// Same dark instrument-panel aesthetic as the HSI.
+// Shares the HSI's instrument palette (src/ui/palette.ts), so an entry keeps
+// one colour across the compass rose and the plan view.
 // Pure rendering: state in, SVG out. No internal state, no listeners.
 //
 // Geometry is computed in NM east/north of the fix (fix at the origin), then
@@ -14,6 +15,7 @@ import type { LegSpec } from '../engine/clearance'
 import { type Entry, type EntryGuidance, type TurnDirection, entryGuidance } from '../engine/entry'
 import { assertCourse, normalizeDeg } from '../engine/geometry'
 import { courseText } from '../format'
+import { PALETTE } from './palette'
 
 /** Position in NM east/north of the holding fix. */
 export interface MapPoint {
@@ -51,13 +53,6 @@ const NM_PER_MIN = 1.5 // ~90 kt ground speed in the hold (C172)
 const TURN_RADIUS_NM = 0.48 // standard-rate 180° at ~90 kt: 1.5 NM of arc / π
 const PARALLEL_OFFSET_NM = 0.15 // draw the parallel leg visibly off the course line
 const ROOM = 84 // svg units for leg length + entry turns along the course axis
-
-// Matches the HSI sector colors so each entry keeps one color across the app.
-const ENTRY_COLORS: Record<Entry, string> = {
-  direct: '#3fbf6f',
-  teardrop: '#e6a23c',
-  parallel: '#4f8fe0',
-}
 
 function r2(v: number): number {
   return Math.round(v * 100) / 100
@@ -119,9 +114,9 @@ function racetrack(hold: MapHold, legNm: number, scale: number): string {
   const mid = project(add(fix, along, -legNm / 2), scale)
   return (
     `<path class="map-racetrack" data-turn="${hold.turnDirection}" d="${d}" ` +
-    `fill="none" stroke="#e8edf2" stroke-width="1.8"/>` +
+    `fill="none" stroke="${PALETTE.ink}" stroke-width="1.8"/>` +
     // direction-of-flight arrow on the inbound leg
-    `<polygon class="map-course-arrow" points="0,-4.5 3.5,3.5 -3.5,3.5" fill="#e8edf2" ` +
+    `<polygon class="map-course-arrow" points="0,-4.5 3.5,3.5 -3.5,3.5" fill="${PALETTE.ink}" ` +
     `transform="translate(${mid.x} ${mid.y}) rotate(${r2(c)})"/>`
   )
 }
@@ -190,7 +185,7 @@ function entryOverlay(entry: Entry, hold: MapHold, legNm: number, scale: number)
     `<g class="map-entry map-entry-${entry}" data-outbound-heading="${g.outboundHeading}" ` +
     `data-side="${g.side}" data-turn-to-inbound="${g.turnToInbound}">` +
     `<path d="${entryPathD(entry, g, hold, legNm, scale)}" fill="none" ` +
-    `stroke="${ENTRY_COLORS[entry]}" stroke-width="2" stroke-dasharray="5 3" ` +
+    `stroke="${PALETTE.entry[entry]}" stroke-width="2" stroke-dasharray="5 3" ` +
     `stroke-linecap="round"/></g>`
   )
 }
@@ -210,20 +205,20 @@ function polyline(points: MapPoint[], scale: number, cls: string, name: string):
     .join(' ')
   const style =
     cls === 'map-ghost-track'
-      ? 'stroke="#9aa7b2" stroke-width="1.4" stroke-dasharray="3 3"'
-      : 'stroke="#7fd0ff" stroke-width="1.6"'
+      ? `stroke="${PALETTE.inkDim}" stroke-width="1.4" stroke-dasharray="3 3"`
+      : `stroke="${PALETTE.readout}" stroke-width="1.6"`
   return `<polyline class="${cls}" points="${pts}" fill="none" ${style}/>`
 }
 
 function fixMarker(name: string | undefined): string {
   // open triangle, FAA-chart intersection style
   const label = name
-    ? `<text class="map-fix-label" x="${C + 7}" y="${C - 5}" fill="#e8edf2" font-size="9" ` +
+    ? `<text class="map-fix-label" x="${C + 7}" y="${C - 5}" fill="${PALETTE.ink}" font-size="9" ` +
       `font-weight="700" font-family="system-ui, sans-serif">${name}</text>`
     : ''
   return (
     `<polygon class="map-fix" points="${C},${C - 4.5} ${C + 4},${C + 3} ${C - 4},${C + 3}" ` +
-    `fill="#0d1115" stroke="#e8edf2" stroke-width="1.5"/>` + label
+    `fill="${PALETTE.face}" stroke="${PALETTE.ink}" stroke-width="1.5"/>` + label
   )
 }
 
@@ -234,17 +229,19 @@ function ownshipEl(ownship: Ownship, scale: number): string {
   return (
     `<g class="map-ownship" data-heading="${heading}" ` +
     `transform="translate(${x} ${y}) rotate(${r2(heading)})">` +
-    `<path d="M0 -6 L0 6 M-5 -1 L5 -1 M-3 4.5 L3 4.5" stroke="#e8edf2" ` +
+    `<path d="M0 -6 L0 6 M-5 -1 L5 -1 M-3 4.5 L3 4.5" stroke="${PALETTE.ink}" ` +
     `stroke-width="1.8" fill="none" stroke-linecap="round"/></g>`
   )
 }
 
 function northArrow(): string {
+  // The arrow itself is a graphic and may sit at the dim 3:1 tier; the "N" is
+  // a letter, so it takes the full-contrast ink instead.
   return (
     `<g class="map-north">` +
-    `<line x1="14" y1="26" x2="14" y2="13" stroke="#9aa7b2" stroke-width="1.5"/>` +
-    `<polygon points="14,8 10.5,15 17.5,15" fill="#9aa7b2"/>` +
-    `<text x="21" y="19" fill="#9aa7b2" font-size="9" font-weight="700" ` +
+    `<line x1="14" y1="26" x2="14" y2="13" stroke="${PALETTE.inkDim}" stroke-width="1.5"/>` +
+    `<polygon points="14,8 10.5,15 17.5,15" fill="${PALETTE.inkDim}"/>` +
+    `<text x="21" y="19" fill="${PALETTE.ink}" font-size="9" font-weight="700" ` +
     `font-family="system-ui, sans-serif">N</text></g>`
   )
 }
@@ -263,7 +260,8 @@ export function renderMap(el: Element, props: MapProps): void {
   el.innerHTML =
     `<svg class="mapview" viewBox="0 0 200 200" role="img" aria-label="${aria}" ` +
     `data-scale="${r2(scale)}">` +
-    `<rect x="1" y="1" width="198" height="198" rx="8" fill="#0d1115" stroke="#2a323c" stroke-width="2"/>` +
+    `<rect x="1" y="1" width="198" height="198" rx="8" fill="${PALETTE.face}" ` +
+    `stroke="${PALETTE.bezel}" stroke-width="2"/>` +
     racetrack(hold, legNm, scale) +
     (props.entryPath ? entryOverlay(props.entryPath, hold, legNm, scale) : '') +
     (props.ghostTrack ? polyline(props.ghostTrack, scale, 'map-ghost-track', 'ghostTrack point') : '') +

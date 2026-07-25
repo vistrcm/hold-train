@@ -9,6 +9,7 @@
 import type { Entry, SectorArc, TurnDirection } from '../engine/entry'
 import { normalizeDeg } from '../engine/geometry'
 import { courseText } from '../format'
+import { PALETTE } from './palette'
 
 export interface HSIProps {
   /** Aircraft magnetic heading; the card rotates so it sits under the lubber. */
@@ -25,12 +26,6 @@ const C = 100 // rose center
 const ROSE_R = 78
 const TICK_R = 74
 const LABEL_R = 52
-
-const SECTOR_COLORS: Record<Entry, string> = {
-  direct: '#3fbf6f',
-  teardrop: '#e6a23c',
-  parallel: '#4f8fe0',
-}
 
 // Card labels every 30°, G1000 style: cardinal letters, numbers without the
 // trailing zero elsewhere.
@@ -73,7 +68,7 @@ function ticks(): string {
     const major = deg % 10 === 0
     const outer = polar(deg, TICK_R)
     const inner = polar(deg, TICK_R - (major ? 9 : 5))
-    const color = major ? '#e8edf2' : '#9aa7b2'
+    const color = major ? PALETTE.ink : PALETTE.inkDim
     parts.push(
       `<line class="hsi-tick" x1="${outer.x}" y1="${outer.y}" x2="${inner.x}" y2="${inner.y}" ` +
         `stroke="${color}" stroke-width="${major ? 1.6 : 1}"/>`,
@@ -88,7 +83,7 @@ function labels(): string {
     const cardinal = label.length === 1
     return (
       `<text class="hsi-label" x="${C}" y="${C - LABEL_R}" transform="rotate(${deg} ${C} ${C})" ` +
-      `text-anchor="middle" fill="#e8edf2" font-size="${cardinal ? 13 : 11}" ` +
+      `text-anchor="middle" fill="${PALETTE.ink}" font-size="${cardinal ? 13 : 11}" ` +
       `font-weight="${cardinal ? 700 : 400}" font-family="system-ui, sans-serif">${label}</text>`
     )
   }).join('')
@@ -99,7 +94,7 @@ function sectorOverlay(sectors: Record<Entry, SectorArc>): string {
   return entries
     .map((entry) => {
       const { from, to } = sectors[entry]
-      const color = SECTOR_COLORS[entry]
+      const color = PALETTE.entry[entry]
       return (
         `<path class="hsi-sector hsi-sector-${entry}" data-from="${from}" data-to="${to}" ` +
         `d="${pieWedge(from, to, TICK_R)}" fill="${color}" fill-opacity="0.16" ` +
@@ -111,7 +106,7 @@ function sectorOverlay(sectors: Record<Entry, SectorArc>): string {
 
 function coursePointer(course: number): string {
   // Drawn pointing up, rotated into place; magenta per G1000 GPS guidance.
-  const m = '#e04ee0'
+  const m = PALETTE.cdi
   return (
     `<g class="hsi-course" transform="rotate(${course} ${C} ${C})">` +
     `<polygon points="100,32 94,46 106,46" fill="${m}"/>` +
@@ -130,7 +125,8 @@ function thumbBand(turnDirection: TurnDirection): string {
   const [from, to] = turnDirection === 'right' ? [70, 90] : [270, 290]
   return (
     `<path class="hsi-thumb" data-from="${from}" data-to="${to}" ` +
-    `d="${bandWedge(from, to, ROSE_R, ROSE_R - 8)}" fill="#e6a23c" fill-opacity="0.9"/>`
+    `d="${bandWedge(from, to, ROSE_R, ROSE_R - 8)}" fill="${PALETTE.entry.teardrop}" ` +
+    `fill-opacity="0.9"/>`
   )
 }
 
@@ -145,7 +141,8 @@ export function renderHSI(el: Element, props: HSIProps): void {
     `<svg class="hsi" viewBox="0 0 200 200" role="img" aria-label="${aria}">` +
     // rotating card: bezel, sector wedges, ticks, labels, course pointer
     `<g class="hsi-rose" transform="rotate(${r2(-heading)} ${C} ${C})">` +
-    `<circle cx="${C}" cy="${C}" r="${ROSE_R}" fill="#0d1115" stroke="#2a323c" stroke-width="2"/>` +
+    `<circle cx="${C}" cy="${C}" r="${ROSE_R}" fill="${PALETTE.face}" stroke="${PALETTE.bezel}" ` +
+    `stroke-width="2"/>` +
     (props.sectorOverlay ? sectorOverlay(props.sectorOverlay) : '') +
     ticks() +
     labels() +
@@ -153,11 +150,13 @@ export function renderHSI(el: Element, props: HSIProps): void {
     `</g>` +
     // airframe-fixed: thumb band, lubber line, aircraft symbol, readout
     (props.thumbOverlay ? thumbBand(props.thumbOverlay) : '') +
-    `<polygon class="hsi-lubber" points="100,26 95,15 105,15" fill="#e8edf2"/>` +
+    `<polygon class="hsi-lubber" points="100,26 95,15 105,15" fill="${PALETTE.ink}"/>` +
     `<path class="hsi-aircraft" d="M100 90 L100 112 M90 99 L110 99 M95 109 L105 109" ` +
-    `stroke="#e8edf2" stroke-width="2" fill="none" stroke-linecap="round"/>` +
-    `<rect x="79" y="0" width="42" height="15" rx="2" fill="#0d1115" stroke="#2a323c"/>` +
-    `<text class="hsi-heading-readout" x="${C}" y="11.5" text-anchor="middle" fill="#7fd0ff" ` +
+    `stroke="${PALETTE.ink}" stroke-width="2" fill="none" stroke-linecap="round"/>` +
+    `<rect x="79" y="0" width="42" height="15" rx="2" fill="${PALETTE.face}" ` +
+    `stroke="${PALETTE.bezel}"/>` +
+    `<text class="hsi-heading-readout" x="${C}" y="11.5" text-anchor="middle" ` +
+    `fill="${PALETTE.readout}" ` +
     `font-size="11" font-weight="700" font-family="system-ui, sans-serif">${courseText(heading)}</text>` +
     `</svg>`
 }
