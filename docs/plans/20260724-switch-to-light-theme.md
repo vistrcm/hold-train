@@ -149,9 +149,22 @@ exit 0; `vite build` exit 0 (5.50 kB CSS, 112.06 kB JS).
 
 ### Task 5: Update documentation
 
-- [ ] add a Conventions entry to `CLAUDE.md`: colors live in exactly two places (`:root` in `src/styles.css`, `PALETTE` in `src/ui/palette.ts`); every new color must clear 4.5:1 as text / 3:1 as a graphic against both `--bg` and `--surface`, enforced by `styles.test.ts` and `palette.test.ts` — a raw hex anywhere else fails the suite
-- [ ] check `README.md` for any dark-theme or screenshot reference and update it. Note the README↔code coupling: `dashboard.test.ts` diffs the module table, so keep the row shape `` | `#/<route>` | <Module> | ✓ | | | `` intact if that table is touched at all
-- [ ] no `docs/content-audit.md` entry — that ledger is for aviation-content fixes, and no content changed
+- [x] add a Conventions entry to `CLAUDE.md`: colors live in exactly two places (`:root` in `src/styles.css`, `PALETTE` in `src/ui/palette.ts`); every new color must clear 4.5:1 as text / 3:1 as a graphic against both `--bg` and `--surface`, enforced by `styles.test.ts` and `palette.test.ts` — a raw hex anywhere else fails the suite
+- [x] check `README.md` for any dark-theme or screenshot reference and update it. Note the README↔code coupling: `dashboard.test.ts` diffs the module table, so keep the row shape `` | `#/<route>` | <Module> | ✓ | | | `` intact if that table is touched at all
+- [x] no `docs/content-audit.md` entry — that ledger is for aviation-content fixes, and no content changed
+
+`README.md` needed no edit: it carries no dark-theme, screenshot or colour
+reference at all (it documents *what* each module trains, never how it looks), so
+the module table was never touched and the `dashboard.test.ts` diff is unaffected.
+The CLAUDE.md entry records three things the checklist did not name, each of which
+a future reader would otherwise have to rediscover: the `from './palette'` half of
+the source assertion (`palette.test.ts:82`) without which "no hex literals" passes
+for a file that renders no colour; `inkDim` being line-only, which is *why* the
+north-arrow letter is `ink`; and the deliberate literal hexes in
+`contrast.test.ts`/`palette.test.ts` — tightening the grep to "zero hexes
+anywhere" would delete the `#767676` → 4.542 probe that pins the gamma exponent
+and make every other ratio assertion circular. Suite 529/529 across 25 files,
+`tsc --noEmit` exit 0.
 
 ## Post-Completion (manual, not agent-automatable)
 
