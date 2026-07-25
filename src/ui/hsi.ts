@@ -9,7 +9,7 @@
 import type { Entry, SectorArc, TurnDirection } from '../engine/entry'
 import { normalizeDeg } from '../engine/geometry'
 import { courseText } from '../format'
-import { PALETTE } from './palette'
+import { OVERLAY_ALPHA, PALETTE } from './palette'
 
 export interface HSIProps {
   /** Aircraft magnetic heading; the card rotates so it sits under the lubber. */
@@ -95,10 +95,13 @@ function sectorOverlay(sectors: Record<Entry, SectorArc>): string {
     .map((entry) => {
       const { from, to } = sectors[entry]
       const color = PALETTE.entry[entry]
+      // The boundary carries the sector at full strength (a stroke-opacity here
+      // composited to ~1.9:1 against the white face, below the 3:1 SC 1.4.11
+      // asks of a graphical object); the fill only tints the wedge.
       return (
         `<path class="hsi-sector hsi-sector-${entry}" data-from="${from}" data-to="${to}" ` +
-        `d="${pieWedge(from, to, TICK_R)}" fill="${color}" fill-opacity="0.16" ` +
-        `stroke="${color}" stroke-opacity="0.45" stroke-width="0.8"/>`
+        `d="${pieWedge(from, to, TICK_R)}" fill="${color}" fill-opacity="${OVERLAY_ALPHA.sectorFill}" ` +
+        `stroke="${color}" stroke-width="0.8"/>`
       )
     })
     .join('')
@@ -126,7 +129,7 @@ function thumbBand(turnDirection: TurnDirection): string {
   return (
     `<path class="hsi-thumb" data-from="${from}" data-to="${to}" ` +
     `d="${bandWedge(from, to, ROSE_R, ROSE_R - 8)}" fill="${PALETTE.entry.teardrop}" ` +
-    `fill-opacity="0.9"/>`
+    `fill-opacity="${OVERLAY_ALPHA.thumbBand}"/>`
   )
 }
 

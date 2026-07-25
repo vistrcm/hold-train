@@ -166,9 +166,40 @@ anywhere" would delete the `#767676` → 4.542 probe that pins the gamma exponen
 and make every other ratio assertion circular. Suite 529/529 across 25 files,
 `tsc --noEmit` exit 0.
 
+## Code review follow-up (applied)
+
+Review found the branch's central claim — "computed, not eyeballed, enforced by
+`npm test`" — held for the values in the palette but not for what several of them
+actually render as. Fixed on this branch:
+
+- [x] **Translucent overlays were measured opaque.** `palette.test.ts` certified
+  the entry sectors at 4.88–6.39:1; `hsi.ts` painted them at `fill-opacity="0.16"`
+  and `stroke-opacity="0.45"`, which composite to 1.24–1.27:1 and 1.90–2.06:1 on
+  the white face. The `inkDim` minor ticks crossing a wedge fell to 2.85:1 — a
+  real regression, they were ~6.0:1 on the dark face. Alphas now live in
+  `OVERLAY_ALPHA`, the boundary stroke is opaque, the fill dropped to 0.10, and
+  the test composites with a new `blend` in `contrast.ts` before measuring.
+- [x] **Hand-listed role tables.** Both suites iterated a literal array, so a new
+  `:root` property or `PALETTE` key shipped with zero contrast assertions. Each
+  now has a `TIERS` map and a test that fails on any colour missing from it.
+- [x] **Guards saw hex only, in two files.** One `COLOUR_LITERAL` in
+  `contrast.ts` (hex plus the functional notations) replaces two divergent
+  regexes; `palette.test.ts` sweeps every `src/**/*.ts` by glob, and pins the SVG
+  `fill=`/`stroke=` attribute values to close named colours.
+- [x] **Instrument colours were measured against `face` only**, though the lubber
+  and readout frame render on `--bg`; now measured against both, and
+  `PALETTE.face` is asserted equal to `--surface` rather than commented as such.
+- [x] **Borderless tap targets** (the open item below): `button`/`.module-link`
+  now carry `1px solid var(--border)`, asserted in `styles.test.ts`.
+
+Each guard was mutation-checked (stray hex in a screen module, restored
+`stroke-opacity`, alpha back to 0.16, border removed, unclassified colour added
+to each palette, `face` drifted from `--surface`) and each failed as intended.
+Suite 548/548 across 25 files, `tsc --noEmit` exit 0, `vite build` exit 0.
+
 ## Post-Completion (manual, not agent-automatable)
 
-- Run `npm run dev` and view every screen in a browser: dashboard, entry drill, entry learn, written test, oral prep, wind lab, clearance copy. jsdom models a simplified cascade and cannot tell you whether the HSI is actually readable.
-- Check the instruments outdoors or at high screen brightness — this is a light theme partly so it survives a sunlit cockpit or a kneeboard tablet.
-- Confirm the magenta CDI still reads as the conventional GPS magenta at `#a3168f`; if it reads muddy against white, adjust hue but keep the ratio ≥ 4.5:1 and re-run the suite.
-- Out of scope for Task 2 but worth a look in the browser: `button` and `.module-link` are `background: var(--surface)` with `border: none`, so on the new `--bg` they sit at 1.17:1 — a white tile on near-white. Legible (the *text* clears 4.5:1) but the tap target has no edge. If it reads flat, the fix is a `1px solid var(--border)` on `button`, which the existing tests already permit.
+- [ ] Run `npm run dev` and view every screen in a browser: dashboard, entry drill, entry learn, written test, oral prep, wind lab, clearance copy. jsdom models a simplified cascade and cannot tell you whether the HSI is actually readable.
+- [ ] Check the instruments outdoors or at high screen brightness — this is a light theme partly so it survives a sunlit cockpit or a kneeboard tablet.
+- [ ] Confirm the magenta CDI still reads as the conventional GPS magenta at `#a3168f`; if it reads muddy against white, adjust hue but keep the ratio ≥ 4.5:1 and re-run the suite.
+- [ ] Look specifically at the entry-sector wedges: the review traded the old wash (0.16 fill, translucent boundary) for an opaque 0.8 px outline over a 0.10 tint. It measures correctly; confirm it still *reads* as three sectors at arm's length on a phone.

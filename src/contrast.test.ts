@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { contrastRatio } from './contrast'
+import { blend, contrastRatio } from './contrast'
 
 // Reference pairs are hand-checkable against the WCAG definition, because every
 // palette assertion in styles.test.ts and ui/palette.test.ts is only as
@@ -69,4 +69,43 @@ describe('contrastRatio', () => {
       expect(() => contrastRatio('#ffffff', bad)).toThrow()
     },
   )
+})
+
+// A translucent SVG mark is not the colour it is drawn with, and WCAG ratios are
+// defined between opaque colours — so the overlays have to be composited before
+// they can be measured. Every expected value here is hand-computable, because
+// `ui/palette.test.ts` trusts this to tell it what the eye actually receives.
+describe('blend', () => {
+  it('returns the background at alpha 0 and the foreground at alpha 1', () => {
+    expect(blend('#15703f', '#ffffff', 0)).toBe('#ffffff')
+    expect(blend('#15703f', '#ffffff', 1)).toBe('#15703f')
+  })
+
+  it('composites in sRGB, per channel', () => {
+    // 0x00·0.5 + 0xff·0.5 = 127.5, which rounds to 128 = 0x80.
+    expect(blend('#000000', '#ffffff', 0.5)).toBe('#808080')
+    // Channels move independently: red stays, green and blue halve.
+    expect(blend('#ff0000', '#ffffff', 0.5)).toBe('#ff8080')
+  })
+
+  it('pads a channel that composites below 0x10', () => {
+    // 0xff·0.05 = 12.75 -> 13 = 0x0d. Without the pad each channel emits one
+    // character and the result is a 3-char string that is not a colour at all.
+    expect(blend('#ffffff', '#000000', 0.05)).toBe('#0d0d0d')
+  })
+
+  it('accepts shorthand on either side', () => {
+    expect(blend('#000', '#fff', 0.5)).toBe(blend('#000000', '#ffffff', 0.5))
+  })
+
+  it.each([-0.01, 1.01, Number.NaN])('rejects an alpha outside [0, 1]: %j', (bad) => {
+    // An out-of-range alpha would extrapolate past the endpoints and produce a
+    // colour that renders nowhere — better to name it than to measure it.
+    expect(() => blend('#000000', '#ffffff', bad)).toThrow(RangeError)
+  })
+
+  it('rejects a malformed colour the same way contrastRatio does', () => {
+    expect(() => blend('white', '#ffffff', 0.5)).toThrow()
+    expect(() => blend('#ffffff', 'white', 0.5)).toThrow()
+  })
 })

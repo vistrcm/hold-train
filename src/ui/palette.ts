@@ -9,6 +9,25 @@
 // (SC 1.4.11). Changing one without re-running that test is how an instrument
 // becomes unreadable on a sunlit kneeboard tablet.
 
+/**
+ * Alphas the HSI paints its translucent overlays at.
+ *
+ * These live here, not inline in `hsi.ts`, because `palette.test.ts` composites
+ * with them: an alpha the test cannot see is an alpha the test silently
+ * certifies at full strength. That is exactly what happened — a sector fill at
+ * 0.16 and a boundary at stroke-opacity 0.45 render at 1.27:1 and 2.03:1 on the
+ * white face, and dropped the minor ticks crossing a wedge to 2.85:1, while the
+ * suite reported the opaque 6.14:1. The wedge boundary is now stroked opaque,
+ * so only the fill is a tint, and it stays faint enough for the ticks and card
+ * labels that cross it.
+ */
+export const OVERLAY_ALPHA = Object.freeze({
+  /** Entry-sector wedge fill (the boundary stroke is opaque). */
+  sectorFill: 0.1,
+  /** The 20° thumb-band aid — a solid marker, not a tint. */
+  thumbBand: 0.9,
+})
+
 export const PALETTE = Object.freeze({
   /** Instrument face — paper white, matching `--surface` in styles.css. */
   face: '#ffffff',

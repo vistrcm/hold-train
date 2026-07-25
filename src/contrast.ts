@@ -1,5 +1,6 @@
-// WCAG contrast oracle — the single place that decides whether a colour in this
-// app is readable. Kept pure and dependency-free so the stylesheet test and the
+// Colour oracle — the single place that decides whether a colour in this app is
+// readable, and the single definition of what a colour literal looks like in
+// source text. Kept pure and dependency-free so the stylesheet test and the
 // instrument-palette test can both assert against computed ratios rather than
 // against someone's eye.
 //
@@ -51,3 +52,42 @@ export function contrastRatio(a: string, b: string): number {
   const darker = Math.min(la, lb)
   return (lighter + 0.05) / (darker + 0.05)
 }
+
+/**
+ * `fg` painted over `bg` at `alpha`, as an opaque colour.
+ *
+ * WCAG ratios are defined between two opaque colours, so a mark drawn with
+ * `fill-opacity`/`stroke-opacity` has to be composited before it can be
+ * measured — the SVG overlays render as tints, and measuring the palette value
+ * they are derived from certifies a colour that never reaches the eye.
+ *
+ * Simple source-over alpha compositing in sRGB, matching what the renderer
+ * does: `result = fg·alpha + bg·(1 − alpha)` per channel.
+ */
+export function blend(fg: string, bg: string, alpha: number): string {
+  if (!(alpha >= 0 && alpha <= 1)) {
+    throw new RangeError(`blend: alpha must be in [0, 1], got ${alpha}`)
+  }
+  const f = channels(fg)
+  const b = channels(bg)
+  const hex = f
+    .map((c, i) => Math.round((c * alpha + b[i]! * (1 - alpha)) * 255))
+    .map((v) => v.toString(16).padStart(2, '0'))
+    .join('')
+  return `#${hex}`
+}
+
+/**
+ * A colour literal in source text, in every notation CSS and SVG accept:
+ * `#rgb`/`#rgba`/`#rrggbb`/`#rrggbbaa`, plus the functional forms. Exported so
+ * the stylesheet guard and the instrument guard share one definition — two
+ * hand-written regexes for the same concept drift, and the half nobody edits
+ * keeps waving colours through.
+ *
+ * Named colours (`red`, `white`) are deliberately absent: matching bare words
+ * against prose and identifiers is all false positives. The SVG modules close
+ * that hole differently, by asserting every `fill=`/`stroke=` attribute value
+ * is `none` or a palette interpolation.
+ */
+export const COLOUR_LITERAL =
+  /#(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{4}|[0-9a-fA-F]{3})(?![0-9a-zA-Z_-])|\b(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch|color|color-mix)\(/g

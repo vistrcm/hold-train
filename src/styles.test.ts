@@ -4,11 +4,28 @@ import { describe, it, expect } from 'vitest'
 // browser silently breaks and no DOM test can see. `?raw` is Vite's own
 // loader — no @types/node, no new dependency.
 import CSS from './styles.css?raw'
-import { contrastRatio } from './contrast'
+import { COLOUR_LITERAL, contrastRatio } from './contrast'
 
-/** A colour literal in any of the four hex forms CSS accepts. The negative
- * lookahead keeps ID selectors (`#app`) and longer identifiers out. */
-const HEX_LITERAL = /#(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{4}|[0-9a-fA-F]{3})(?![0-9a-zA-Z_-])/g
+/** What a colour does decides its threshold: SC 1.4.3 asks 4.5:1 of text,
+ * SC 1.4.11 asks 3:1 of a graphical object. `backdrop` names the two surfaces
+ * every other role is measured against.
+ *
+ * Every colour in `:root` must appear here — the test below fails on one that
+ * does not, rather than skipping it. A hand-listed set of roles measured only
+ * what existed when the list was typed, so a new `--warn` could be added and
+ * ship with zero contrast assertions. */
+const TIERS: Readonly<Record<string, 'text' | 'graphic' | 'backdrop'>> = {
+  '--bg': 'backdrop',
+  '--surface': 'backdrop',
+  '--text': 'text',
+  '--text-dim': 'text',
+  '--accent': 'text',
+  '--ok': 'text',
+  '--err': 'text',
+  '--border': 'graphic',
+}
+
+const MINIMUM = { text: 4.5, graphic: 3 } as const
 
 function rootBlock(css: string): string {
   const match = css.match(/:root\s*\{([\s\S]*?)\}/)
@@ -70,13 +87,22 @@ describe('styles.css', () => {
   // The `var()`-is-defined test above can only see colours that already go
   // through a custom property, so a raw literal escapes both it and the
   // contrast check below. Forcing every colour into `:root` is what makes the
-  // palette the single place a colour can enter the stylesheet.
+  // palette the single place a colour can enter the stylesheet. The functional
+  // notations count too — the guard used to match hex only, so the notation it
+  // could not see was a free way back in.
   it('declares every colour in :root and nowhere else', () => {
     const root = rootBlock(CSS)
     // Non-vacuous: the rule is only meaningful if :root really holds the palette.
-    expect(root.match(HEX_LITERAL)?.length ?? 0).toBeGreaterThanOrEqual(7)
-    const outside = CSS.replace(root, '').match(HEX_LITERAL) ?? []
+    expect(root.match(COLOUR_LITERAL)?.length ?? 0).toBeGreaterThanOrEqual(7)
+    const outside = CSS.replace(root, '').match(COLOUR_LITERAL) ?? []
     expect(outside).toEqual([])
+  })
+
+  // The contrast test below can only judge roles it is told about, so the role
+  // table has to cover the palette exhaustively rather than sample it.
+  it('classifies every colour declared in :root', () => {
+    const unclassified = [...palette(CSS).keys()].filter((name) => !(name in TIERS))
+    expect(unclassified, 'add these to TIERS as text/graphic/backdrop').toEqual([])
   })
 
   // Computed, not eyeballed. WCAG SC 1.4.3 wants 4.5:1 for normal text and
@@ -84,38 +110,38 @@ describe('styles.css', () => {
   // rounding a computed value up, so the raw ratio is compared.
   it('clears WCAG contrast for every palette role', () => {
     const colours = palette(CSS)
-    const bg = colours.get('--bg')
-    const surface = colours.get('--surface')
-    expect(bg).toBeDefined()
-    expect(surface).toBeDefined()
-
-    const roles: ReadonlyArray<readonly [string, number]> = [
-      ['--text', 4.5],
-      ['--text-dim', 4.5],
-      ['--accent', 4.5],
-      ['--ok', 4.5],
-      ['--err', 4.5],
-      // A border is a graphical object, not text: 3:1 per SC 1.4.11.
-      ['--border', 3],
-    ]
+    const backdrops = [...colours].filter(([name]) => TIERS[name] === 'backdrop')
+    expect(backdrops.map(([name]) => name).sort()).toEqual(['--bg', '--surface'])
 
     const failures: string[] = []
-    for (const [name, min] of roles) {
-      const value = colours.get(name)
-      if (!value) {
-        failures.push(`${name} is not declared in :root`)
-        continue
-      }
-      for (const [backdrop, against] of [
-        ['--bg', bg!],
-        ['--surface', surface!],
-      ] as const) {
+    for (const [name, value] of colours) {
+      const tier = TIERS[name]
+      if (tier === undefined || tier === 'backdrop') continue
+      for (const [backdrop, against] of backdrops) {
         const ratio = contrastRatio(value, against)
-        if (ratio < min) {
-          failures.push(`${name} on ${backdrop}: ${ratio.toFixed(2)} < ${min}`)
+        if (ratio < MINIMUM[tier]) {
+          failures.push(`${name} on ${backdrop}: ${ratio.toFixed(2)} < ${MINIMUM[tier]}`)
         }
       }
     }
     expect(failures).toEqual([])
+  })
+
+  // The two backdrops are 1.13:1 apart, so a `background: var(--surface)` tile
+  // on the `--bg` page has no edge a browser can draw — SC 1.4.11 asks 3:1 of
+  // an interactive component's visual boundary. The largest tap targets in the
+  // app (every answer button, every home-screen module tile) therefore carry an
+  // explicit `--border` edge instead of relying on the fill difference.
+  it('gives surface-filled tap targets a boundary the fill cannot supply', () => {
+    const colours = palette(CSS)
+    const bg = colours.get('--bg')!
+    const surface = colours.get('--surface')!
+    const border = colours.get('--border')!
+    // Why the rule exists: if these two ever diverge enough, drop it knowingly.
+    expect(contrastRatio(surface, bg)).toBeLessThan(3)
+    expect(contrastRatio(border, bg)).toBeGreaterThanOrEqual(3)
+    expect(CSS).toMatch(/button,\s*\.module-link\s*\{[^}]*border:\s*1px solid var\(--border\)/)
+    // `border: none` here would outrank the shared rule by source order.
+    expect(CSS).not.toMatch(/\bbutton\s*\{[^}]*border:\s*none/)
   })
 })

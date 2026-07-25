@@ -40,6 +40,8 @@ npm run preview    # serve the production build
 
 Requires Node.js 20.19+ or 22.12+ (Vite 8's engines requirement). Phone/tablet friendly down to 320 px.
 
+One light theme, no dark mode and no toggle — this gets read off a kneeboard tablet in a sunlit cockpit. Every UI and instrument colour is checked against WCAG AA by `npm test` (4.5:1 for text, 3:1 for lines and shapes), so a palette change that makes the HSI unreadable fails the suite rather than the flight.
+
 ## Anki import
 
 1. Open the **Anki Export** module (`#/anki`) and download `hold-train-core.tsv` (fixed deck) and/or `hold-train-misses.tsv` (built from your recorded entry-drill, written-test, and oral-prep misses).

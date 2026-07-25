@@ -74,6 +74,10 @@ a {
   color: var(--accent);
 }
 
+/* `--surface` on `--bg` is only 1.13:1, so a surface-filled tap target has no
+   visible edge of its own. SC 1.4.11 wants 3:1 for the boundary of a UI
+   component, which the `--border` edge supplies (3.21:1 on `--bg`). Asserted by
+   `styles.test.ts` — the two backdrops are too close for the fill to carry it. */
 button,
 .module-link {
   min-height: var(--touch);
@@ -81,11 +85,11 @@ button,
   font-size: var(--fs-lg);
   cursor: pointer;
   touch-action: manipulation;
+  border: 1px solid var(--border);
 }
 
 button {
   padding: 0.6rem 1.2rem;
-  border: none;
   border-radius: 8px;
   background: var(--surface);
   color: var(--text);
