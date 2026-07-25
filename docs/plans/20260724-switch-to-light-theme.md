@@ -83,12 +83,20 @@ function against itself passes for a constant stub.
 **Files:**
 - Modify: `src/styles.test.ts`, `src/styles.css`
 
-- [ ] extend `src/styles.test.ts` with three failing assertions: (a) the stylesheet declares `color-scheme: light`; (b) no hex literal appears outside the `:root` block — this is what forces the 14 stray pass/fail colors through the palette; (c) a computed contrast test that parses `--name: #value` pairs out of the raw CSS and asserts each text role (`--text`, `--text-dim`, `--accent`, `--ok`, `--err`) clears 4.5:1 against **both** `--bg` and `--surface`, and `--border` clears 3.0:1 against both
-- [ ] confirm the new tests fail for the right reason before touching `styles.css`
-- [ ] replace the `:root` values with the light palette from the Overview table, add `--err: #a81f18`, and set `color-scheme: light`
-- [ ] replace all six `#3fbf6f` occurrences with `var(--ok)` and all seven `#e05c5c` occurrences with `var(--err)`
-- [ ] change `border: 1px solid var(--surface)` to `var(--border)` on the input and card rules (lines ~241, ~309, ~328) and the `border-left: 3px solid var(--surface)` accent bar (~140), so component boundaries survive the inversion
-- [ ] run `npm test` and `npm run typecheck` — both must pass before Task 3
+- [x] extend `src/styles.test.ts` with three failing assertions: (a) the stylesheet declares `color-scheme: light`; (b) no hex literal appears outside the `:root` block — this is what forces the 14 stray pass/fail colors through the palette; (c) a computed contrast test that parses `--name: #value` pairs out of the raw CSS and asserts each text role (`--text`, `--text-dim`, `--accent`, `--ok`, `--err`) clears 4.5:1 against **both** `--bg` and `--surface`, and `--border` clears 3.0:1 against both
+- [x] confirm the new tests fail for the right reason before touching `styles.css`
+- [x] replace the `:root` values with the light palette from the Overview table, add `--err: #a81f18`, and set `color-scheme: light`
+- [x] replace all six `#3fbf6f` occurrences with `var(--ok)` and all seven `#e05c5c` occurrences with `var(--err)`
+- [x] change `border: 1px solid var(--surface)` to `var(--border)` on the input and card rules (lines ~241, ~309, ~328) and the `border-left: 3px solid var(--surface)` accent bar (~140), so component boundaries survive the inversion
+- [x] run `npm test` and `npm run typecheck` — both must pass before Task 3
+
+The RED run recorded that the *dark* `--border: #2a323b` was already 1.43:1 against
+`--bg` and 1.26:1 against `--surface` — dash cards and the activity table had no
+visible boundary before this change either. The 3:1 assertion is therefore a fix,
+not just a migration guard. Test (b) uses a hex regex with a trailing
+`(?![0-9a-zA-Z_-])` so the `#app` ID selector is not mistaken for a colour, plus a
+`>= 7` count inside `:root` so the "nowhere else" claim cannot pass on an empty
+palette.
 
 ### Task 3: Instrument palette for the SVG modules
 
@@ -125,3 +133,4 @@ function against itself passes for a constant stub.
 - Run `npm run dev` and view every screen in a browser: dashboard, entry drill, entry learn, written test, oral prep, wind lab, clearance copy. jsdom models a simplified cascade and cannot tell you whether the HSI is actually readable.
 - Check the instruments outdoors or at high screen brightness — this is a light theme partly so it survives a sunlit cockpit or a kneeboard tablet.
 - Confirm the magenta CDI still reads as the conventional GPS magenta at `#a3168f`; if it reads muddy against white, adjust hue but keep the ratio ≥ 4.5:1 and re-run the suite.
+- Out of scope for Task 2 but worth a look in the browser: `button` and `.module-link` are `background: var(--surface)` with `border: none`, so on the new `--bg` they sit at 1.17:1 — a white tile on near-white. Legible (the *text* clears 4.5:1) but the tap target has no edge. If it reads flat, the fix is a `1px solid var(--border)` on `button`, which the existing tests already permit.

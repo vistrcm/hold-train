@@ -1,13 +1,20 @@
 /* Mobile-first base styles. Modules add their own screen-specific styles. */
 
+/* The only place a colour may be declared in this stylesheet — `styles.test.ts`
+   fails the build on a hex literal outside this block, and checks every role
+   below against both backdrops with the WCAG oracle in `src/contrast.ts`.
+   Text roles clear 4.5:1 (SC 1.4.3); --border is a graphical object at 3:1
+   (SC 1.4.11). Light on purpose: this gets read on a kneeboard tablet in a
+   sunlit cockpit. */
 :root {
-  --bg: #101418;
-  --surface: #1a2027;
-  --text: #e8edf2;
-  --text-dim: #9aa7b2;
-  --accent: #4fa3ff;
-  --ok: #3fbf6f;
-  --border: #2a323b;
+  --bg: #eef2f6;
+  --surface: #ffffff;
+  --text: #10161c;
+  --text-dim: #4d5762;
+  --accent: #0b57b8;
+  --ok: #15703f;
+  --err: #a81f18;
+  --border: #7d8894;
   --touch: 44px; /* minimum touch-target size */
 
   /* type scale (minor third, mobile-first) */
@@ -17,7 +24,7 @@
   --fs-xl: 1.44rem;
   --fs-2xl: 1.73rem;
 
-  color-scheme: dark;
+  color-scheme: light;
 }
 
 * {
@@ -137,7 +144,7 @@ button {
 .entry-chart {
   font-size: var(--fs-sm);
   color: var(--text-dim);
-  border-left: 3px solid var(--surface);
+  border-left: 3px solid var(--border);
   padding-left: 0.6rem;
   margin: 0.35rem 0;
 }
@@ -156,11 +163,11 @@ button {
 }
 
 .entry-feedback.is-correct .entry-verdict {
-  color: #3fbf6f;
+  color: var(--ok);
 }
 
 .entry-feedback.is-wrong .entry-verdict {
-  color: #e05c5c;
+  color: var(--err);
 }
 
 .entry-next {
@@ -206,11 +213,11 @@ button {
 }
 
 .written-feedback.is-correct .written-verdict {
-  color: #3fbf6f;
+  color: var(--ok);
 }
 
 .written-feedback.is-wrong .written-verdict {
-  color: #e05c5c;
+  color: var(--err);
 }
 
 .written-next {
@@ -238,7 +245,7 @@ button {
   min-height: var(--touch);
   font-size: var(--fs-lg);
   padding: 0.4rem 0.8rem;
-  border: 1px solid var(--surface);
+  border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--surface);
   color: var(--text);
@@ -260,12 +267,12 @@ button {
 }
 
 .lab-debrief.is-correct .lab-verdict {
-  color: #3fbf6f;
+  color: var(--ok);
 }
 
 .lab-debrief.is-wrong .lab-verdict,
 .lab-debrief.is-error {
-  color: #e05c5c;
+  color: var(--err);
 }
 
 /* Clearance copy drill */
@@ -306,7 +313,7 @@ button {
 }
 
 .copy-form fieldset {
-  border: 1px solid var(--surface);
+  border: 1px solid var(--border);
   border-radius: 8px;
 }
 
@@ -325,14 +332,14 @@ button {
   min-height: var(--touch);
   font-size: var(--fs-lg);
   padding: 0.4rem 0.8rem;
-  border: 1px solid var(--surface);
+  border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--surface);
   color: var(--text);
 }
 
 .copy-error {
-  color: #e05c5c;
+  color: var(--err);
   font-size: var(--fs-sm);
 }
 
@@ -346,11 +353,11 @@ button {
 }
 
 .copy-row.is-correct {
-  color: #3fbf6f;
+  color: var(--ok);
 }
 
 .copy-row.is-wrong {
-  color: #e05c5c;
+  color: var(--err);
 }
 
 .copy-row.is-trap {
@@ -359,11 +366,11 @@ button {
 }
 
 .copy-verdict.is-correct {
-  color: #3fbf6f;
+  color: var(--ok);
 }
 
 .copy-verdict.is-wrong {
-  color: #e05c5c;
+  color: var(--err);
 }
 
 .copy-spoken {
@@ -388,11 +395,11 @@ button {
 }
 
 .tofrom-feedback.is-correct .tofrom-verdict {
-  color: #3fbf6f;
+  color: var(--ok);
 }
 
 .tofrom-feedback.is-wrong .tofrom-verdict {
-  color: #e05c5c;
+  color: var(--err);
 }
 
 /* Learn: lesson list and lesson pages */
