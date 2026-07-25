@@ -125,12 +125,27 @@ is handled by Vite's asset plugin before the TS transform.
 
 ### Task 4: Verify acceptance criteria
 
-- [ ] `grep -rnE '#[0-9a-fA-F]{3,8}|rgba?\(|hsla?\(' src index.html` returns hits only in `src/styles.css` `:root` and `src/ui/palette.ts` — any other hit is an unthemed color that survived
-- [ ] grep for `dark` across `src/` and `index.html` to confirm no dark-theme remnant (`color-scheme`, comments, class names)
-- [ ] confirm `vite.config.ts` still has `test.css.include = [/styles\.css/]`, and that `styles.test.ts`'s `is actually loaded` guard passes — without it the whole palette suite is vacuous
-- [ ] run the full suite: `npm test`
-- [ ] run `npm run typecheck` (`tsc --noEmit`)
-- [ ] run `npm run build` to confirm the production bundle still compiles
+- [x] `grep -rnE '#[0-9a-fA-F]{3,8}|rgba?\(|hsla?\(' src index.html` returns hits only in `src/styles.css` `:root` and `src/ui/palette.ts` — any other hit is an unthemed color that survived
+- [x] grep for `dark` across `src/` and `index.html` to confirm no dark-theme remnant (`color-scheme`, comments, class names)
+- [x] confirm `vite.config.ts` still has `test.css.include = [/styles\.css/]`, and that `styles.test.ts`'s `is actually loaded` guard passes — without it the whole palette suite is vacuous
+- [x] run the full suite: `npm test`
+- [x] run `npm run typecheck` (`tsc --noEmit`)
+- [x] run `npm run build` to confirm the production bundle still compiles
+
+Evidence, and one honest qualification on the first item. The colour grep returns
+hits in four files, not two: `styles.css` `:root` (8 vars) and `ui/palette.ts` (9
+values) as specified, **plus** `contrast.test.ts` and one line of
+`palette.test.ts`. Those extra hits are reference fixtures — `#767676` on white is
+the published 4.542:1 probe that pins the gamma exponent, and a test that imported
+its expected values from the palette would be circular and prove nothing. No
+rendered artifact carries a literal: `hsi.ts`, `mapview.ts`, every file under
+`modules/`, and `index.html` are clean, which is the property `styles.test.ts`
+(b) and `palette.test.ts`'s `?raw` assertion actually enforce. The `dark` grep
+returns only false positives by construction: `darker` is the WCAG formula's
+denominator, `styles.test.ts:67` is the assertion that `color-scheme: dark` is
+*absent*, and `palette.ts:27` says the magenta was "darkened". Suite 529/529
+across 25 files; `is actually loaded` verified green in isolation; `tsc --noEmit`
+exit 0; `vite build` exit 0 (5.50 kB CSS, 112.06 kB JS).
 
 ### Task 5: Update documentation
 
