@@ -65,10 +65,18 @@ The palette tests are only as trustworthy as the function computing the ratios, 
 **Files:**
 - Create: `src/contrast.ts`, `src/contrast.test.ts`
 
-- [ ] write `src/contrast.test.ts` first, against hand-checkable reference pairs: `#000000`/`#ffffff` → 21, identical colors → 1, ratio is symmetric, 3-digit shorthand (`#fff`) parses the same as `#ffffff`, and an invalid hex throws
-- [ ] implement `contrastRatio(a: string, b: string): number` in `src/contrast.ts` using the WCAG relative-luminance formula (sRGB channel linearization at the 0.03928 breakpoint, `0.2126 R + 0.7152 G + 0.0722 B`, then `(L1 + 0.05) / (L2 + 0.05)`), returning the unrounded value — the spec forbids rounding up to a threshold
-- [ ] cite the formula source in a file comment
-- [ ] run `npm test` and `npm run typecheck` — both must pass before Task 2
+- [x] write `src/contrast.test.ts` first, against hand-checkable reference pairs: `#000000`/`#ffffff` → 21, identical colors → 1, ratio is symmetric, 3-digit shorthand (`#fff`) parses the same as `#ffffff`, and an invalid hex throws
+- [x] implement `contrastRatio(a: string, b: string): number` in `src/contrast.ts` using the WCAG relative-luminance formula (sRGB channel linearization at the 0.03928 breakpoint, `0.2126 R + 0.7152 G + 0.0722 B`, then `(L1 + 0.05) / (L2 + 0.05)`), returning the unrounded value — the spec forbids rounding up to a threshold
+- [x] cite the formula source in a file comment
+- [x] run `npm test` and `npm run typecheck` — both must pass before Task 2
+
+Added beyond the checklist, because black/white → 21 holds for any transform with
+f(0)=0 and f(1)=1 and so cannot catch a wrong constant: a mid-tone probe
+(`#767676` on white → 4.542, sensitive to the 2.4 exponent and 1.055 offset), a
+sub-breakpoint probe (`#010101` → 20.87, exercises the `/12.92` linear branch),
+and an unrounded-value probe (`#777777` → 4.478 must not surface as 4.5). The
+symmetry and shorthand tests each got a non-vacuous anchor — comparing the
+function against itself passes for a constant stub.
 
 ### Task 2: Light palette in the stylesheet
 
