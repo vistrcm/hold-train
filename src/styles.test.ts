@@ -4,7 +4,7 @@ import { describe, it, expect } from 'vitest'
 // browser silently breaks and no DOM test can see. `?raw` is Vite's own
 // loader — no @types/node, no new dependency.
 import CSS from './styles.css?raw'
-import { COLOUR_LITERAL, CSS_NAMED_COLOURS, contrastRatio } from './contrast'
+import { COLOUR_LITERAL, CSS_NAMED_COLOURS, HEX_COLOUR, contrastRatio } from './contrast'
 
 /** What a colour does decides its threshold: SC 1.4.3 asks 4.5:1 of text,
  * SC 1.4.11 asks 3:1 of a graphical object. `backdrop` names the two surfaces
@@ -40,7 +40,11 @@ function rootBlock(css: string): string {
  * nothing measures. */
 function rootProps(css: string): Map<string, string> {
   const found = new Map<string, string>()
-  for (const [, name, value] of rootBlock(css).matchAll(/(--[\w-]+):\s*([^;]+);/g)) {
+  // The `;` is optional: CSS lets the last declaration of a block omit it, and
+  // a harvest that demands one silently drops that declaration. `rootBlock`
+  // returns the content without its closing brace, so end-of-string is the
+  // other terminator here.
+  for (const [, name, value] of rootBlock(css).matchAll(/(--[\w-]+):\s*([^;}]+?)\s*(?=[;}]|$)/g)) {
     found.set(name!, value!.trim())
   }
   return found
@@ -49,12 +53,13 @@ function rootProps(css: string): Map<string, string> {
 /** A `:root` value that carries no colour: a length or a bare number. */
 const SCALE = /^-?[\d.]+(?:px|rem|em|ch|%|s|ms)?$/
 
-const HEX = /^#[0-9a-fA-F]{3,8}$/
-
 /** The `--name: #value` pairs, the only colours in the app's stylesheet once
- * the two rules below hold. */
+ * the two rules below hold. `HEX_COLOUR` comes from the oracle rather than
+ * being retyped here, so "is a colour" and "is a colour `contrastRatio` can
+ * read" cannot diverge — a local `{3,8}` copy admitted `#rrggbbaa`, which then
+ * threw from inside the contrast test with the palette test still green. */
 function palette(css: string): Map<string, string> {
-  return new Map([...rootProps(css)].filter(([, value]) => HEX.test(value)))
+  return new Map([...rootProps(css)].filter(([, value]) => HEX_COLOUR.test(value)))
 }
 
 /** Declaration values outside `:root`, with comments and quoted strings removed
@@ -63,9 +68,14 @@ function palette(css: string): Map<string, string> {
 function declarationValues(css: string): Array<readonly [string, string]> {
   const code = css.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/'[^']*'|"[^"]*"/g, ' ')
   const outside = code.replace(rootBlock(code), ' ')
-  // A plain ident then `:` then a value terminated by `;` — selectors such as
-  // `p:first-child {` or `input:not([type=])` end in `{` or `,` and never match.
-  return [...outside.matchAll(/([\w-]+)\s*:\s*([^;{}]+);/g)].map(
+  // A plain ident then `:` then a value terminated by `;` OR by the block's
+  // closing `}` — selectors such as `p:first-child {` or `@media (min-width:
+  // 640px) {` end in `{` and never match, because `{` is neither a legal value
+  // character nor a terminator. The `}` alternative is not optional polish: CSS
+  // lets the last declaration of a block omit its semicolon, and demanding one
+  // let `{ ...; color: crimson }` past the named-colour scan below — the one
+  // notation that scan exists to catch.
+  return [...outside.matchAll(/([\w-]+)\s*:\s*([^;{}]+?)\s*(?=[;}])/g)].map(
     ([, prop, value]) => [prop!, value!] as const,
   )
 }
@@ -144,12 +154,28 @@ describe('styles.css', () => {
     expect(strays, 'route colours through a var(--x) declared in :root').toEqual([])
   })
 
+  // The scan above is only as good as the harvest under it, and a harvest that
+  // required a trailing `;` read right past the last declaration of every block
+  // — where a hand-formatted stylesheet is exactly where the semicolon gets
+  // left off. Pinned against a synthetic sheet rather than the real one, so the
+  // guard keeps holding after someone tidies styles.css.
+  it('harvests a final declaration that omits its semicolon', () => {
+    // No hex in the fixture: `palette.test.ts` sweeps this file for literals
+    // too, and `rootBlock` only needs a `:root` block to exist, not a colour.
+    const synthetic = ':root {\n  --touch: 44px;\n}\n.verdict {\n  font-weight: 700;\n  color: crimson\n}\n'
+    const values = declarationValues(synthetic)
+    expect(values).toEqual([
+      ['font-weight', '700'],
+      ['color', 'crimson'],
+    ])
+  })
+
   // A `:root` colour the harvest cannot read is a colour the role table cannot
   // classify and the oracle cannot measure — it would ship with zero assertions
   // exactly like an unlisted role. `contrastRatio` reads hex, so hex it is.
   it('declares every :root colour as a hex the oracle can read', () => {
     const unreadable = [...rootProps(CSS)]
-      .filter(([, value]) => !HEX.test(value) && !SCALE.test(value))
+      .filter(([, value]) => !HEX_COLOUR.test(value) && !SCALE.test(value))
       .map(([name, value]) => `${name}: ${value}`)
     expect(unreadable, 'a :root value must be a #hex colour or a length').toEqual([])
   })

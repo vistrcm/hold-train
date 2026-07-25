@@ -17,12 +17,28 @@
 // least" thresholds and the Understanding documents state a computed value is
 // not to be rounded up to meet one, so 4.4999 must stay 4.4999.
 
-const HEX = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i
+/**
+ * The two hex notations this module can read, as a source fragment so the
+ * anchored form below and the callers that need it inside a larger pattern
+ * (harvesting `--name: #value` out of the stylesheet) share one definition.
+ *
+ * Same reason `COLOUR_LITERAL` is exported rather than retyped per suite: a
+ * second hand-written copy drifts. The copy that drifted read `{3,8}`, so the
+ * test named "declares every :root colour as a hex the oracle can read" let
+ * `#rrggbbaa` through and the throw surfaced inside the contrast test instead.
+ *
+ * Longest alternative first: embedded in a larger pattern, `{3}` first would
+ * match `#fff` of `#ffffff` and only reach the full colour by backtracking.
+ */
+export const HEX_COLOUR_SOURCE = '#(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{3})'
+
+/** A complete `#rgb`/`#rrggbb` colour and nothing else. */
+export const HEX_COLOUR = new RegExp(`^${HEX_COLOUR_SOURCE}$`)
 
 /** sRGB channels in [0, 1]. Throws rather than returning NaN, so a mistyped
  * colour surfaces as a mistyped colour instead of as a failing palette. */
 function channels(hex: string): [number, number, number] {
-  if (!HEX.test(hex)) {
+  if (!HEX_COLOUR.test(hex)) {
     throw new Error(`contrastRatio: not a #rgb or #rrggbb colour: ${JSON.stringify(hex)}`)
   }
   const digits = hex.slice(1)

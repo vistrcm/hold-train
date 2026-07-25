@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { COLOUR_LITERAL, blend, contrastRatio } from '../contrast'
+import { COLOUR_LITERAL, HEX_COLOUR_SOURCE, blend, contrastRatio } from '../contrast'
 // The stylesheet is read for `--bg` alone: the airframe-fixed parts of the HSI
 // (lubber triangle, heading-readout box) hang outside the rose and render on the
 // page background, not on the instrument face, and `PALETTE.face` claims in a
@@ -13,6 +13,11 @@ import STYLES from '../styles.css?raw'
 // the stylesheet and dashboard.test.ts uses on the README.
 import HSI_SOURCE from './hsi.ts?raw'
 import MAPVIEW_SOURCE from './mapview.ts?raw'
+// The app shell is the one artifact that is neither a `.ts` file the glob below
+// sweeps nor the stylesheet `styles.test.ts` scans, so it was the one place a
+// colour could still enter while CLAUDE.md claimed a literal "anywhere else
+// fails npm test". Task 4 of the plan grepped it once by hand; this asserts it.
+import INDEX_HTML from '../../index.html?raw'
 import { OVERLAY_ALPHA, PALETTE } from './palette'
 
 /** What a colour does decides its threshold: WCAG SC 1.4.3 asks 4.5:1 of
@@ -57,7 +62,11 @@ function leaves(): Array<readonly [string, string]> {
 /** `--bg` as declared in the stylesheet — the surface the airframe-fixed parts
  * of the instrument sit on. */
 function styleColour(name: string): string {
-  const match = STYLES.match(new RegExp(`${name}:\\s*(#[0-9a-fA-F]{3,8})\\s*;`))
+  // `HEX_COLOUR_SOURCE` rather than a local pattern: this value is handed
+  // straight to `contrastRatio`, so the two must agree on what a hex is. The
+  // local copy read `{3,8}` and would have captured a `#rrggbbaa` the oracle
+  // then threw on, from a helper whose whole job is to find a readable colour.
+  const match = STYLES.match(new RegExp(`${name}:\\s*(${HEX_COLOUR_SOURCE})\\s*;`))
   if (!match?.[1]) throw new Error(`styles.css declares no ${name}`)
   return match[1]
 }
@@ -285,5 +294,29 @@ describe('every source file', () => {
       }
     }
     expect(strays).toEqual([])
+  })
+})
+
+// `index.html` is markup, so neither the `.ts` sweep above nor the stylesheet
+// scan in styles.test.ts can see it — yet it is a place a colour enters the app,
+// via a `<meta name="theme-color">` or an inline `style=`. Left unasserted, the
+// "colours live in exactly two places" rule was true of everything someone
+// remembered to glob.
+describe('the app shell', () => {
+  it('is actually loaded', () => {
+    expect(INDEX_HTML).toMatch(/<html/i)
+  })
+
+  it('carries no colour literal', () => {
+    expect(INDEX_HTML.match(COLOUR_LITERAL) ?? []).toEqual([])
+  })
+
+  // The notation the literal scan cannot see, closed the same way the two
+  // instrument modules close it: by bounding where a CSS declaration — and so a
+  // named colour — is allowed to appear at all. An inline `style=` is the only
+  // route for one into markup, and this shell is a single mount point that has
+  // no reason to carry styling of its own.
+  it('styles nothing inline, so no named colour can reach it', () => {
+    expect([...INDEX_HTML.matchAll(/\sstyle=/gi)].map((m) => m[0])).toEqual([])
   })
 })
