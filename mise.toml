@@ -1,0 +1,12 @@
+[tools]
+node = "26.5.1"
+npm = "12.0.2"
+wrangler = { version = "4.115.0", allow_builds = ["esbuild", "sharp", "workerd"] }
+
+# npm verifies and builds, wrangler ships. `npm run build` is already
+# `tsc --noEmit && vite build`, so tests, typecheck and build all gate the
+# upload without the typecheck running twice. A wrong entry sector on a live
+# URL is negative training, so a red suite must not be able to reach Cloudflare.
+[tasks.deploy]
+description = 'Test, build, and ship to Cloudflare'
+run = ['npm test', 'npm run build', 'wrangler pages deploy']
