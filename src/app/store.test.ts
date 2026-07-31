@@ -127,6 +127,18 @@ describe('loadState / saveState', () => {
     expect(store.loadState()).toEqual(state)
   })
 
+  it('has a real localStorage for the default path to find', () => {
+    // `defaultStorage` returns undefined when localStorage is missing and the
+    // store quietly falls back to memory — correct in a browser blocking site
+    // data, silent ruin in a test. Node >= 24 ships its own unavailable
+    // localStorage global that jsdom's does not replace (vitest overwrites an
+    // existing global only for keys on its own list, and this is not one), so
+    // main.test.ts's real-localStorage default path kept passing while
+    // exercising the memory fallback instead. vite.config.ts disables Node's
+    // Web Storage to prevent that; this fails loudly if it stops working.
+    expect(typeof localStorage, 'jsdom localStorage was not installed').not.toBe('undefined')
+  })
+
   it('defaults to window.localStorage', () => {
     localStorage.clear()
     const store = createStore()

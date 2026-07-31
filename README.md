@@ -42,6 +42,19 @@ Requires Node.js 20.19+ or 22.12+ (Vite 8's engines requirement). Phone/tablet f
 
 One light theme, no dark mode and no toggle — this gets read off a kneeboard tablet in a sunlit cockpit. Every UI and instrument colour is checked against WCAG AA by `npm test` (4.5:1 for text, 3:1 for lines and shapes), so a palette change that makes the HSI unreadable fails the suite rather than the flight.
 
+## How to deploy
+
+Deployed to Cloudflare Pages as a direct upload of `dist/`. Live at **https://holdpractice.vitko.info** — the custom domain is bound in the Cloudflare dashboard, not in `wrangler.jsonc`.
+
+```sh
+mise trust               # once, after any change to mise.toml
+mise install             # once, installs the pinned node and wrangler
+wrangler login           # once, browser OAuth against your Cloudflare account
+mise run deploy          # npm test → npm run build → wrangler pages deploy
+```
+
+No SPA-fallback rewrite is configured because the router is hash-based: the browser only ever requests `/` and resolves `#/entry-drill` client-side, so there is no deep-link path for the server to rewrite. `src/deploy.test.ts` asserts the uploaded directory still matches Vite's build output — that coupling is invisible to both tools, and breaking it deploys a stale app with a green suite.
+
 ## Anki import
 
 1. Open the **Anki Export** module (`#/anki`) and download `hold-train-core.tsv` (fixed deck) and/or `hold-train-misses.tsv` (built from your recorded entry-drill, written-test, and oral-prep misses).

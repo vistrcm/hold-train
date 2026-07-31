@@ -1,0 +1,12 @@
+{
+  // Cloudflare Pages project. `mise run deploy` uploads the built directory
+  // with `wrangler pages deploy`.
+  "name": "hold-train",
+  "compatibility_date": "2026-07-30",
+  // Vite's build output, and the directory that gets uploaded. Guarded against
+  // drift with Vite's outDir by src/deploy.test.ts.
+  "pages_build_output_dir": "./dist"
+  // The custom domain is bound in the Cloudflare dashboard, not here. The hash
+  // router (`#/entry-drill`) means the browser only ever requests `/`, so there
+  // is no SPA rewrite to configure either — no _redirects, no 404.html.
+}
