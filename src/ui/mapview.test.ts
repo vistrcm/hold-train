@@ -260,7 +260,7 @@ describe('entry-path illustration (engine is the oracle)', () => {
     const el = render({ holdSpec: hold(), entryPath: 'parallel' })
     const d = nums(el.querySelector('.map-entry path')!.getAttribute('d'))
     expect(d[2]).toBeLessThan(100) // A4: west = non-holding side
-    expect(d[7]).toBe(1) // large-arc: more than 180°
+    expect(d[7]).toBe(1) // large-arc flag — a constant in the path template, not evidence
     expect(d[8]).toBe(0) // A1: sweep counter-clockwise, against the right-turn pattern
     expect(d[9]).toBeGreaterThan(100) // A2: rolls out east = holding side
   })

@@ -230,9 +230,11 @@ describe('entryGuidance', () => {
   // i.e. back across the holding course onto the holding side), NOT rotational.
   // The rejoin turn therefore opposes the pattern's turn direction. Evidence, all
   // rendered and visually inspected — see docs/parallel-entry-evidence.md:
-  //   * AIM FIG 5-3-4 and IFH FAA-H-8083-15B Fig 10-6 draw, in ONE standard-pattern
-  //     figure, the teardrop rejoin CLOCKWISE (with the pattern) and the parallel
-  //     rejoin COUNTER-CLOCKWISE (against it). Same words, opposite senses.
+  //   * AIM FIG 5-3-4 draws, in ONE standard-pattern figure, the teardrop rejoin
+  //     CLOCKWISE (with the pattern) and the parallel rejoin COUNTER-CLOCKWISE
+  //     (against it). Same words, opposite senses. AIP FIG ENR 1.5-3, drawn
+  //     independently, reproduces it. IFH FAA-H-8083-15B Fig 10-6 is reported to
+  //     agree but was never rendered here — second-hand, and not relied on.
   //   * ICAO Doc 8168 Vol I Pt II §6 Ch 2 says it in words: 2.2.4 (parallel) "the
   //     aircraft is TURNED TOWARD THE HOLDING SIDE"; 2.2.5 (teardrop) "turned RIGHT".
   //     Spatial for one, rotational for the other, deliberately.
@@ -288,16 +290,29 @@ describe('entryGuidance', () => {
     expect(PARALLEL_INTERCEPT_DEG).toBe(45)
   })
 
-  it('A3: the parallel rejoin sweeps more than 180° in the opposed direction', () => {
+  // ⚠️ The rollout heading below is derived from the PATTERN, not from
+  // `g.turnToInbound`. That is the whole point. Deriving it from `turnToInbound`
+  // — `normalizeDeg(c + 45 * rejoinSign)`, the obvious spelling — makes the test
+  // a tautology: the outer `* rejoinSign` cancels the inner one
+  // (45·rs² − 180·rs = 45 − 180·rs), so the sweep is 225 for BOTH senses and an
+  // inverted engine passes. This version fixes the rollout at `C − 45·pattern`
+  // (offset away from the pattern's turn direction, which is what "the rejoin
+  // converges from the holding side" means as a heading) and measures the sweep
+  // in the engine's direction, so an inverted `turnToInbound` yields 135°.
+  it('A3: the parallel rejoin sweeps 225°, and an inverted rejoin would give 135°', () => {
     for (const c of [0, 45, 90, 135, 180, 225, 270, 315, 140]) {
       for (const h of [std(c), nonStd(c)]) {
         const g = entryGuidance('parallel', h)
+        const patternSign = h.turnDirection === 'right' ? 1 : -1
         const rejoinSign = g.turnToInbound === 'right' ? 1 : -1
-        const rolloutHeading = normalizeDeg(c + PARALLEL_INTERCEPT_DEG * rejoinSign)
+        const rolloutHeading = normalizeDeg(c - PARALLEL_INTERCEPT_DEG * patternSign)
         const sweep = normalizeDeg((rolloutHeading - g.outboundHeading) * rejoinSign)
-        // 225 by construction; a bare sign flip with no intercept angle gives 180.
         expect(sweep, `${h.turnDirection} ${c}`).toBe(225)
         expect(sweep, `${h.turnDirection} ${c}`).toBeGreaterThan(180)
+        // pin the discrimination itself, so a future simplification back to the
+        // tautological spelling fails here rather than silently going vacuous
+        const inverted = normalizeDeg((rolloutHeading - g.outboundHeading) * -rejoinSign)
+        expect(inverted, `${h.turnDirection} ${c}`).toBe(135)
       }
     }
   })

@@ -518,7 +518,11 @@ geometry; timing-wind: j4, j8(c), j5; reports: 5-3-3 a1(f)/(g), i6 + P/CG + 91.1
   misplaced by **1.72 NM** (−1.05 → +0.67 NM perpendicular offset); `sim.ts`'s whole-track
   error was ~1.9 NM at 90 kt, scaling to ~3.2 NM at 150 kt. The nonholding side *is*
   protected airspace, but it is the narrower allowance and is sized for the one-minute
-  outbound leg plus drift, not for an extra ~2 turn radii beyond it. This is a
+  outbound leg plus drift, not for an extra ~2 turn radii beyond it — **the template widths
+  behind that asymmetry are unverified by this project** (`docs/research-claude.md` sources
+  the 8/4 NM framing to a CFII, not to the FAA), and both the claim and the "unprotected"
+  wording this ledger blessed at the 2026-07 entry above (`src/modules/wind-lab.ts`) are
+  pending in `docs/plans/20260802-protected-airspace-terminology.md`. This is a
   safety-of-flight training defect in a drill tool: a pilot who rehearses it here flies it
   that way. ACS IR.III.B.K1 / R4 / S1.
 
@@ -527,18 +531,26 @@ geometry; timing-wind: j4, j8(c), j5; reports: 5-3-3 a1(f)/(g), i6 + P/CG + 91.1
   **left** rejoin rolling out on `C − 45°`; nonstandard → **right** rejoin on `C + 45°`;
   sweep ~225° either way. Both of a parallel entry's first two turns oppose the pattern;
   only the final turn on reaching the fix follows it. The 45° intercept is convention, not
-  AIM text (the AIM requires only "more than 180 degrees"); it matches how the FAA figures
-  draw the rollout and is single-sourced as `PARALLEL_INTERCEPT_DEG` in `src/engine/entry.ts`.
+  AIM text (the AIM requires only "more than 180 degrees"), and it is **not** a measurement
+  of the figures: the one rollout tangent actually measured in the dossier is ≈31°
+  (FIG 5-3-4, `arrow-inner.png`). 45° is a drawing choice for legibility, single-sourced as
+  `PARALLEL_INTERCEPT_DEG` in `src/engine/entry.ts` so the map and the sim cannot disagree
+  about it. Only the direction is evidence-backed; the angle is house convention.
 
   **Evidence.** AIM 5-3-8 j3(a)'s "turn in the direction of the holding pattern through
   more than 180 degrees" is **spatial** (toward the racetrack), not rotational, and the
-  sentence alone cannot settle it. Three FAA figures were fetched and rendered at high
+  sentence alone cannot settle it. **Two** FAA figures were fetched and rendered at high
   resolution and inspected visually — AIM **FIG 5-3-4** (900 dpi from the vector PDF plus
-  the official faa.gov PNG), AIP **FIG ENR 1.5-3** (3162×2238), and IFH FAA-H-8083-15B
-  **Fig 10-6** (1000 dpi) — and all three draw the parallel rejoin crossing the course onto
-  the holding side. Fig 10-6 is decisive: in one standard-pattern figure the *teardrop*
-  rejoin is clockwise and the *parallel* rejoin counter-clockwise, so the identical AIM
-  phrase cannot be carrying rotational sense in both sub-paragraphs. ICAO Doc 8168 Vol I,
+  the official faa.gov PNG) and AIP **FIG ENR 1.5-3** (3162×2238) — and both draw the
+  parallel rejoin crossing the course onto the holding side. **FIG 5-3-4 is decisive**: in
+  one standard-pattern figure the *teardrop* rejoin is clockwise and the *parallel* rejoin
+  counter-clockwise (dossier Source 1, observation 5), so the identical AIM phrase cannot
+  be carrying rotational sense in both sub-paragraphs; FIG ENR 1.5-3 reproduces the same
+  discrimination in an independently drawn figure. IFH FAA-H-8083-15B **Fig 10-6** is
+  reported by the discovery dossier to show the same thing but was **not re-fetched or
+  rendered in this pass** — it is second-hand and carries no weight here
+  (`docs/parallel-entry-evidence.md`, "Sources deliberately not cited"). The correction
+  does not rest on it. ICAO Doc 8168 Vol I,
   Part II, §6, Ch.2 (6th ed. 2018) states it in words: 2.2.4 (parallel) "turned **toward
   the holding side**", 2.2.5 (teardrop) "turned **right**". IPH FAA-H-8083-16B contains no
   entry-path figure and cannot discriminate — do not cite it either way. Full dossier with
@@ -618,3 +630,87 @@ geometry; timing-wind: j4, j8(c), j5; reports: 5-3-3 a1(f)/(g), i6 + P/CG + 91.1
   derivation as a citation is the same failure class this correction exists to fix.
   Regression test: "quotes the AIM outbound-timing sentence verbatim for every entry, with
   its citation" in `src/modules/entry-drill.test.ts`.
+
+## Post-completion review fix — 2026-08-02 (code review iteration)
+
+- **Fixed: IFH FAA-H-8083-15B Fig 10-6 was asserted as rendered first-hand evidence in five
+  places while the dossier said it was never fetched** (`CLAUDE.md`, `docs/content-audit.md`
+  above, `docs/research-claude.md`, `src/engine/entry.ts`, `src/engine/entry.test.ts`,
+  `src/engine/sim.ts`). `docs/parallel-entry-evidence.md` states plainly under "Sources
+  deliberately not cited" that Fig 10-6 was **not re-fetched in this pass** and should be
+  treated as second-hand; every other artifact said "three FAA figures rendered and visually
+  inspected", one adding a "(1000 dpi)" render that never happened, and two attributed the
+  decisive same-figure discriminator to Fig 10-6 when the dossier records it as observation 5
+  of **FIG 5-3-4**. Per CLAUDE.md an unverifiable claim is labelled, never asserted — and
+  `research-claude.md` is precisely the file whose confidently-worded, under-verified note
+  caused the original defect, so it had reacquired the failure mode it was being corrected
+  for. All sites now read "two figures rendered (FIG 5-3-4, AIP FIG ENR 1.5-3)", name
+  FIG 5-3-4 as the discriminator, and label Fig 10-6 second-hand. The conclusion is
+  unchanged: two independently drawn figures plus ICAO Doc 8168 2.2.4 already settle it.
+
+- **Fixed: `PARALLEL_INTERCEPT_DEG = 45` was justified by a figure measurement that says
+  ≈31°** (`src/engine/entry.ts`, `docs/parallel-entry-evidence.md`, this ledger). Four
+  artifacts claimed 45° "matches how the FAA figures draw the rollout"; the only rollout
+  tangent actually measured in the dossier is ≈31° (Source 1, observation 4) — nearer the
+  drifted `sim.ts` value of 30 than to 45. The angle is now stated as a legibility
+  convention, and the dossier says explicitly that it establishes the rejoin's **direction**
+  only.
+
+- **Fixed: the A3 test could not fail** (`src/engine/entry.test.ts`). It derived the rollout
+  heading from `turnToInbound` — `normalizeDeg(c + 45 * rejoinSign)` — and then measured the
+  sweep in that same direction. The outer sign cancels the inner one
+  (45·rs² − 180·rs = 45 − 180·rs), so the sweep is 225° for **both** senses: the test named
+  for the inversion this correction exists to fix passed with the engine inverted, across all
+  18 course × pattern combinations. The rollout is now fixed at `C − 45·pattern`, derived
+  from a quantity independent of the field under test, and an inverted engine yields 135°.
+  Verified by flipping `turnToInbound` in `entry.ts` and confirming the test fails.
+
+- **Fixed: the sim was never compared to the oracle** (`src/engine/sim.ts`,
+  `src/parallel-entry.invariants.test.ts`). `sim.ts` hand-derived the turn sign from
+  `hold.turnDirection`, aliased it (`reinterceptTurnSign = outboundTurnSign`), then re-derived
+  it a third time in `rolloutHeading` as `-PARALLEL_INTERCEPT_DEG * pattern` — three spellings
+  of one quantity in eight lines, the same drift class this correction fixes across files,
+  reproduced at function scope. Every parallel assertion in `sim.test.ts` is a hardcoded
+  golden excursion, so the sim was pinned against itself: substituting 30° for 45° passed
+  every one of them. The sign now comes from `entryGuidance(...).turnToInbound`, and a new
+  invariant integrates the signed cross product of successive track segments over the rejoin
+  window to assert the **rotation the integrator actually flies** matches the engine — which
+  is also the faithful trajectory-level >180° sweep that the deleted excursion proxy never
+  was. Regression test: "rejoin rotation sense matches entryGuidance turnToInbound for every
+  course × pattern" in `src/parallel-entry.invariants.test.ts`.
+
+- **Fixed: `mapview.ts` re-derived the rejoin direction from the pattern** while its own
+  header claimed "Nothing about a turn direction is derived here". `entryPathD` already
+  receives the engine's guidance, so `const rs = s === 1 ? -1 : 1` was a second hand-written
+  copy of the engine's rule; it now reads `g.turnToInbound`. Covered by the existing map
+  sweep-flag and A2 rollout-side invariants (verified by substituting the old private copy).
+
+- **Fixed: the drill named a fix-crossing turn the pilot must not make, inside the ±5°
+  boundary band** (`src/modules/entry-drill.ts`). `flyItText` read the fix-crossing turn off
+  `turnToInbound`, but that turn is taken from the **aircraft's heading**. The two agree
+  throughout the parallel sector; inside the ±5° teardrop/parallel band (AIM 5-3-8 j8(d)),
+  where parallel is still graded correct, they do not — at heading 177 into a standard hold
+  on inbound 000 the turn onto 180° is 3° to the **right**, and the drill said "turn left
+  onto 180° … both turns opposite the pattern". Reachable in ~1.7% of generated scenarios.
+  `flyItText` now takes the heading, names the turn the pilot actually makes, says "roll out
+  on" when the aircraft is already aligned, and claims "both turns opposite the pattern" only
+  when it is true of the scenario shown. Regression tests: "at the teardrop/parallel boundary
+  the named turn follows the heading, not the pattern" and "exactly aligned with outbound: no
+  fix-crossing turn is named at all" in `src/modules/entry-drill.test.ts`; the A1 sweep now
+  covers the sector interior (d = 185…285) rather than one heading.
+
+- **Fixed: the prose guard rejected correct nonstandard prose and scanned a hand-listed set**
+  (`src/parallel-entry.invariants.test.ts`). `WRONG` contained a bare `reintercepts right`,
+  which is the **corrected** rule for a left-turn hold — a guard that fails on correct prose
+  gets weakened, and then it guards nothing; the alternatives now carry the pattern with them.
+  The three scanned modules were hand-listed, leaving `questions.ts` (which carries entry
+  prose) and any module added later unscanned — the same exhaustiveness hole CLAUDE.md
+  describes for `TIERS` and `OVERLAY_ALPHA`. Content modules are now globbed with the eager
+  `?raw` idiom from `palette.test.ts`, and the non-vacuity check is aggregated across modules
+  so one that says nothing about the rejoin is silent rather than failing.
+
+- **Fixed: the protected-airspace asymmetry was asserted without a source** in the correction
+  entry above, contradicting both `src/modules/wind-lab.ts`'s shipped "unprotected" wording
+  and the 2026-07 ledger entry that blessed it. Now labelled unverified and pointed at
+  `docs/plans/20260802-protected-airspace-terminology.md`, so the ledger records an open
+  contradiction instead of two entries that quietly disagree.

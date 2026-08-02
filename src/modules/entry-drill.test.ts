@@ -8,6 +8,7 @@ import {
   type Entry,
   type HoldCourse,
 } from '../engine/entry'
+import { normalizeDeg } from '../engine/geometry'
 import {
   COCKPIT_TARGET_SECONDS,
   createEntryDrill,
@@ -16,6 +17,7 @@ import {
   generateScenario,
   gradeEntryAnswer,
   OUTBOUND_TIMING_AIM,
+  OUTBOUND_TIMING_NOTE,
   OUTBOUND_TIMING_SOURCE,
   renderEntryDrill,
 } from './entry-drill'
@@ -266,44 +268,81 @@ describe('flyItText', () => {
 
   it('golden case: heading 251 into a left-turn hold is a parallel flown with two RIGHT turns', () => {
     expect(determineEntry(251, GOLDEN).primary).toBe('parallel')
-    const text = flyItText(entryGuidance('parallel', GOLDEN))
+    const text = flyItText(entryGuidance('parallel', GOLDEN), 251)
     expect(text).toContain('turn right onto 320°')
     expect(text).toContain('nonholding side')
     expect(text).toContain('right turn through more than 180°')
+    expect(text).toContain('both turns opposite the pattern')
     // A left-turn hold, yet not one left turn in the entry until back at the fix.
     expect(text).not.toContain('left')
   })
 
   it('standard hold mirrors it: a right-turn hold is entered with two LEFT turns', () => {
-    const text = flyItText(entryGuidance('parallel', STANDARD))
+    // heading 250 is mid-sector for inbound 000 / right turns.
+    expect(determineEntry(250, STANDARD).primary).toBe('parallel')
+    const text = flyItText(entryGuidance('parallel', STANDARD), 250)
     expect(text).toContain('turn left onto 180°')
     expect(text).toContain('nonholding side')
     expect(text).toContain('left turn through more than 180°')
+    expect(text).toContain('both turns opposite the pattern')
     expect(text).not.toContain('right')
   })
 
-  it('A1: the named fix-crossing turn always matches the rejoin and opposes the pattern', () => {
+  it('A1: the named fix-crossing turn matches the rejoin across the parallel sector', () => {
     for (const inboundCourse of [0, 45, 90, 135, 180, 225, 270, 315, 140]) {
       for (const turnDirection of ['right', 'left'] as const) {
-        const g = entryGuidance('parallel', { inboundCourse, turnDirection })
+        const hold = { inboundCourse, turnDirection }
+        const g = entryGuidance('parallel', hold)
         const opposed = turnDirection === 'right' ? 'left' : 'right'
         expect(g.turnToInbound).toBe(opposed)
-        expect(flyItText(g)).toContain(`turn ${opposed} onto ${courseText(g.outboundHeading)}`)
+        // sweep the sector interior (d = 185…285 measured pattern-ward), not just
+        // one heading: the fix-crossing turn is heading-dependent, so a single
+        // sample cannot show it holds throughout.
+        for (const d of [185, 200, 235, 270, 285]) {
+          const m = turnDirection === 'right' ? d : -d
+          const heading = normalizeDeg(inboundCourse + m)
+          expect(determineEntry(heading, hold).primary, `${inboundCourse} ${d}`).toBe('parallel')
+          expect(flyItText(g, heading), `${inboundCourse} ${d}`).toContain(
+            `turn ${opposed} onto ${courseText(g.outboundHeading)}`,
+          )
+        }
       }
     }
   })
 
+  // The ±5° boundary band (AIM 5-3-8 j8(d)) is where parallel is an ACCEPTED
+  // answer but the aircraft is already all but aligned with outbound, so the
+  // fix-crossing turn runs the other way. Naming the opposed turn here would
+  // teach a turn the pilot must not make.
+  it('at the teardrop/parallel boundary the named turn follows the heading, not the pattern', () => {
+    const r = determineEntry(177, STANDARD)
+    expect(r.primary).toBe('teardrop')
+    expect(r.alternates).toContain('parallel') // parallel is graded correct here
+    const text = flyItText(entryGuidance('parallel', STANDARD), 177)
+    expect(text).toContain('turn right onto 180°') // 177 → 180 is 3° RIGHT
+    expect(text).not.toContain('both turns opposite the pattern')
+    expect(text).toContain('left turn through more than 180°') // the rejoin is unchanged
+  })
+
+  it('exactly aligned with outbound: no fix-crossing turn is named at all', () => {
+    const text = flyItText(entryGuidance('parallel', STANDARD), 180)
+    expect(text).toContain('roll out on 180°')
+    expect(text).not.toContain('turn right onto')
+    expect(text).not.toContain('turn left onto')
+    expect(text).not.toContain('both turns opposite the pattern')
+  })
+
   it('teardrop keeps the pattern direction and the holding side, with no >180° script', () => {
-    const text = flyItText(entryGuidance('teardrop', STANDARD))
+    const text = flyItText(entryGuidance('teardrop', STANDARD), 130)
     // 180 outbound offset 30° toward the holding side (east of a 000 inbound).
     expect(text).toContain('outbound heading 150°')
-    expect(text).toContain('holding side')
+    expect(text).toContain('on the holding side') // not satisfied by 'nonholding side'
     expect(text).toContain('right turn')
     expect(text).not.toContain('more than 180°')
   })
 
   it('direct turns with the pattern at the fix and gets no >180° script', () => {
-    const text = flyItText(entryGuidance('direct', STANDARD))
+    const text = flyItText(entryGuidance('direct', STANDARD), 30)
     expect(text).toContain('outbound heading 180°')
     expect(text).toContain('right turn')
     expect(text).not.toContain('more than 180°')
@@ -407,7 +446,7 @@ describe('renderEntryDrill screen', () => {
     answerButton(el, 'parallel').click()
 
     const guidance = el.querySelector('.entry-guidance')!.textContent!
-    expect(guidance).toBe(flyItText(entryGuidance('parallel', scenario.holdSpec)))
+    expect(guidance).toBe(flyItText(entryGuidance('parallel', scenario.holdSpec), scenario.heading))
     expect(guidance).toMatch(/cross the fix, turn (left|right) onto/)
   })
 
@@ -421,7 +460,12 @@ describe('renderEntryDrill screen', () => {
       const timing = el.querySelector('.entry-outbound-timing')!.textContent!
       expect(timing).toContain(OUTBOUND_TIMING_AIM)
       expect(timing).toContain(OUTBOUND_TIMING_SOURCE)
-      expect(timing.toLowerCase()).toContain('derivation')
+      // The derivation must render in full and OUTSIDE the cited span: matching
+      // the bare word 'derivation' would pass even if the note were folded into
+      // the quotation, which is the thing the split exists to prevent.
+      expect(timing).toContain(OUTBOUND_TIMING_NOTE)
+      expect(OUTBOUND_TIMING_AIM).not.toContain(OUTBOUND_TIMING_NOTE)
+      expect(OUTBOUND_TIMING_NOTE.toLowerCase()).toContain('derivation')
     }
     expect(OUTBOUND_TIMING_SOURCE).toBe('AIM 5-3-8 j4(b)')
   })

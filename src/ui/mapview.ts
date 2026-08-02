@@ -179,7 +179,11 @@ function entryPathD(entry: Entry, g: EntryGuidance, hold: MapHold, legNm: number
   // src/engine/entry.ts and docs/parallel-entry-evidence.md — the AIM's "in the
   // direction of the holding pattern" is spatial, not rotational, and FIG 5-3-4
   // draws this arc counter-clockwise in a standard right-turn pattern).
-  const rs: 1 | -1 = s === 1 ? -1 : 1 // rejoin sign: opposite the pattern
+  // Rejoin sign READ FROM THE ENGINE, not re-derived from the pattern here.
+  // `g.turnToInbound` already encodes "opposite the pattern" for a parallel; a
+  // local `s === 1 ? -1 : 1` is a second copy of the engine's rule, and three
+  // copies of this geometry are how it came to be wrong in five modules at once.
+  const rs: 1 | -1 = g.turnToInbound === 'right' ? 1 : -1
   const nonHoldingSide = unit(normalizeDeg(c - 90 * s))
   const legEnd = add(add(fix, unit(g.outboundHeading), legNm), nonHoldingSide, PARALLEL_OFFSET_NM)
   const center = turnCenter(legEnd, g.outboundHeading, rs)

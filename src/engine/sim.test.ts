@@ -185,11 +185,19 @@ describe('entry shapes', () => {
 
   // The former 'parallel reintercept sweeps more than 180°' test lived here. It
   // measured the sweep by the track's westward excursion, which measures the
-  // DEFECT, not the sweep: only the wrong-way loop reaches past 2R. A faithful
-  // >180° sweep is not reproducible under this model's initial condition
-  // (sim.ts header), so A3 is asserted in the engine — see entry.test.ts,
-  // 'the parallel rejoin sweeps 225°, always more than 180°'. Do not restore an
-  // excursion proxy here.
+  // DEFECT, not the sweep: only the wrong-way loop reaches past 2R. Do not
+  // restore an excursion proxy here.
+  //
+  // A3 is asserted in two places instead, neither of them an excursion:
+  //   * src/engine/entry.test.ts, 'A3: the parallel rejoin sweeps 225°, and an
+  //     inverted rejoin would give 135°' — the heading algebra;
+  //   * src/parallel-entry.invariants.test.ts, 'rejoin rotation sense matches
+  //     entryGuidance turnToInbound for every course × pattern' — the ROTATION
+  //     this integrator actually flies, measured by integrating the signed
+  //     cross product of successive track segments. That is the faithful
+  //     trajectory-level sweep, and it also pins the sim against the oracle;
+  //     every assertion in this file is a golden value that pins the sim against
+  //     itself.
 
   // Left-turn mirrors: the turnSign inversion is exactly the sign-convention
   // bug class the project rules flag, so both shapes get mirrored coverage.

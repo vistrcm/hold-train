@@ -175,9 +175,11 @@ Let `C` = inbound holding course, `O` = `C + 180°`.
 final turn at the fix follows it. The rejoin arc's centre lies on the **holding** side.
 
 The `~225°` sweep and the 45° intercept are **convention, not AIM text** — the AIM requires only
-"more than 180 degrees". 45° is chosen because it matches how the FAA figures draw the rollout, and
-is recorded once as `PARALLEL_INTERCEPT_DEG` in `src/engine/entry.ts` so the map and the sim cannot
-drift from it.
+"more than 180 degrees" — and 45° is **not** what these figures were measured to draw: the one
+rollout tangent measured above (Source 1, observation 4) is **≈31°**. 45° is a drawing choice for
+legibility, recorded once as `PARALLEL_INTERCEPT_DEG` in `src/engine/entry.ts` so the map and the
+sim cannot drift from it. **Everything this dossier establishes is about the rejoin's DIRECTION.**
+Do not cite it for the angle.
 
 ## Correct but unrelated — do not sweep these into a change here
 

@@ -23,7 +23,9 @@ import {
   type Entry,
   type EntryGuidance,
   type EntryResult,
+  type TurnDirection,
 } from '../engine/entry'
+import { angleDiff } from '../engine/geometry'
 import { renderHSI, type HSIProps } from '../ui/hsi'
 import { renderMap } from '../ui/mapview'
 import { courseText } from '../format'
@@ -142,17 +144,28 @@ export const OUTBOUND_TIMING_NOTE =
  * A parallel entry is the only entry whose turn ACROSS THE FIX onto outbound
  * opposes the pattern, so it is the only one whose first turn is worth naming:
  * a left-turn hold is entered with two right turns, and only the final turn at
- * the fix follows the pattern. That first turn shares the rejoin's rotational
- * sense (both oppose the pattern — see docs/parallel-entry-evidence.md), so it
- * is read off `turnToInbound` rather than hardcoded or re-derived here.
+ * the fix follows the pattern (see docs/parallel-entry-evidence.md).
+ *
+ * ⚠️ That first turn is taken FROM THE AIRCRAFT'S HEADING, so it is derived from
+ * `heading`, not from `turnToInbound`. Throughout the parallel sector proper the
+ * two agree — that agreement is the structure worth teaching — but inside the
+ * ±5° teardrop/parallel boundary band (AIM 5-3-8 j8(d)) parallel is an accepted
+ * answer while the aircraft is already all but aligned with the outbound course:
+ * at heading 177 into a standard hold on inbound 000, the turn onto 180 is a 3°
+ * turn to the RIGHT, and "turn left onto 180°" would be negative training. The
+ * "both turns opposite the pattern" gloss is therefore stated only when it is
+ * true of the scenario in front of the learner.
  */
-export function flyItText(g: EntryGuidance): string {
+export function flyItText(g: EntryGuidance, heading: number): string {
   const outbound = courseText(g.outboundHeading)
   if (g.entry === 'parallel') {
+    const first = angleDiff(heading, g.outboundHeading)
+    const firstTurn: TurnDirection | null = first === 0 ? null : first > 0 ? 'right' : 'left'
+    const cross = firstTurn ? `turn ${firstTurn} onto ${outbound}` : `roll out on ${outbound}`
     return (
-      `Fly it: cross the fix, turn ${g.turnToInbound} onto ${outbound} on the ${g.side} side, ` +
-      `then ${g.turnToInbound} turn through more than 180° back to the inbound course — ` +
-      `both turns opposite the pattern.`
+      `Fly it: cross the fix, ${cross} on the ${g.side} side, then ${g.turnToInbound} turn ` +
+      `through more than 180° back to the inbound course` +
+      (firstTurn === g.turnToInbound ? ' — both turns opposite the pattern.' : '.')
     )
   }
   return (
@@ -350,7 +363,7 @@ export function renderEntryDrill(el: HTMLElement, options: EntryDrillOptions = {
     feedbackEl.className = `entry-feedback ${fb.correct ? 'is-correct' : 'is-wrong'}`
     feedbackEl.innerHTML = `
       <p class="entry-verdict">${verdict}</p>
-      <p class="entry-guidance">${flyItText(g)}</p>
+      <p class="entry-guidance">${flyItText(g, drill.scenario.heading)}</p>
       <p class="entry-outbound-timing">Outbound timing: “${OUTBOUND_TIMING_AIM}”
         <cite>${OUTBOUND_TIMING_SOURCE}</cite> ${OUTBOUND_TIMING_NOTE}</p>
       <p class="entry-timing">${timing}</p>

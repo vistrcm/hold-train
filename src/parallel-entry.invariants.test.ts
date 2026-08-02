@@ -16,23 +16,22 @@
 //
 // The defect spread because `entry.ts`, `sim.ts` and `mapview.ts` each
 // hand-wrote the same geometry, so a single-file flip went unnoticed by a green
-// suite. These two assertions make the rule single-sourced in assertion as well
-// as in code: the map must agree with the engine, and the prose must agree with
-// both. Lives at src/ (not src/engine/) because it imports across engine/, ui/
-// and content/ — the same placement as styles.test.ts, contrast.test.ts and
-// deploy.test.ts.
+// suite. These assertions make the rule single-sourced in assertion as well as
+// in code: the map must agree with the engine, the SIM must agree with the
+// engine, and the prose must agree with both. All three modules are covered,
+// because guarding two of the three leaves the third free to go stale with the
+// suite green — the exact hole this file exists to close. Lives at src/ (not
+// src/engine/) because it imports across engine/, ui/ and content/ — the same
+// placement as styles.test.ts, contrast.test.ts and deploy.test.ts.
 
 import { describe, expect, it } from 'vitest'
 // The content modules are read as source text, not imported for their values:
 // the claim under test is a sentence, and `?raw` is the idiom this repo already
-// uses on styles.css (styles.test.ts) and README.md (dashboard.test.ts). The
-// `.ts` extension is required — `vite/client`'s `*?raw` declaration is what
-// makes these typecheck (see src/ui/palette.test.ts).
-import ANKI_SOURCE from './content/anki-deck.ts?raw'
-import LESSONS_SOURCE from './content/lessons.ts?raw'
-import ORAL_SOURCE from './content/oral.ts?raw'
+// uses on styles.css (styles.test.ts) and README.md (dashboard.test.ts). They
+// are globbed rather than imported one by one — see `CONTENT` below.
 import { type HoldCourse, type TurnDirection, entryGuidance } from './engine/entry'
 import { normalizeDeg } from './engine/geometry'
+import { flyCircuit } from './engine/sim'
 import { renderMap } from './ui/mapview'
 
 const EVIDENCE = 'see docs/parallel-entry-evidence.md — do not re-derive from the AIM sentence'
@@ -86,9 +85,14 @@ function drawParallel(hold: HoldCourse): DrawnParallel {
 describe('the map draws the rejoin the engine specifies', () => {
   // mapview.test.ts:214 checks the `data-turn-to-inbound` attribute, but that is
   // copied straight out of entryGuidance and so agrees vacuously — it would keep
-  // passing with the arc drawn the other way round. This compares the geometry
-  // actually drawn against the oracle, which is the link whose absence let a
-  // single-file flip go unnoticed.
+  // passing with the arc drawn the other way round. This reads the sweep flag off
+  // the rendered ARC, so it fails the moment `mapview.ts` derives the sign from
+  // anything but the oracle (verified by substituting the old private copy).
+  //
+  // Now that mapview.ts reads `g.turnToInbound` directly, this test agrees by
+  // construction when the ENGINE flips — that case is caught by A2 below, which
+  // is anchored on the pattern rather than on the field under test. The two
+  // together cover both failure modes; neither does alone.
   it('sweep flag matches entryGuidance turnToInbound for every course × pattern', () => {
     for (const turnDirection of PATTERNS) {
       for (const inboundCourse of COURSES) {
@@ -125,6 +129,81 @@ describe('the map draws the rejoin the engine specifies', () => {
   })
 })
 
+// --- the sim ↔ engine agreement sweep ----------------------------------------
+
+const CALM = { directionFrom: 0, speedKt: 0 }
+const LEG_SECONDS = 60
+
+/**
+ * Signed rotation of the flown ground track over one sample window, in radians:
+ * positive = counter-clockwise (left), negative = clockwise (right).
+ *
+ * The 2D cross product of successive track segments is `|a||b|sin Δθ`, so
+ * normalising each segment and summing recovers Σ sin Δθ ≈ the swept angle for
+ * the ~3°/sample steps the sim takes. This measures the ROTATION the integrator
+ * actually flew, not a constant read back out of the module under test —
+ * `sim.test.ts` deliberately has no direction assertion of this kind (its former
+ * one measured the track's excursion, which measures the DEFECT, not the sweep).
+ */
+function trackRotationRad(track: readonly { e: number; n: number }[], from: number, to: number): number {
+  let sum = 0
+  for (let i = from; i + 2 <= to; i++) {
+    const a = { e: track[i + 1]!.e - track[i]!.e, n: track[i + 1]!.n - track[i]!.n }
+    const b = { e: track[i + 2]!.e - track[i + 1]!.e, n: track[i + 2]!.n - track[i + 1]!.n }
+    const la = Math.hypot(a.e, a.n)
+    const lb = Math.hypot(b.e, b.n)
+    if (la < 1e-9 || lb < 1e-9) {
+      continue
+    }
+    sum += Math.asin(Math.max(-1, Math.min(1, (a.e * b.n - a.n * b.e) / (la * lb))))
+  }
+  return sum
+}
+
+describe('the sim flies the rejoin the engine specifies', () => {
+  // `sim.ts` hand-derived this sign from `hold.turnDirection` and kept a private
+  // copy of the intercept angle that had already drifted to 30°. Both now come
+  // from `entryGuidance`, and this sweep is what keeps them there: without it a
+  // future flip of the engine's parallel rule leaves the sim stale and green,
+  // because every parallel assertion in sim.test.ts is a hardcoded golden
+  // excursion that pins the sim against itself rather than against the oracle.
+  it('rejoin rotation sense matches entryGuidance turnToInbound for every course × pattern', () => {
+    for (const turnDirection of PATTERNS) {
+      for (const inboundCourse of COURSES) {
+        const hold: HoldCourse = { inboundCourse, turnDirection }
+        const g = entryGuidance('parallel', hold)
+        const r = flyCircuit(
+          hold,
+          {
+            entry: 'parallel',
+            outboundHeading: g.outboundHeading,
+            inboundCrab: 0,
+            outboundSeconds: LEG_SECONDS,
+          },
+          CALM,
+        )
+        // 180° onto outbound at 3°/s = 60 s, then the 60 s leg, then the 225°
+        // rejoin = 75 s; the track is sampled at 1 s from the fix, so the rejoin
+        // is samples 60+60 … 195.
+        const rejoin = trackRotationRad(r.track, 120, 195)
+        const expectedSign = g.turnToInbound === 'right' ? -1 : 1 // clockwise = negative
+        expect(
+          Math.sign(rejoin),
+          `${inboundCourse}°/${turnDirection}: engine says rejoin ${g.turnToInbound}, ` +
+            `sim flew ${((rejoin * 180) / Math.PI).toFixed(1)}° (${EVIDENCE})`,
+        ).toBe(expectedSign)
+        // A3 at the trajectory level: the flown rejoin really does exceed 180°.
+        // The window clips the first and last segment, so the measured sweep is
+        // a little under the nominal 225°.
+        expect(
+          Math.abs((rejoin * 180) / Math.PI),
+          `${inboundCourse}°/${turnDirection}: rejoin swept less than 180°`,
+        ).toBeGreaterThan(180)
+      }
+    }
+  })
+})
+
 // --- the prose scan -----------------------------------------------------------
 
 /** The corrected rule, in any of the wordings the content modules use. */
@@ -138,14 +217,30 @@ const CORRECT = /opposite|against the pattern|toward the holding side|crosses (b
  * doing so — the app's citation convention rests on the primary-source wording.
  * A negative matching "in the direction of the holding pattern" would therefore
  * fail the CORRECT text. Match what the old gloss said instead.
+ *
+ * ⚠️ A bare "reintercepts right" is NOT wrong — it is the corrected rule for a
+ * nonstandard hold. Only the pairing with a pattern of the same sense is wrong,
+ * so the last two alternatives carry the pattern with them. A guard that fails
+ * on correct prose gets weakened, and then it guards nothing.
  */
-const WRONG = /same way the pattern|follows the pattern|only that direction|reintercepts right/i
+const WRONG =
+  /same way the pattern|follows the pattern|only that direction|right-turn hold[^.]*reintercepts? right|left-turn hold[^.]*reintercepts? left/i
 
-const CONTENT: ReadonlyArray<{ file: string; source: string }> = [
-  { file: 'src/content/lessons.ts', source: LESSONS_SOURCE },
-  { file: 'src/content/oral.ts', source: ORAL_SOURCE },
-  { file: 'src/content/anki-deck.ts', source: ANKI_SOURCE },
-]
+/**
+ * Every content module, harvested rather than hand-listed.
+ *
+ * A hand-written list scans only what existed when the list was typed — the same
+ * exhaustiveness hole CLAUDE.md describes for `TIERS` and `OVERLAY_ALPHA`, and
+ * the reason `questions.ts` (which carries entry prose of its own) was outside
+ * the original three. Sweeping the directory means a fourth module cannot ship
+ * an unscanned rejoin gloss. Same eager `?raw` glob idiom as
+ * src/ui/palette.test.ts.
+ */
+const CONTENT: ReadonlyArray<{ file: string; source: string }> = Object.entries(
+  import.meta.glob<string>('./content/*.ts', { query: '?raw', import: 'default', eager: true }),
+)
+  .filter(([path]) => !path.endsWith('.test.ts'))
+  .map(([path, source]) => ({ file: path.replace('./', 'src/'), source }))
 
 /**
  * Source lines that make a claim about the parallel rejoin. Each content item is
@@ -163,14 +258,20 @@ function parallelRejoinLines(source: string): string[] {
 }
 
 describe('no content module teaches the rejoin the wrong way', () => {
+  it('the scan finds prose to scan at all', () => {
+    // A rename or a reflow that hides the prose from this scan would make the
+    // suite pass by finding nothing, which is the failure mode the raw-text
+    // idiom is most prone to (cf. styles.test.ts's `is actually loaded` test).
+    // Counted across all modules, not per file: a module that says nothing about
+    // the parallel rejoin (questions.ts today) is silent, not broken.
+    expect(CONTENT.length, 'no content modules were globbed').toBeGreaterThan(3)
+    const total = CONTENT.reduce((n, c) => n + parallelRejoinLines(c.source).length, 0)
+    expect(total, 'found no parallel-rejoin prose to scan in any content module').toBeGreaterThan(2)
+  })
+
   it('every parallel-rejoin sentence states the corrected rule', () => {
     for (const { file, source } of CONTENT) {
-      const lines = parallelRejoinLines(source)
-      // A rename or a reflow that hides the prose from this scan would make the
-      // suite pass by finding nothing, which is the failure mode the raw-text
-      // idiom is most prone to (cf. styles.test.ts's `is actually loaded` test).
-      expect(lines.length, `${file}: found no parallel-rejoin prose to scan`).toBeGreaterThan(0)
-      for (const line of lines) {
+      for (const line of parallelRejoinLines(source)) {
         expect(line, `${file}: does not state the corrected rule (${EVIDENCE})`).toMatch(CORRECT)
         expect(line, `${file}: still glosses the rejoin as following the pattern (${EVIDENCE})`).not.toMatch(
           WRONG,

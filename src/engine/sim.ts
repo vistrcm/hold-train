@@ -31,7 +31,7 @@
 //
 // Frame: NM east/north of the holding fix (the map view's MapPoint shape).
 
-import { PARALLEL_INTERCEPT_DEG, type Entry, type TurnDirection } from './entry'
+import { PARALLEL_INTERCEPT_DEG, type Entry, type TurnDirection, entryGuidance } from './entry'
 import { assertCourse, normalizeDeg } from './geometry'
 import { inboundCrab, outboundHeading, outboundTimeSeconds, type Wind } from './wind'
 
@@ -160,16 +160,20 @@ export function flyCircuit(
   // Do NOT re-derive this from ">180 degrees": computed correctly across the
   // sector BOTH senses exceed 180° (right 212.6–222.1, left 189.3–215.3), so
   // the clause cannot discriminate, and reasoning from it is what inverted this
-  // app on 2026-07-22. The evidence is FIG 5-3-4 / AIP FIG ENR 1.5-3 / IFH Fig
-  // 10-6 and ICAO Doc 8168 2.2.4 — see docs/parallel-entry-evidence.md.
-  const outboundTurnSign: 1 | -1 = isParallel ? (pattern === 1 ? -1 : 1) : pattern
-  const reinterceptTurnSign: 1 | -1 = outboundTurnSign
+  // app on 2026-07-22. The evidence is FIG 5-3-4 and AIP FIG ENR 1.5-3 (both
+  // rendered) plus ICAO Doc 8168 2.2.4 — see docs/parallel-entry-evidence.md.
+  // Both turns of every entry share one rotational sense, and it is the engine's
+  // `turnToInbound` — read from the oracle rather than re-derived here, so a
+  // change to the parallel rule cannot leave this file stale. A private copy of
+  // this sign, and of the intercept angle below, is exactly how the map, the sim
+  // and the engine came to disagree about this maneuver.
+  const turnSign: 1 | -1 = entryGuidance(decisions.entry, hold).turnToInbound === 'right' ? 1 : -1
   // Parallel rolls out on an intercept heading angled back into the course, not
   // on the inbound heading itself — turning to the inbound heading would be
   // exactly 180°, which rolls out parallel to the course and never intercepts.
   // The angle is the engine's, so the map cannot draw a different one.
   const rolloutHeading = normalizeDeg(
-    c + (isParallel ? -PARALLEL_INTERCEPT_DEG * pattern : 0) + decisions.inboundCrab,
+    c + (isParallel ? PARALLEL_INTERCEPT_DEG * turnSign : 0) + decisions.inboundCrab,
   )
 
   // integrator state
@@ -214,12 +218,12 @@ export function flyCircuit(
   }
 
   // 1: turn from the inbound course heading to the decided outbound heading
-  turnTo(decisions.outboundHeading, outboundTurnSign)
+  turnTo(decisions.outboundHeading, turnSign)
   // 2: outbound leg
   flyStraight(decisions.outboundSeconds)
   // 3: turn to the crab-corrected inbound heading (parallel: back toward the
   // holding side, onto the intercept heading, through 225°)
-  turnTo(rolloutHeading, reinterceptTurnSign)
+  turnTo(rolloutHeading, turnSign)
 
   // 4: fly straight until crossing the line abeam the fix
   const alongE = Math.sin(c * DEG)
