@@ -150,35 +150,46 @@ describe('entry shapes', () => {
   })
 
   // AIM 5-3-8 j3(a): parallel turns onto the outbound heading toward the
-  // NONholding side, then reintercepts "in the direction of the holding pattern
-  // through more than 180 degrees". The two turns oppose each other — that is
-  // the whole shape of the entry, and why it is the only maneuver the AIM puts
-  // on the nonholding side.
-  it('parallel: outbound turn opposes the pattern, reintercept turn follows it', () => {
+  // NONholding side, and then BOTH the outbound turn and the rejoin oppose the
+  // pattern — the rejoin goes back toward the holding side, crossing the course.
+  // "Turn in the direction of the holding pattern" is spatial, not rotational;
+  // FIG 5-3-4 draws the teardrop rejoin clockwise and the parallel rejoin
+  // counter-clockwise in one figure. See docs/parallel-entry-evidence.md. Do NOT
+  // re-derive this from the ">180°" clause — both senses exceed 180°, so the
+  // clause does not discriminate, and reasoning from it inverted this app once.
+  it('parallel: outbound turn opposes the pattern, and so does the reintercept', () => {
+    const R = 0.4775
     const r = flyCircuit(RIGHT_NORTH, decisions({ entry: 'parallel' }), CALM)
     expect(r.completed).toBe(true)
     // right-turn hold → holding side east; the whole entry stays west of course
     for (const p of r.track) {
       expect(p.e).toBeLessThan(0.01)
     }
+    // 180° onto outbound (60 s) + 60 s leg + 225° rejoin at 3°/s (75 s) = 195 s,
+    // sampled at 1 s, so this slice is everything through rejoin completion.
+    const throughRejoin = r.track.slice(0, 196)
+    // A2: the rejoin turn stays inside the displacement the outbound turn
+    // already made — it curls back toward the course, it does not bulge past it
+    expect(Math.min(...throughRejoin.map((p) => p.e))).toBeGreaterThan(-2 * R - 1e-3) // ≈ -0.9549
+    expect(throughRejoin.at(-1)!.e).toBeGreaterThan(-0.2) // rollout ≈ -0.1390
+    // Whole track: -1.3022 after the fix, -1.9099 before it. The straight
+    // intercept leg diverges further west under this model's initial condition
+    // (see the sim.ts header note), so the 2R bound above is measured through
+    // rejoin completion only — asserting it over the whole track is FALSE.
+    expect(Math.min(...r.track.map((p) => p.e))).toBeGreaterThan(-3 * R)
     // honest physics: the reintercept turn rolls out on an intercept heading,
     // so the aircraft is still on the nonholding side abeam the fix — it has
     // not joined the course yet. Cross-track is signed toward the holding side.
     expect(r.inboundCrossTrackNm).toBeLessThan(-0.5)
   })
 
-  it('parallel reintercept sweeps more than 180° (the AIM 5-3-8 j3(a) overshoot)', () => {
-    // A pure sign flip would leave an exactly-180° turn, which rolls out
-    // parallel to the course 2R off and never intercepts. Measure the turn by
-    // the track's westward excursion: the >180° loop reaches further from the
-    // course than the 2R the outbound turn alone produces.
-    const r = flyCircuit(RIGHT_NORTH, decisions({ entry: 'parallel' }), CALM)
-    const westmost = Math.min(...r.track.map((p) => p.e))
-    // R ≈ 0.4775 (file header). Outbound turn alone ends 2R west and an
-    // opposite-direction reintercept loops back east, never passing 2R. The
-    // pattern-direction loop centers at 3R and reaches ~4R.
-    expect(westmost).toBeLessThan(-3 * 0.4775)
-  })
+  // The former 'parallel reintercept sweeps more than 180°' test lived here. It
+  // measured the sweep by the track's westward excursion, which measures the
+  // DEFECT, not the sweep: only the wrong-way loop reaches past 2R. A faithful
+  // >180° sweep is not reproducible under this model's initial condition
+  // (sim.ts header), so A3 is asserted in the engine — see entry.test.ts,
+  // 'the parallel rejoin sweeps 225°, always more than 180°'. Do not restore an
+  // excursion proxy here.
 
   // Left-turn mirrors: the turnSign inversion is exactly the sign-convention
   // bug class the project rules flag, so both shapes get mirrored coverage.
@@ -206,7 +217,9 @@ describe('entry shapes', () => {
     // cross-track is signed toward the holding side, so a nonholding-side
     // rollout is negative in both the standard and nonstandard case
     expect(r.inboundCrossTrackNm).toBeLessThan(-0.5)
-    expect(Math.max(...r.track.map((p) => p.e))).toBeGreaterThan(3 * 0.4775)
+    // mirror of the standard case: the excursion peaks at 1.3022 on the
+    // straight intercept leg, inside 3R — the wrong-way rejoin reached 1.9099
+    expect(Math.max(...r.track.map((p) => p.e))).toBeLessThan(3 * 0.4775)
   })
 })
 

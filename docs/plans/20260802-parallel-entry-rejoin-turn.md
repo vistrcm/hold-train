@@ -396,7 +396,7 @@ if this task fails to confirm, **STOP and report; do not proceed to Task 2.**
 - Modify: `src/engine/sim.ts`
 - Modify: `src/engine/sim.test.ts`
 
-- [ ] in `src/engine/sim.test.ts`, rewrite `'parallel: outbound turn opposes the pattern, reintercept
+- [x] in `src/engine/sim.test.ts`, rewrite `'parallel: outbound turn opposes the pattern, reintercept
       turn follows it'` → `'…and so does the reintercept'`. Timeline for `RIGHT_NORTH`, no wind:
       180° onto outbound (60 s) + 60 s leg + 225° rejoin at 3°/s (75 s) = **195 s**, sampled at 1 s,
       so `track.slice(0, 196)` is everything through rejoin completion. Assert:
@@ -411,27 +411,36 @@ if this task fails to confirm, **STOP and report; do not proceed to Task 2.**
       ```
       The last line is the exact negation of the current `sim.test.ts:181`
       (`toBeLessThan(-3 * 0.4775)`), so the red step is unambiguous
-- [ ] ⚠️ do **not** assert the `-2R` bound over the whole track — it is false after the fix
+- [x] ⚠️ do **not** assert the `-2R` bound over the whole track — it is false after the fix
       (−1.3022). A red test here is the most likely way a memoryless session gets argued back into
       the wrong turn direction, because "make the test pass" outranks "read the dossier"
-- [ ] replace `'parallel reintercept sweeps more than 180°'` — its westward-excursion proxy measures
+      — **honoured: the `-2R` bound is applied to `track.slice(0, 196)` only, with a comment saying
+      why, and the whole-track bound is the looser `-3R`**
+- [x] replace `'parallel reintercept sweeps more than 180°'` — its westward-excursion proxy measures
       the defect, not the sweep, and a faithful >180° sweep is not reproducible under this model's
-      initial condition. A3 is asserted in the engine instead (Task 2)
-- [ ] update `'left-turn parallel mirrors: flies the east (non-holding) side'`: `sim.test.ts:207`
+      initial condition. A3 is asserted in the engine instead (Task 2) — **deleted, and a comment
+      left in its place pointing at the engine's A3 test so it is not restored**
+- [x] update `'left-turn parallel mirrors: flies the east (non-holding) side'`: `sim.test.ts:207`
       currently asserts `Math.max(...e) > 3 * 0.4775`; after the fix the max is 1.3022, so it becomes
       `toBeLessThan(3 * 0.4775)`
-- [ ] run tests — confirm they FAIL first
-- [ ] in `src/engine/sim.ts`, set `reinterceptTurnSign` to oppose the pattern for parallel (it may
+- [x] run tests — confirm they FAIL first — **2 failed: rejoin minimum came out at −1.9099 (the
+      plan's documented "before" value, to 4 dp) against the −0.9549 bound, and the nonstandard
+      mirror peaked at +1.9099 against 3R**
+- [x] in `src/engine/sim.ts`, set `reinterceptTurnSign` to oppose the pattern for parallel (it may
       simply reuse `outboundTurnSign`), and flip the rollout sign to
-      `c - PARALLEL_INTERCEPT_DEG * pattern`
-- [ ] delete the private `PARALLEL_INTERCEPT_DEG = 30` and import the exported 45 from `./entry`
-- [ ] rewrite the header comment (lines 10–16) and the inline comments at lines 140–152, which state
+      `c - PARALLEL_INTERCEPT_DEG * pattern` — **`reinterceptTurnSign = outboundTurnSign`, which is
+      now correct for every entry, not just parallel**
+- [x] delete the private `PARALLEL_INTERCEPT_DEG = 30` and import the exported 45 from `./entry`
+      — ➕ note: the private copy was also a *value* drift (30 vs the engine's 45), not only a
+      duplicated sign
+- [x] rewrite the header comment (lines 10–16) and the inline comments at lines 140–152, which state
       the wrong rule
-- [ ] add a header note recording the model limitation verbatim from this plan's Context section:
+- [x] add a header note recording the model limitation verbatim from this plan's Context section:
       the circuit starts established on the inbound course, so the outbound leg sits `2R` off
       instead of ~0.3R, the rejoin is tangent rather than crossing, and the inbound leg therefore
       does not converge. Note that `flyCircuit` is only called with `entry: 'direct'`
-- [ ] run `npm test` and `npm run typecheck` — both must pass before Task 5
+- [x] run `npm test` and `npm run typecheck` — both must pass before Task 5 — **562 passed / 26
+      files (one fewer than Task 3's 563: the excursion-proxy test was removed); typecheck clean**
 
 ### Task 5: Name the fix-crossing turn and the timing reference in the drill feedback
 
