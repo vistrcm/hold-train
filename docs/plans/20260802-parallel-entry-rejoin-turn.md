@@ -327,31 +327,38 @@ if this task fails to confirm, **STOP and report; do not proceed to Task 2.**
 - Modify: `src/engine/entry.ts`
 - Modify: `src/engine/entry.test.ts`
 
-- [ ] in `src/engine/entry.test.ts`, replace the three tests at lines 223–255 that pin the defect:
+- [x] in `src/engine/entry.test.ts`, replace the three tests at lines 223–255 that pin the defect:
       `'parallel: outbound course on the nonholding side, reintercept WITH the pattern'` →
       expects `turnToInbound` `'left'` for a standard hold; `'nonstandard mirrors…'` → expects
       `'right'` for a left-turn hold; `'every entry reintercepts in the pattern direction'` →
       becomes `'direct and teardrop reintercept with the pattern, parallel against it'`, looping
       over `[0, 45, 90, 180, 270, 315]` × standard/nonstandard × `ENTRIES`
-- [ ] replace the misleading comment block above those tests with the dossier summary: spatial not
+- [x] replace the misleading comment block above those tests with the dossier summary: spatial not
       rotational; FIG 5-3-4 draws teardrop clockwise and parallel counter-clockwise; ICAO 8168
       2.2.4/2.2.5; and an explicit warning that ">180°" does not discriminate
-- [ ] add the **A3** assertion here, where it is a genuine property (the map's large-arc flag is
+- [x] add the **A3** assertion here, where it is a genuine property (the map's large-arc flag is
       hardcoded to `1` at `src/ui/mapview.ts:178`, so asserting it there passes before *and* after
       the fix). For all courses × both patterns, the rejoin sweep must exceed 180°:
       `normalizeDeg((rolloutHeading - g.outboundHeading) * rejoinSign) > 180`, where
       `rolloutHeading = normalizeDeg(c + PARALLEL_INTERCEPT_DEG * rejoinSign)`. It is 225 by
       construction, and would have been exactly 180 for a sign flip with no intercept angle
-- [ ] add a test that `PARALLEL_INTERCEPT_DEG === 45`
-- [ ] run tests — confirm the new assertions FAIL against the current implementation (this is the
-      red step; a passing test here means it is asserting the old behaviour)
-- [ ] in `src/engine/entry.ts`, export `PARALLEL_INTERCEPT_DEG = 45` and change the `'parallel'` case
+      — asserted as exactly `225` **and** `> 180`, over `[0, 45, 90, 135, 180, 225, 270, 315, 140]`
+- [x] add a test that `PARALLEL_INTERCEPT_DEG === 45`
+- [x] run tests — confirm the new assertions FAIL against the current implementation (this is the
+      red step; a passing test here means it is asserting the old behaviour) — **6 failed for the
+      expected reasons: `turnToInbound` returned the pattern direction, and the missing constant
+      made A3's `rolloutHeading` NaN**
+- [x] in `src/engine/entry.ts`, export `PARALLEL_INTERCEPT_DEG = 45` and change the `'parallel'` case
       to return the opposed `turnToInbound`. Do **not** add a field to `EntryGuidance` — see
       Technical Details. Leave `towardHoldingSide` at `±30`; it is the teardrop's offset
-- [ ] replace the `'parallel'` case's justification comment — it currently argues the wrong reading
+      — **`towardHoldingSide` untouched; its doc comment now names it as the teardrop's quantity**
+- [x] replace the `'parallel'` case's justification comment — it currently argues the wrong reading
       and is the origin of the defect. Cite FIG 5-3-4 and ICAO 8168 2.2.4, and state that ">180°"
       must not be reasoned from
-- [ ] run `npm test` and `npm run typecheck` — both must pass before Task 3
+- [x] run `npm test` and `npm run typecheck` — both must pass before Task 3 — **562 passed / 26
+      files; typecheck clean.** ➕ Note for Task 7: the full suite stayed green after inverting the
+      engine, because `mapview.ts` and `sim.ts` hand-write their own copies of the geometry and
+      nothing cross-checks them against the oracle. That silence is the exact gap Task 7 closes
 
 ### Task 3: Redraw the parallel rejoin arc on the holding side in the map view
 

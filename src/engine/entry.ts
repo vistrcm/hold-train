@@ -51,6 +51,24 @@ export interface EntryGuidance {
 const SOURCE = 'AIM 5-3-8 j3, FIG 5-3-4; ±5° per AIM 5-3-8 j8(d)'
 const GUIDANCE_SOURCE = 'AIM 5-3-8 j3'
 
+/**
+ * Angle the parallel entry's rejoin turn rolls out on, measured from the inbound
+ * holding course toward the rejoin turn's direction — so the rollout heading is
+ * `normalizeDeg(inboundCourse + PARALLEL_INTERCEPT_DEG * rejoinSign)`, giving a
+ * 225° sweep from outbound.
+ *
+ * This is CONVENTION, not AIM text: AIM 5-3-8 j3(a) requires only "more than 180
+ * degrees". 45° is chosen because it matches how FIG 5-3-4, AIP FIG ENR 1.5-3 and
+ * IFH FAA-H-8083-15B Fig 10-6 draw the rollout. It lives here, in the oracle, so
+ * the map (`src/ui/mapview.ts`) and the sim (`src/engine/sim.ts`) cannot drift
+ * from it — three hand-written copies of this geometry are how the rejoin
+ * direction came to be wrong in five modules at once.
+ *
+ * Distinct from `towardHoldingSide` (±30°) below, which is the TEARDROP's offset
+ * per AIM 5-3-8 j3(b). Different maneuver, different quantity.
+ */
+export const PARALLEL_INTERCEPT_DEG = 45
+
 /** ±5° in heading is within good operating limits for determining entry. */
 const BOUNDARY_TOLERANCE = 5
 
@@ -140,15 +158,32 @@ export function entryGuidance(entry: Entry, hold: HoldCourse): EntryGuidance {
     case 'parallel':
       // AIM 5-3-8 j3(a): parallel outbound on the nonholding side, then "turn in
       // the direction of the holding pattern through more than 180 degrees".
-      // The initial turn onto the outbound heading opposes the pattern (that is
-      // what puts the aircraft on the nonholding side); the reintercept turn
-      // follows it. Drawing it out confirms the AIM's two clauses agree: from
-      // the outbound heading, only the pattern-direction turn exceeds 180°.
+      //
+      // That phrase is SPATIAL — toward the racetrack, back across the holding
+      // course onto the holding side — NOT rotational. So the rejoin turn OPPOSES
+      // the pattern. The parallel entry is the one entry with two turns against
+      // the pattern; only the final turn at the fix follows it.
+      //
+      // FIG 5-3-4 settles the ambiguity the sentence cannot: in one standard-
+      // pattern figure it draws the teardrop rejoin clockwise (with the pattern)
+      // and the parallel rejoin counter-clockwise (against it) — same words, two
+      // senses. IFH FAA-H-8083-15B Fig 10-6 and AIP FIG ENR 1.5-3 agree. ICAO Doc
+      // 8168 Vol I Pt II §6 Ch 2 states it in words: 2.2.4 (parallel) "the
+      // aircraft is turned TOWARD THE HOLDING SIDE"; 2.2.5 (teardrop) "turned
+      // RIGHT". Rendered evidence: docs/parallel-entry-evidence.md.
+      //
+      // ⚠️ DO NOT re-derive this from "more than 180 degrees". That clause does
+      // not discriminate between the two readings, and reasoning from it is what
+      // shipped this field inverted app-wide on 2026-07-22 (docs/content-audit.md).
+      // The old argument measured the bearing to the fix at the START of the turn
+      // and never updated it for motion DURING the turn; computed properly, right
+      // turns sweep 212.6°–222.1° and left turns 189.3°–215.3° — both over 180°,
+      // and exactly equal at zero offset by symmetry.
       return {
         entry,
         outboundHeading: outboundCourse,
         side: 'nonholding',
-        turnToInbound: pattern,
+        turnToInbound: pattern === 'right' ? 'left' : 'right',
         source: GUIDANCE_SOURCE,
       }
   }

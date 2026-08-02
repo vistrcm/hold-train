@@ -4,6 +4,7 @@ import {
   determineEntry,
   entryGuidance,
   ENTRIES,
+  PARALLEL_INTERCEPT_DEG,
   type Entry,
   type HoldCourse,
   type SectorArc,
@@ -225,31 +226,78 @@ describe('entryGuidance', () => {
   // PATTERN through more than 180 degrees, and return to the holding fix or
   // intercept the holding course inbound."
   //
-  // Drawn out (inbound 270, right turns, outbound 090): the aircraft parallels
-  // outbound on the south (nonholding) side, ending south-east of the fix. The
-  // fix then bears roughly 285. A RIGHT turn 090 -> 285 is 195 deg (more than
-  // 180); a LEFT turn is 165 deg (less than 180). Only the pattern direction
-  // satisfies the AIM's "more than 180 degrees", so the two clauses agree.
-  it('parallel: outbound course on the nonholding side, reintercept WITH the pattern', () => {
+  // ⚠️ "In the direction of the holding pattern" is SPATIAL (toward the racetrack,
+  // i.e. back across the holding course onto the holding side), NOT rotational.
+  // The rejoin turn therefore opposes the pattern's turn direction. Evidence, all
+  // rendered and visually inspected — see docs/parallel-entry-evidence.md:
+  //   * AIM FIG 5-3-4 and IFH FAA-H-8083-15B Fig 10-6 draw, in ONE standard-pattern
+  //     figure, the teardrop rejoin CLOCKWISE (with the pattern) and the parallel
+  //     rejoin COUNTER-CLOCKWISE (against it). Same words, opposite senses.
+  //   * ICAO Doc 8168 Vol I Pt II §6 Ch 2 says it in words: 2.2.4 (parallel) "the
+  //     aircraft is TURNED TOWARD THE HOLDING SIDE"; 2.2.5 (teardrop) "turned RIGHT".
+  //     Spatial for one, rotational for the other, deliberately.
+  //
+  // ⚠️ ">180°" DOES NOT DISCRIMINATE and must never be reasoned from. The old
+  // derivation below this line was the origin of a shipped defect: it measured the
+  // bearing to the fix at the START of the turn and never updated it for the
+  // aircraft's motion DURING the turn. Computed correctly across the parallel
+  // sector, right turns sweep 212.6°–222.1° and left turns 189.3°–215.3° — both
+  // exceed 180°, and they are exactly equal (215.3°) at zero offset by symmetry.
+  it('parallel: outbound course on the nonholding side, reintercept AGAINST the pattern', () => {
     const g = entryGuidance('parallel', hold)
     expect(g.outboundHeading).toBe(90)
     expect(g.side).toBe('nonholding')
-    expect(g.turnToInbound).toBe('right')
+    expect(g.turnToInbound).toBe('left')
   })
 
-  it('nonstandard mirrors: teardrop offset flips, parallel reintercept is left', () => {
+  it('nonstandard mirrors: teardrop offset flips, parallel reintercept is right', () => {
     expect(entryGuidance('teardrop', nonStd(270)).outboundHeading).toBe(120)
     expect(entryGuidance('teardrop', nonStd(270)).turnToInbound).toBe('left')
-    expect(entryGuidance('parallel', nonStd(270)).turnToInbound).toBe('left')
+    expect(entryGuidance('parallel', nonStd(270)).turnToInbound).toBe('right')
     expect(entryGuidance('direct', nonStd(270)).turnToInbound).toBe('left')
   })
 
-  it('every entry reintercepts in the pattern direction (AIM 5-3-8 j3)', () => {
+  it('direct and teardrop reintercept with the pattern, parallel against it', () => {
     for (const inbound of [0, 45, 90, 180, 270, 315]) {
       for (const h of [std(inbound), nonStd(inbound)]) {
+        const opposed = h.turnDirection === 'right' ? 'left' : 'right'
         for (const e of ENTRIES) {
-          expect(entryGuidance(e, h).turnToInbound).toBe(h.turnDirection)
+          const expected = e === 'parallel' ? opposed : h.turnDirection
+          expect(entryGuidance(e, h).turnToInbound, `${e} ${h.turnDirection} ${inbound}`)
+            .toBe(expected)
         }
+      }
+    }
+  })
+
+  it('the golden case: inbound 140, left turns → the rejoin is a RIGHT turn', () => {
+    // "Hold northwest of the Delta NDB on the one four zero bearing to the
+    // station, left turns", aircraft heading 251°. Holding side northeast.
+    const g = entryGuidance('parallel', nonStd(140))
+    expect(g.outboundHeading).toBe(320)
+    expect(g.side).toBe('nonholding')
+    expect(g.turnToInbound).toBe('right')
+    expect(normalizeDeg(140 + PARALLEL_INTERCEPT_DEG)).toBe(185) // rollout heading
+  })
+
+  // A3. The intercept angle is convention, not AIM text (the AIM requires only
+  // "more than 180 degrees"); 45° is chosen because it matches how the FAA
+  // figures draw the rollout, and lives in the engine so the map and the sim
+  // cannot drift from it.
+  it('the intercept angle is 45°, single-sourced in the engine', () => {
+    expect(PARALLEL_INTERCEPT_DEG).toBe(45)
+  })
+
+  it('A3: the parallel rejoin sweeps more than 180° in the opposed direction', () => {
+    for (const c of [0, 45, 90, 135, 180, 225, 270, 315, 140]) {
+      for (const h of [std(c), nonStd(c)]) {
+        const g = entryGuidance('parallel', h)
+        const rejoinSign = g.turnToInbound === 'right' ? 1 : -1
+        const rolloutHeading = normalizeDeg(c + PARALLEL_INTERCEPT_DEG * rejoinSign)
+        const sweep = normalizeDeg((rolloutHeading - g.outboundHeading) * rejoinSign)
+        // 225 by construction; a bare sign flip with no intercept angle gives 180.
+        expect(sweep, `${h.turnDirection} ${c}`).toBe(225)
+        expect(sweep, `${h.turnDirection} ${c}`).toBeGreaterThan(180)
       }
     }
   })
