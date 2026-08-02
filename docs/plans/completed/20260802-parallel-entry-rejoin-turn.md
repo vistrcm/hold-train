@@ -664,16 +664,28 @@ plan's hand-derived "after the fix" table, which was written before the implemen
 
 ### Task 10: [Final] Update documentation
 
-- [ ] add a CLAUDE.md convention entry recording that the parallel rejoin direction is **settled**,
+- [x] add a CLAUDE.md convention entry recording that the parallel rejoin direction is **settled**,
       that it opposes the pattern, that the evidence lives in `docs/parallel-entry-evidence.md`, and
       that the ">180°" clause must never be used to re-derive it. This repo has now reasoned itself
-      into the wrong answer once; the note is what stops a third round
-- [ ] update `README.md` if any module description references entry geometry (note
+      into the wrong answer once; the note is what stops a third round — **new section "## Settled:
+      the parallel entry's rejoin turn opposes the pattern", placed immediately after "Engine is the
+      oracle" (it is an oracle fact before it is a citation fact). Four bullets: the rule and the
+      single-sourced `PARALLEL_INTERCEPT_DEG`; the ⚠️ do-not-re-derive warning naming the 2026-07-22
+      ledger entry and stating that ">180°" discriminates nothing; the evidence pointer; and the
+      guard file, including the instruction to keep its negative regexes anchored on the gloss so the
+      guard can never be satisfied by deleting the AIM quotation**
+- [x] update `README.md` if any module description references entry geometry (note
       `dashboard.test.ts` diffs README's route table against `PHASE_PREP` — keep the row shape)
-- [ ] run `npm test` and `npm run typecheck` — README is an asserted artifact
+      — **one line changed: the Entry-determination bullet said "the parallel's >180° reintercept",
+      naming the one quantity that cannot settle the direction and no direction at all. Now names the
+      direction (against the pattern, 225°, back across the course onto the holding side) and points
+      at `docs/parallel-entry-evidence.md`. The route table was not touched**
+- [x] run `npm test` and `npm run typecheck` — README is an asserted artifact
       (`dashboard.test.ts:3` imports it `?raw`), so this task can turn the suite red *after*
-      acceptance has already passed
-- [ ] move this plan to `docs/plans/completed/`
+      acceptance has already passed — **577 passed / 27 files; typecheck exit 0. The README edit is
+      in prose, outside the `matchAll` region `dashboard.test.ts:175` scans, so the table diff was
+      unaffected**
+- [x] move this plan to `docs/plans/completed/`
 
 ## Post-Completion
 
