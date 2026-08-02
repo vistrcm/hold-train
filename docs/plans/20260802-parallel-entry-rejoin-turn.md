@@ -284,36 +284,42 @@ if this task fails to confirm, **STOP and report; do not proceed to Task 2.**
 **Files:**
 - Create: `docs/parallel-entry-evidence.md`
 
-- [ ] fetch AIM FIG 5-3-4. `faa.gov` returns HTTP 403 to plain fetches — use
+- [x] fetch AIM FIG 5-3-4. `faa.gov` returns HTTP 403 to plain fetches — use
       `curl -sL -A "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36"`.
       **Trace the crossing on `https://faraim.org/faa/aim/chapter-5/section-5-3-8.pdf`** (vector,
       render at 400–900 dpi) or the AIP PNG in the later checkbox. The AIM HTML's inline figure
       (`.../aim_html/images/aim0503_At_Anchor2.png`, alt "Holding Pattern Entry Procedures") is only
       **312×221 px** — far too coarse to resolve which side of the course line the arc is on. Use it
       as a sanity check, never as the evidence
-- [ ] render the figure to PNG (`pdftoppm -png -r 400 -f 5 -l 5`, or
+- [x] render the figure to PNG (`pdftoppm -png -r 400 -f 5 -l 5`, or
       `magick -density 400 'file.pdf[4]' out.png`, or `gs -sDEVICE=png16m -r400`) and **view it with
       the Read tool** — Read renders images visually. Do NOT infer the figure's content from prose
-- [ ] orient before tracing: find the racetrack, confirm which side of the course it lies on (= the
+- [x] orient before tracing: find the racetrack, confirm which side of the course it lies on (= the
       holding side), then trace the parallel dashed track from the fix
-- [ ] record: does the parallel rejoin arc **cross the holding course onto the holding side**
+- [x] record: does the parallel rejoin arc **cross the holding course onto the holding side**
       (expected: yes), and is its rotational sense **opposite** the pattern's (expected: yes,
-      counter-clockwise in the STANDARD PATTERN figure)?
-- [ ] confirm the discriminator in the same figure: the **teardrop** rejoin is clockwise (with the
-      pattern) while the **parallel** rejoin is counter-clockwise (against it)
-- [ ] repeat with a second independent FAA source — AIP `FIG ENR 1.5-3` at
+      counter-clockwise in the STANDARD PATTERN figure)? — **yes to both, confirmed**
+- [x] confirm the discriminator in the same figure: the **teardrop** rejoin is clockwise (with the
+      pattern) while the **parallel** rejoin is counter-clockwise (against it) — **confirmed via the
+      two rejoin arrowheads: teardrop points due south at the outermost point of its turn
+      (clockwise), parallel rolls out heading down-left above the course line (counter-clockwise)**
+- [x] repeat with a second independent FAA source — AIP `FIG ENR 1.5-3` at
       `https://www.faa.gov/air_traffic/publications/atpubs/aip_html/images/AIP_ENR_1.5_fig107.png`
       (3162×2238, crop and zoom to the crossing point)
-- [ ] write `docs/parallel-entry-evidence.md` recording, for each source: URL, byte size, page,
+- [x] write `docs/parallel-entry-evidence.md` recording, for each source: URL, byte size, page,
       render command, what was seen, and the verdict. This is the artifact future sessions read
       instead of re-deriving from the AIM sentence
-- [ ] ⚠️ if either figure shows the rejoin bulging further onto the nonholding side, STOP — the
-      dossier is wrong and the shipped behaviour may be right
-- [ ] ⚠️ if the artefacts cannot be **obtained or rendered** (no network, a 403, no renderer), that
+- [x] ⚠️ if either figure shows the rejoin bulging further onto the nonholding side, STOP — the
+      dossier is wrong and the shipped behaviour may be right — **not triggered: neither figure
+      draws anything below the course line except the straight parallel leg and the sector-(b)
+      arrival line. Proceeding to Task 2**
+- [x] ⚠️ if the artefacts cannot be **obtained or rendered** (no network, a 403, no renderer), that
       is **not** disconfirmation. Record the failure in `docs/parallel-entry-evidence.md`, fall back
       to ICAO Doc 8168 2.2.4/2.2.5 as the standing textual evidence, and proceed to Task 2.
       Environment note as of 2026-08-02: `faa.gov` returns 200 with a browser UA, `magick` and `gs`
-      are present, `pdftoppm` is **not**
+      are present, `pdftoppm` is **not** — **fallback not needed; both artefacts were obtained and
+      rendered. Additional note: `magick -density 900` aborts (out of memory) on this page, so the
+      900 dpi render was done with `gs -sDEVICE=png16m -r900`**
 
 ### Task 2: Invert the parallel rejoin direction in the engine and centralise the intercept angle
 
