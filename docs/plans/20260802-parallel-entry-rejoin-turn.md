@@ -620,17 +620,47 @@ covered by Task 4, so only two assertions here are genuinely new.
 
 ### Task 9: Verify acceptance criteria
 
-- [ ] `entryGuidance('parallel', {inboundCourse: 140, turnDirection: 'left'}).turnToInbound === 'right'`
-- [ ] `determineEntry(251, {inboundCourse: 140, turnDirection: 'left'}).primary === 'parallel'` —
-      unchanged, proving sector classification was not collaterally damaged
-- [ ] rendered map for the golden case: sweep flag `1`, rollout ≈ `(93.3, 62.3)` — i.e. the rollout
+Verified by a throwaway harness (`tmp/acceptance/task9.test.ts`, run under vitest, then deleted —
+per CLAUDE.md temporary scripts live in a dedicated temp directory) that recomputed each value
+directly rather than trusting that some existing test covered it. Every measured number matched this
+plan's hand-derived "after the fix" table, which was written before the implementation.
+
+- [x] `entryGuidance('parallel', {inboundCourse: 140, turnDirection: 'left'}).turnToInbound === 'right'`
+      — **`right`**, with `side: 'nonholding'` (A4 unbroken at the golden case)
+- [x] `determineEntry(251, {inboundCourse: 140, turnDirection: 'left'}).primary === 'parallel'` —
+      unchanged, proving sector classification was not collaterally damaged — **`parallel`,
+      `alternates: []`** (not near a boundary, as the plan's "41° / 69°" note predicts)
+- [x] rendered map for the golden case: sweep flag `1`, rollout ≈ `(93.3, 62.3)` — i.e. the rollout
       endpoint on the northeast (holding) side. Do not assert the large-arc flag as evidence of
-      anything; `mapview.ts:178` hardcodes it to `1`
-- [ ] all four assertions A1–A4 hold for both standard and nonstandard patterns
-- [ ] no content string anywhere claims the rejoin follows the pattern
-- [ ] full suite: `npm test`
-- [ ] type check: `npm run typecheck`
-- [ ] confirm zero runtime dependencies were added (CLAUDE.md hard rule)
+      anything; `mapview.ts:178` hardcodes it to `1` — **sweep flag `1`, rollout `(93.34, 62.30)`,
+      both within 0.5 units of the plan's figure. The large-arc flag was deliberately not used as
+      evidence**
+- [x] all four assertions A1–A4 hold for both standard and nonstandard patterns — swept over
+      `[0, 45, 90, 135, 180, 225, 270, 315, 140]` × both patterns (18 combinations):
+      **A1** `turnToInbound !== pattern` everywhere, and in `sim.ts` the outbound turn and the rejoin
+      share a sense (sim's first turn reaches −0.9549 NM toward the *nonholding* side for both
+      patterns, mirroring exactly);
+      **A2** the map's rollout endpoint is on the holding side for all 18 (measured as a signed NM
+      projection onto the holding-side unit vector, so it is valid at any course, unlike
+      `mapview.test.ts`'s `d[9] > 100` which only works at inbound 0), and the sim's through-rejoin
+      minimum is **−0.9549** with rollout **−0.1390** and whole-track **−1.3022** — the plan's three
+      predicted values to 4 dp;
+      **A3** sweep is exactly **225°** (`> 180`) for all 18;
+      **A4** `side === 'nonholding'` for all 18 and the drawn leg end (`d[2],d[3]`) is on the
+      nonholding side for all 18
+- [x] no content string anywhere claims the rejoin follows the pattern — repo-wide `grep -rniE` over
+      `src/` for the wrong-gloss patterns plus `reintercept/rejoin … with the pattern` returned **9
+      hits, all benign**: 4 are the guard regexes themselves (`parallel-entry.invariants.test.ts`,
+      `lessons.test.ts`, `oral.test.ts`, `anki-deck.test.ts`) and 5 are *correct* statements about a
+      different turn — the **teardrop** rejoin being clockwise (`entry.ts:168`, `entry.test.ts:234`,
+      `entry.test.ts:260`) or the **final turn at the fix** following the pattern (`sim.ts:156`,
+      `entry-drill.ts:145`). The three user-visible strings were read in full: each states the
+      corrected rule *and* still carries the AIM clause verbatim
+- [x] full suite: `npm test` — **577 passed / 27 files** (re-run after deleting the temp harness, so
+      the count is the repo's own)
+- [x] type check: `npm run typecheck` — **exit 0**
+- [x] confirm zero runtime dependencies were added (CLAUDE.md hard rule) — **`package.json` has no
+      `dependencies` key at all; `devDependencies` is exactly jsdom, typescript, vite, vitest**
 
 ### Task 10: [Final] Update documentation
 
