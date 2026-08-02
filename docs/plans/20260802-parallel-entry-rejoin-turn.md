@@ -366,27 +366,29 @@ if this task fails to confirm, **STOP and report; do not proceed to Task 2.**
 - Modify: `src/ui/mapview.ts`
 - Modify: `src/ui/mapview.test.ts`
 
-- [ ] in `src/ui/mapview.test.ts`, flip the sweep-flag assertions in
+- [x] in `src/ui/mapview.test.ts`, flip the sweep-flag assertions in
       `'parallel: leg on the non-holding side, >180° reintercept turn with the pattern'` (`d[8]`
       `1` → `0`) and `'parallel mirrors for a nonstandard hold'` (`d[8]` `0` → `1`); rename both to
       say the rejoin opposes the pattern
-- [ ] add the A2 assertion on the **rollout endpoint** (`d[9]`, `d[10]`) — not the arc centre, which
+- [x] add the A2 assertion on the **rollout endpoint** (`d[9]`, `d[10]`) — not the arc centre, which
       is not readable from an SVG `d` string (arcs are endpoint-parameterized). It must lie on the
       **holding** side: for the default `hold()` (inbound 0, right turns) that is east, so
       `d[9] > 100`; add the nonstandard mirror (`d[9] < 100`)
-- [ ] **keep** the existing A4 assertions — `mapview.test.ts:251` (`d[2] < 100`) and `:259`
+- [x] **keep** the existing A4 assertions — `mapview.test.ts:251` (`d[2] < 100`) and `:259`
       (`d[2] > 100`) already pin the outbound leg to the nonholding side. Verify they still pass, so
-      this change cannot overshoot into breaking the part that was right
-- [ ] add the golden case from this plan: inbound 140 / left turns / 1-min legs → sweep flag `1`,
+      this change cannot overshoot into breaking the part that was right — **kept and passing; they
+      were the two assertions that stayed green through the red step**
+- [x] add the golden case from this plan: inbound 140 / left turns / 1-min legs → sweep flag `1`,
       large-arc `1`, rollout ≈ `(93.3, 62.3)` within 0.5 units
-- [ ] run tests — confirm they FAIL first
-- [ ] in `src/ui/mapview.ts`, in the `entryPathD` parallel branch introduce the rejoin sign
+- [x] run tests — confirm they FAIL first — **3 failed, all on the sweep flag / rollout side**
+- [x] in `src/ui/mapview.ts`, in the `entryPathD` parallel branch introduce the rejoin sign
       `const rs = (s === 1 ? -1 : 1) as 1 | -1` and use it for `turnCenter`, for the rollout heading
       (`normalizeDeg(c + PARALLEL_INTERCEPT_DEG * rs)`, importing the constant from `../engine/entry`
       — do not hardcode 45), and for the sweep flag
-- [ ] update the module header comment (lines 1–7), which currently describes the parallel entry as
+- [x] update the module header comment (lines 1–7), which currently describes the parallel entry as
       "a >180° pattern-direction reintercept"
-- [ ] run `npm test` and `npm run typecheck` — both must pass before Task 4
+- [x] run `npm test` and `npm run typecheck` — both must pass before Task 4 — **563 passed / 26
+      files; typecheck clean**
 
 ### Task 4: Correct the sim's rejoin direction and document its model limitation
 

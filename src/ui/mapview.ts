@@ -1,8 +1,11 @@
 // Map view: north-up plan view of a holding pattern — racetrack on the
 // holding side, fix marker, ownship, flown ground track vs ghost track, and
 // entry-path illustrations (teardrop 30° offset toward the holding side;
-// parallel on the non-holding side with a >180° pattern-direction reintercept).
-// Entry directions come from entryGuidance — the engine is the oracle.
+// parallel on the non-holding side, then a >180° reintercept turned AGAINST the
+// pattern, crossing back over the holding course onto the holding side).
+// Entry directions and the parallel intercept angle come from the engine —
+// entryGuidance and PARALLEL_INTERCEPT_DEG are the oracle. Nothing about a turn
+// direction is derived here; see docs/parallel-entry-evidence.md.
 // Shares the HSI's instrument palette (src/ui/palette.ts), so an entry keeps
 // one colour across the compass rose and the plan view.
 // Pure rendering: state in, SVG out. No internal state, no listeners.
@@ -12,7 +15,13 @@
 // chosen per hold so the racetrack plus entry turns fit at any leg length.
 
 import type { LegSpec } from '../engine/clearance'
-import { type Entry, type EntryGuidance, type TurnDirection, entryGuidance } from '../engine/entry'
+import {
+  type Entry,
+  type EntryGuidance,
+  PARALLEL_INTERCEPT_DEG,
+  type TurnDirection,
+  entryGuidance,
+} from '../engine/entry'
 import { assertCourse, normalizeDeg } from '../engine/geometry'
 import { courseText } from '../format'
 import { PALETTE } from './palette'
@@ -164,15 +173,20 @@ function entryPathD(entry: Entry, g: EntryGuidance, hold: MapHold, legNm: number
     )
   }
 
-  // parallel: outbound on the non-holding side, then a >180° turn in the
-  // pattern's direction back to an intercept (AIM 5-3-8 j3(a))
+  // parallel: outbound on the non-holding side, then a >180° turn AGAINST the
+  // pattern's rotation, crossing back over the holding course onto the holding
+  // side (AIM 5-3-8 j3(a); see the entryGuidance 'parallel' case in
+  // src/engine/entry.ts and docs/parallel-entry-evidence.md — the AIM's "in the
+  // direction of the holding pattern" is spatial, not rotational, and FIG 5-3-4
+  // draws this arc counter-clockwise in a standard right-turn pattern).
+  const rs: 1 | -1 = s === 1 ? -1 : 1 // rejoin sign: opposite the pattern
   const nonHoldingSide = unit(normalizeDeg(c - 90 * s))
   const legEnd = add(add(fix, unit(g.outboundHeading), legNm), nonHoldingSide, PARALLEL_OFFSET_NM)
-  const center = turnCenter(legEnd, g.outboundHeading, s)
-  // roll out angled 30° into the inbound course, converging from the
-  // non-holding side
-  const rollout = pointAtHeading(center, normalizeDeg(c + 30 * s), s)
-  const sweep = s === 1 ? 1 : 0
+  const center = turnCenter(legEnd, g.outboundHeading, rs)
+  // roll out angled into the inbound course from the holding side, at the
+  // engine's intercept angle (45° — the oracle owns the convention)
+  const rollout = pointAtHeading(center, normalizeDeg(c + PARALLEL_INTERCEPT_DEG * rs), rs)
+  const sweep = rs === 1 ? 1 : 0
   return (
     `M ${pt(fix, scale)} L ${pt(legEnd, scale)} ` +
     `A ${rr} ${rr} 0 1 ${sweep} ${pt(rollout, scale)} L ${pt(fix, scale)}`
