@@ -75,7 +75,21 @@ sector: right turn 212.6°–222.1°, left turn 189.3°–215.3° — **both exc
 exactly equal (215.3°) at zero offset by symmetry. The clause does not discriminate between the two
 readings. Reasoning from it is the root cause of this defect.
 
-### How the evidence was obtained (three FAA figures, rendered and visually inspected)
+### How the evidence was obtained (two FAA figures, rendered and visually inspected)
+
+> **Superseded — corrected during implementation. Read `docs/parallel-entry-evidence.md` instead;
+> it, not this table, is the authority.** Two corrections to the table below:
+>
+> 1. **The IFH row was never rendered in this project.** It is a second-hand recollection carried
+>    into the plan, and this heading originally read "three FAA figures". `docs/parallel-entry-evidence.md`
+>    ("Sources deliberately not cited") and `CLAUDE.md` both say to cite it as second-hand or not at
+>    all. Two figures were rendered: AIM FIG 5-3-4 and AIP FIG ENR 1.5-3. The "decisive control"
+>    credited to the IFH — teardrop clockwise and parallel counter-clockwise in one figure — is in
+>    fact available from FIG 5-3-4 itself, so nothing rests on the unrendered row.
+> 2. **"rolls out on inbound − 45°" is not what was measured.** The one rollout tangent measured in
+>    the dossier is ≈31°. `PARALLEL_INTERCEPT_DEG = 45` is a drawing convention chosen for
+>    legibility (see `src/engine/entry.ts`); the figures settle the rejoin's DIRECTION only, and the
+>    AIM requires only ">180°". Never justify the 45 by claiming the FAA draws it.
 
 | Source | Result |
 |---|---|
@@ -459,9 +473,12 @@ structure visible to the learner, which is the whole point of the corrected geom
       asserted `'parallel'` in the same test so the classification stays proven undamaged**
 - [x] extend the "Fly it" line for parallel entries to name the fix-crossing turn explicitly
       (e.g. "cross the fix, turn right onto 320° on the nonholding side…"), deriving the direction
-      from the engine, not from a hardcoded string — **the fix-crossing turn is read off
-      `g.turnToInbound` (A1: for a parallel both turns share a sense), so no new `EntryGuidance`
-      field was needed. Line ends "— both turns opposite the pattern"**
+      from the engine, not from a hardcoded string — **superseded during implementation: the
+      fix-crossing turn is derived from `angleDiff(heading, g.outboundHeading)`, not from
+      `g.turnToInbound`. A1 ("both turns share a sense") holds throughout the parallel sector but
+      NOT inside the ±5° teardrop/parallel band, where parallel is still graded correct and the
+      fix-crossing turn can follow the pattern — so `flyItText` takes the heading and appends
+      "— both turns opposite the pattern" only when that is true of the scenario shown**
 - [x] state the outbound timing reference using the AIM's **verbatim** sentence, cited to
       `AIM 5-3-8 j4(b)`: "Outbound leg timing begins over/abeam the fix, whichever occurs later. If
       the abeam position cannot be determined, start timing when turn to outbound is completed."
