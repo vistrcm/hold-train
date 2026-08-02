@@ -495,23 +495,37 @@ These are the highest-severity strings in the repo: they state the defect explic
 - Modify: `src/content/oral.test.ts`
 - Modify: `src/content/anki-deck.test.ts`
 
-- [ ] ⚠️ **Both `lessons.ts:81` and `oral.ts:159` quote the AIM's own clause** ("then turn in the
+- ➕ note: the three gloss sentences had already been corrected by hand in commit `302f9ba`
+      ("update text", 2026-08-02), immediately before this plan's work started — **untested**, which
+      is precisely the exposure Task 7 closes. This task therefore added the missing structural
+      sentence, verified the retained AIM clauses, and pinned all of it with tests
+- [x] ⚠️ **Both `lessons.ts:81` and `oral.ts:159` quote the AIM's own clause** ("then turn in the
       direction of the holding pattern through more than 180°") and *then* gloss it wrongly. The
       verbatim AIM clause is **retained** — only the gloss that follows it changes. Do not delete the
       primary-source wording along with the error; the app's citation convention rests on it
-- [ ] `src/content/lessons.ts:81` — delete "it turns the same way the pattern does (right in a
+      — **all three strings verified to still carry the clause verbatim, and each is now asserted
+      with `toContain` so a future edit cannot drop the primary-source wording**
+- [x] `src/content/lessons.ts:81` — delete "it turns the same way the pattern does (right in a
       standard hold), away from the course at first, because that is the only direction that makes
       the turn exceed 180°". Replace with the corrected rule and *why it is counter-intuitive*: the
       parallel entry is the one entry with two turns against the pattern; only the final turn at the
-      fix follows it
-- [ ] `src/content/oral.ts:159` — same correction; this is a DPE-facing answer
-- [ ] `src/content/anki-deck.ts:46` — same correction. Note this card ships to the user's Anki deck,
+      fix follows it — **the corrected rule was already present; added the missing structural
+      sentence: "That makes parallel the one entry whose first two turns — off the course outbound,
+      then the rejoin — both oppose the pattern; only the turn on reaching the fix again follows it."**
+- [x] `src/content/oral.ts:159` — same correction; this is a DPE-facing answer
+- [x] `src/content/anki-deck.ts:46` — same correction. Note this card ships to the user's Anki deck,
       so a wrong card is drilled to memory
-- [ ] check `src/content/questions.ts` for any written-test item asserting the rejoin direction and
-      correct it if present
-- [ ] add tests asserting each corrected string mentions the opposed turn and does **not** claim the
-      rejoin follows the pattern
-- [ ] run `npm test` and `npm run typecheck` — both must pass before Task 7
+- [x] check `src/content/questions.ts` for any written-test item asserting the rejoin direction and
+      correct it if present — **none: its only turn-direction items are about the *pattern's* turn
+      direction (the omitted-direction trap), a different and correct fact; entry items are
+      scenario-based with engine-generated answer keys. Nothing to change**
+- [x] add tests asserting each corrected string mentions the opposed turn and does **not** claim the
+      rejoin follows the pattern — **4 tests (2 in `lessons.test.ts`, 1 each in `oral.test.ts` and
+      `anki-deck.test.ts`). Negatives anchor on the gloss (`same way the pattern`,
+      `follows the pattern`, `only that direction`) so the retained AIM quotation cannot match them.
+      Red first: 3 failures, all on the missing structural sentence**
+- [x] run `npm test` and `npm run typecheck` — both must pass before Task 7 — **573 passed / 26
+      files (was 569); typecheck clean**
 
 ### Task 7: Add a cross-module invariant guard so a single-file flip cannot happen again
 
