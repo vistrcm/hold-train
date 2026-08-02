@@ -283,9 +283,10 @@ describe('entryGuidance', () => {
   })
 
   // A3. The intercept angle is convention, not AIM text (the AIM requires only
-  // "more than 180 degrees"); 45° is chosen because it matches how the FAA
-  // figures draw the rollout, and lives in the engine so the map and the sim
-  // cannot drift from it.
+  // "more than 180 degrees") and is NOT a measurement of the figures — the one
+  // rollout tangent measured in docs/parallel-entry-evidence.md is ≈31°. 45° is a
+  // drawing choice for legibility; do not justify it by claiming the FAA draws it.
+  // It lives in the engine so the map and the sim cannot drift from it.
   it('the intercept angle is 45°, single-sourced in the engine', () => {
     expect(PARALLEL_INTERCEPT_DEG).toBe(45)
   })

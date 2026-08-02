@@ -257,6 +257,28 @@ function parallelRejoinLines(source: string): string[] {
     .filter((l) => !/\?['"`],?\s*$/.test(l))
 }
 
+/**
+ * The sentences within a line that actually claim something about the rejoin.
+ *
+ * ⚠️ CORRECT must be matched against THIS, not against the whole line. A content
+ * line is a paragraph: `lessons.ts` and `oral.ts` describe the teardrop on the
+ * same line, and the teardrop legitimately turns "toward the holding side" — a
+ * CORRECT alternative. Line-scoped, the positive assertion is therefore vacuous
+ * for two of the three modules: the pre-fix defective wording matches it (pinned
+ * by `the positive rejects the pre-fix wording` below), leaving only the WRONG
+ * blacklist doing any work, and a blacklist catches only wordings already known.
+ * Same class as styles.test.ts's `is actually loaded` guard — scan the claim, not
+ * the block it sits in.
+ *
+ * WRONG stays line-scoped: it is strictly safer to blacklist over more text.
+ */
+function rejoinClaim(line: string): string {
+  return line
+    .split(/(?<=[.;])\s+/)
+    .filter((s) => /reintercept|rejoin/i.test(s))
+    .join(' ')
+}
+
 describe('no content module teaches the rejoin the wrong way', () => {
   it('the scan finds prose to scan at all', () => {
     // A rename or a reflow that hides the prose from this scan would make the
@@ -272,7 +294,9 @@ describe('no content module teaches the rejoin the wrong way', () => {
   it('every parallel-rejoin sentence states the corrected rule', () => {
     for (const { file, source } of CONTENT) {
       for (const line of parallelRejoinLines(source)) {
-        expect(line, `${file}: does not state the corrected rule (${EVIDENCE})`).toMatch(CORRECT)
+        const claim = rejoinClaim(line)
+        expect(claim, `${file}: no rejoin sentence to scan on a line that mentions one`).not.toBe('')
+        expect(claim, `${file}: does not state the corrected rule (${EVIDENCE})`).toMatch(CORRECT)
         expect(line, `${file}: still glosses the rejoin as following the pattern (${EVIDENCE})`).not.toMatch(
           WRONG,
         )
@@ -286,5 +310,19 @@ describe('no content module teaches the rejoin the wrong way', () => {
     const aim =
       'turn in the direction of the holding pattern through more than 180 degrees, and return to the holding fix'
     expect(aim).not.toMatch(WRONG)
+  })
+
+  it('the positive rejects the pre-fix wording, scoped but not line-scoped', () => {
+    // Guards the guard, the other way round: a positive that the defect satisfies
+    // certifies nothing. This is lessons.ts as it actually shipped before the
+    // 2026-08-02 correction — one line carrying both the teardrop ("toward the
+    // holding side", a CORRECT alternative) and the defective rejoin gloss.
+    const preFix =
+      'Teardrop (≈70° sector): at the fix turn to a heading 30° off the outbound course toward the holding side, fly about 1 minute, then turn to intercept inbound. The parallel reintercept catches people out: it turns the same way the pattern does (right in a standard hold), away from the course at first, because that is the only direction that makes the turn exceed 180°.'
+    expect(preFix, 'the whole line matches CORRECT — which is exactly why it is not the unit').toMatch(
+      CORRECT,
+    )
+    expect(rejoinClaim(preFix), 'CORRECT must reject the defective rejoin sentence').not.toMatch(CORRECT)
+    expect(preFix, 'and WRONG must still catch it').toMatch(WRONG)
   })
 })
