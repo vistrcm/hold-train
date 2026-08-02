@@ -44,8 +44,10 @@ export const MAX_SIM_SECONDS = 900
 
 const DT = 0.1 // s per integration step
 // The parallel rejoin's rollout angle is NOT defined here — it is imported from
-// ./entry, the oracle. A private copy is how the map, the sim and the engine
-// came to disagree about this maneuver.
+// ./entry, the oracle. This file used to hold a private copy of it; the copy
+// agreed with the map's literal (both 30) until the angle was single-sourced and
+// raised to 45, so it was never itself a drift — it was one more hand-written
+// copy of geometry that the rejoin SIGN did drift in, across five modules.
 const SAMPLE_SECONDS = 1 // ground-track sampling interval
 /** Longest outbound leg flyCircuit will accept. Callers that *suggest* a leg
  *  time must clamp to this, or they hand the pilot a number the sim rejects. */
@@ -165,8 +167,9 @@ export function flyCircuit(
   // Both turns of every entry share one rotational sense, and it is the engine's
   // `turnToInbound` — read from the oracle rather than re-derived here, so a
   // change to the parallel rule cannot leave this file stale. A private copy of
-  // this sign, and of the intercept angle below, is exactly how the map, the sim
-  // and the engine came to disagree about this maneuver.
+  // this sign is exactly how the map, the sim and the engine came to disagree
+  // about this maneuver. (The intercept angle below is single-sourced for the
+  // same reason, but it had not in fact diverged — see the note at DT.)
   const turnSign: 1 | -1 = entryGuidance(decisions.entry, hold).turnToInbound === 'right' ? 1 : -1
   // Parallel rolls out on an intercept heading angled back into the course, not
   // on the inbound heading itself — turning to the inbound heading would be

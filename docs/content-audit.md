@@ -567,8 +567,11 @@ geometry; timing-wind: j4, j8(c), j5; reports: 5-3-3 a1(f)/(g), i6 + P/CG + 91.1
 
   **Why it spread to five modules.** The same geometry was hand-written three times
   (`entry.ts`, `sim.ts`, `mapview.ts`) instead of derived once — against CLAUDE.md's
-  "engine is the oracle" rule. `sim.ts` even carried a *value* drift, a private
-  `PARALLEL_INTERCEPT_DEG = 30` against the engine's 45. All three now consume the exported
+  "engine is the oracle" rule. What drifted was the rejoin **sign**; the intercept *angle*
+  did not — `sim.ts` carried a private `PARALLEL_INTERCEPT_DEG = 30` and `mapview.ts` a bare
+  literal 30, the engine defined none, and the two consumers agreed. The angle was raised to
+  45 here as a legibility choice and single-sourced at the same time; that is a change, not a
+  drift repair. All three now consume the exported
   constant, and `mapview.ts`/`sim.ts` derive the rejoin sign rather than restating it.
   Inverting the engine alone left the full suite green, because nothing cross-checked the
   map or the sim against the oracle; that silence is what
@@ -652,7 +655,8 @@ geometry; timing-wind: j4, j8(c), j5; reports: 5-3-3 a1(f)/(g), i6 + P/CG + 91.1
   ≈31°** (`src/engine/entry.ts`, `docs/parallel-entry-evidence.md`, this ledger). Four
   artifacts claimed 45° "matches how the FAA figures draw the rollout"; the only rollout
   tangent actually measured in the dossier is ≈31° (Source 1, observation 4) — nearer the
-  drifted `sim.ts` value of 30 than to 45. The angle is now stated as a legibility
+  30 both consumers already used than to 45, which is why 45 is recorded as a legibility
+  choice made here rather than as a correction of the old value. The angle is now stated as a legibility
   convention, and the dossier says explicitly that it establishes the rejoin's **direction**
   only.
 

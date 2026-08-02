@@ -222,9 +222,17 @@ const CORRECT = /opposite|against the pattern|toward the holding side|crosses (b
  * nonstandard hold. Only the pairing with a pattern of the same sense is wrong,
  * so the last two alternatives carry the pattern with them. A guard that fails
  * on correct prose gets weakened, and then it guards nothing.
+ *
+ * ⚠️ Same reason "follows the pattern" is anchored to the rejoin adjacently. The
+ * corrected rule ends "only the final turn on reaching the fix follows the
+ * pattern" — a bare alternative rejects that, and `[^.]*` does not help, since
+ * the modules join the two clauses with a semicolon ("…both oppose the pattern;
+ * only the turn on reaching the fix again follows…"). All three content modules
+ * write "follows it" today, which is the guard steering prose rather than
+ * checking it. Pinned by `the negatives accept the corrected rule` below.
  */
 const WRONG =
-  /same way the pattern|follows the pattern|only that direction|right-turn hold[^.]*reintercepts? right|left-turn hold[^.]*reintercepts? left/i
+  /same way the pattern|(?:rejoin|reintercepts?)(?: turn)? follows the pattern|only that direction|right-turn hold[^.]*reintercepts? right|left-turn hold[^.]*reintercepts? left/i
 
 /**
  * Every content module, harvested rather than hand-listed.
@@ -310,6 +318,20 @@ describe('no content module teaches the rejoin the wrong way', () => {
     const aim =
       'turn in the direction of the holding pattern through more than 180 degrees, and return to the holding fix'
     expect(aim).not.toMatch(WRONG)
+  })
+
+  it('the negatives accept the corrected rule, including its "follows the pattern" clause', () => {
+    // Guards the guard, the third way: a blacklist that rejects CORRECT prose
+    // gets weakened until it guards nothing. This is the settled rule as
+    // CLAUDE.md states it, with the closing clause spelled out rather than
+    // elided to "follows it" — the wording a bare alternative used to reject,
+    // and the reason all three content modules currently avoid it.
+    const corrected =
+      'Parallel is the one entry whose first two turns — off the course outbound, then the rejoin — both oppose the pattern; only the final turn on reaching the fix follows the pattern.'
+    expect(corrected, 'WRONG must not reject the corrected rule').not.toMatch(WRONG)
+    // …while the gloss the alternative exists to catch still is caught.
+    expect('the parallel rejoin follows the pattern, turning right in a standard hold').toMatch(WRONG)
+    expect('the parallel reintercept turn follows the pattern').toMatch(WRONG)
   })
 
   it('the positive rejects the pre-fix wording, scoped but not line-scoped', () => {
