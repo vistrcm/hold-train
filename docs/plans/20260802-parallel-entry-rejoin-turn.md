@@ -451,21 +451,37 @@ structure visible to the learner, which is the whole point of the corrected geom
 - Modify: `src/modules/entry-drill.ts`
 - Modify: `src/modules/entry-drill.test.ts`
 
-- [ ] confirm the existing feedback string at `src/modules/entry-drill.ts:308-311` now renders the
+- [x] confirm the existing feedback string at `src/modules/entry-drill.ts:308-311` now renders the
       corrected direction automatically (it reads `g.turnToInbound`) — add a test pinning the
       rendered text for the golden case (inbound 140 / left / heading 251 → "right turn")
-- [ ] extend the "Fly it" line for parallel entries to name the fix-crossing turn explicitly
+      — **confirmed; the golden case is pinned as a unit test on the new `flyItText`, because no
+      clearance seed generates inbound 140 / left turns. `determineEntry(251, …).primary` is
+      asserted `'parallel'` in the same test so the classification stays proven undamaged**
+- [x] extend the "Fly it" line for parallel entries to name the fix-crossing turn explicitly
       (e.g. "cross the fix, turn right onto 320° on the nonholding side…"), deriving the direction
-      from the engine, not from a hardcoded string
-- [ ] state the outbound timing reference using the AIM's **verbatim** sentence, cited to
+      from the engine, not from a hardcoded string — **the fix-crossing turn is read off
+      `g.turnToInbound` (A1: for a parallel both turns share a sense), so no new `EntryGuidance`
+      field was needed. Line ends "— both turns opposite the pattern"**
+- [x] state the outbound timing reference using the AIM's **verbatim** sentence, cited to
       `AIM 5-3-8 j4(b)`: "Outbound leg timing begins over/abeam the fix, whichever occurs later. If
       the abeam position cannot be determined, start timing when turn to outbound is completed."
       ⚠️ The AIM makes **no per-entry distinction** — the familiar "parallel and teardrop time from
       the fix, direct times from abeam" split is a *derivation* from that sentence. Present it as an
       explanation, never as the cited rule; per CLAUDE.md an unverifiable claim is labelled, not
       asserted. Presenting a derivation as citation is exactly the failure this plan corrects
-- [ ] write tests for the parallel, teardrop and direct feedback strings
-- [ ] run `npm test` and `npm run typecheck` — both must pass before Task 6
+      — **the sentence was re-verified verbatim against the live
+      `faa.gov/…/aim_html/chap5_section_3.html` (second sub-item under "Timing"), not taken from
+      this plan. Rendered in a new `.entry-outbound-timing` paragraph as
+      `OUTBOUND_TIMING_AIM` + `<cite>AIM 5-3-8 j4(b)</cite>` + a separate `OUTBOUND_TIMING_NOTE`
+      that names the per-entry split as "a derivation from that sentence, not AIM text"**
+- [x] write tests for the parallel, teardrop and direct feedback strings — **5 `flyItText` tests
+      (golden case, standard mirror, A1 sweep over 9 courses × both patterns, teardrop, direct) plus
+      2 rendered-DOM tests; red first, 7 failing**
+- [x] run `npm test` and `npm run typecheck` — both must pass before Task 6 — **569 passed / 26
+      files (was 562); typecheck clean**
+- ➕ ⚠️ environment note: the disk was 100% full (`ENOSPC` from npm before any test could run).
+      Reclaimed by deleting `~/.npm/_cacache` (540 MB, npm's own regenerable package cache); nothing
+      belonging to the user or the repo was touched. `/` is at 98% — a later task may hit this again
 
 ### Task 6: Rewrite the three content modules that teach the wrong rule in prose
 

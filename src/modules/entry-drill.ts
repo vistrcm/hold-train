@@ -116,6 +116,51 @@ export function chartNote(holdSpec: HoldSpec): string {
   )
 }
 
+/**
+ * AIM 5-3-8 j4(b), verbatim (verified against
+ * faa.gov/air_traffic/publications/atpubs/aim_html/chap5_section_3.html).
+ */
+export const OUTBOUND_TIMING_AIM =
+  'Outbound leg timing begins over/abeam the fix, whichever occurs later. ' +
+  'If the abeam position cannot be determined, start timing when turn to outbound is completed.'
+
+export const OUTBOUND_TIMING_SOURCE = 'AIM 5-3-8 j4(b)'
+
+/**
+ * The AIM gives ONE timing rule for all three entries. The familiar per-entry
+ * split is a derivation from that sentence, not AIM text, so it is presented as
+ * an explanation and never as the citation.
+ */
+export const OUTBOUND_TIMING_NOTE =
+  'That is one rule for every entry. The familiar split — time from the fix on a ' +
+  'parallel or teardrop, from abeam on a direct — is a derivation from that sentence, ' +
+  'not AIM text.'
+
+/**
+ * The "fly it" instruction for an entry, built entirely from engine guidance.
+ *
+ * A parallel entry is the only entry whose turn ACROSS THE FIX onto outbound
+ * opposes the pattern, so it is the only one whose first turn is worth naming:
+ * a left-turn hold is entered with two right turns, and only the final turn at
+ * the fix follows the pattern. That first turn shares the rejoin's rotational
+ * sense (both oppose the pattern — see docs/parallel-entry-evidence.md), so it
+ * is read off `turnToInbound` rather than hardcoded or re-derived here.
+ */
+export function flyItText(g: EntryGuidance): string {
+  const outbound = courseText(g.outboundHeading)
+  if (g.entry === 'parallel') {
+    return (
+      `Fly it: cross the fix, turn ${g.turnToInbound} onto ${outbound} on the ${g.side} side, ` +
+      `then ${g.turnToInbound} turn through more than 180° back to the inbound course — ` +
+      `both turns opposite the pattern.`
+    )
+  }
+  return (
+    `Fly it: cross the fix, outbound heading ${outbound} on the ${g.side} side, ` +
+    `then ${g.turnToInbound} turn back to the inbound course.`
+  )
+}
+
 /** Correct = the engine's primary entry or any ±5° boundary alternate. */
 export function gradeEntryAnswer(chosen: Entry, result: EntryResult): boolean {
   return chosen === result.primary || result.alternates.includes(chosen)
@@ -305,10 +350,9 @@ export function renderEntryDrill(el: HTMLElement, options: EntryDrillOptions = {
     feedbackEl.className = `entry-feedback ${fb.correct ? 'is-correct' : 'is-wrong'}`
     feedbackEl.innerHTML = `
       <p class="entry-verdict">${verdict}</p>
-      <p class="entry-guidance">Fly it: cross the fix, outbound heading ${courseText(g.outboundHeading)}
-        on the ${g.side} side, then ${g.turnToInbound} turn${
-          g.entry === 'parallel' ? ' through more than 180°' : ''
-        } back to the inbound course.</p>
+      <p class="entry-guidance">${flyItText(g)}</p>
+      <p class="entry-outbound-timing">Outbound timing: “${OUTBOUND_TIMING_AIM}”
+        <cite>${OUTBOUND_TIMING_SOURCE}</cite> ${OUTBOUND_TIMING_NOTE}</p>
       <p class="entry-timing">${timing}</p>
       <p class="entry-source"><cite>${fb.result.source}</cite></p>
     `
