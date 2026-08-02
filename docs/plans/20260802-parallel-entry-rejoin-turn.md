@@ -538,26 +538,44 @@ the rule single-sourced in assertion as well as in code.
 Scope is deliberately narrow: A1 is already covered by Task 2's rewritten test and the sim bound is
 covered by Task 4, so only two assertions here are genuinely new.
 
-- [ ] **the map↔engine agreement sweep** — for every course in `[0, 45, 90, 135, 180, 225, 270, 315]`
+- [x] **the map↔engine agreement sweep** — for every course in `[0, 45, 90, 135, 180, 225, 270, 315]`
       × standard/nonstandard, render and require the drawn arc's **sweep flag** to agree with
       `entryGuidance('parallel', hold).turnToInbound`. This is the exact cross-module link whose
       absence let a single-file flip go unnoticed. Note `mapview.test.ts:212-229` does **not** cover
       it: it checks the `data-turn-to-inbound` attribute, which is copied straight from the engine
       and therefore agrees vacuously
-- [ ] **the prose scan** — import the content modules as text (`'./content/lessons.ts?raw'`, with the
+- [x] **the prose scan** — import the content modules as text (`'./content/lessons.ts?raw'`, with the
       extension; `vite/client`'s `*?raw` declaration is what makes it typecheck — see
       `palette.test.ts:14`) and assert each parallel item matches the corrected rule
       (`/opposite|against the pattern|toward the holding side|crosses (back )?over/i`) and does not
       match the wrong one. ⚠️ Write the negative regexes so the **AIM's own verbatim clause does not
       match** — it legitimately contains "turn in the direction of the holding pattern". Anchor on
       the gloss wording ("same way", "follows the pattern"), not the quotation. Fail with a pointer
-      to `docs/parallel-entry-evidence.md`
-- [ ] place the file at `src/` (not `src/engine/`) — it imports across `engine/`, `ui/` and
+      to `docs/parallel-entry-evidence.md` — **done; the negatives are
+      `same way the pattern|follows the pattern|only that direction|reintercepts right`, and a
+      second test asserts the AIM clause itself does not match them, so the guard cannot grow into
+      one that is only satisfiable by deleting the citation**
+- [x] place the file at `src/` (not `src/engine/`) — it imports across `engine/`, `ui/` and
       `content/`, and this repo puts cross-cutting suites at the `src/` root (`styles.test.ts`,
       `contrast.test.ts`, `deploy.test.ts`)
-- [ ] add a header comment explaining that this file exists because the rule was flipped the wrong
+- [x] add a header comment explaining that this file exists because the rule was flipped the wrong
       way once, and that the AIM sentence alone cannot settle it
-- [ ] run `npm test` and `npm run typecheck` — both must pass before Task 8
+- [x] run `npm test` and `npm run typecheck` — both must pass before Task 8 — **577 passed / 27
+      files (was 573 / 26); typecheck clean**
+- ➕ **A2 added to the sweep as well as A1.** A sweep flag flipped on its own, without moving the
+      arc centre, still draws an arc the engine never meant, and the flag-only check would pass it.
+      The rollout endpoint is un-projected back to NM via the svg's `data-scale` and dotted with the
+      holding-side unit vector, so "which side of the course?" becomes a signed scalar valid at any
+      course — `mapview.test.ts`'s `d[9] > 100` form only works at inbound 0
+- ➕ note: the plan's selector ("lines mentioning parallel + reintercept/rejoin") first matched an
+      Anki card **front** — `'Parallel entry: which side of the course do you reintercept from?'` —
+      which asserts nothing and so cannot be right or wrong. Interrogatives are now filtered out;
+      the `lines.length > 0` guard per module remains, so the scan cannot pass vacuously
+- ➕ **the guard was verified to discriminate, not just to pass.** `rs` in `mapview.ts` was
+      temporarily set back to `s` and one `oral.ts` gloss reverted to "the same way the pattern
+      does": all three assertions failed with the intended messages (`engine says rejoin left, map
+      drew sweep flag 1`; `rollout is -0.970 NM toward the holding side`). Both files were restored
+      and `git diff` confirmed clean
 
 ### Task 8: Correct the research note that caused the defect, and record the fix in the audit ledger
 
