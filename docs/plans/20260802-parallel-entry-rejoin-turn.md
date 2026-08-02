@@ -583,26 +583,40 @@ covered by Task 4, so only two assertions here are genuinely new.
 - Modify: `docs/research-claude.md`
 - Modify: `docs/content-audit.md`
 
-- [ ] `docs/research-claude.md:92-93` — the "CORRECTED 2026-07-22" block is itself the error. Replace
+- [x] `docs/research-claude.md:92-93` — the "CORRECTED 2026-07-22" block is itself the error. Replace
       it with the corrected rule, and **keep a dated note explaining that the >180° derivation is
       invalid because it never updated the fix bearing for motion during the turn** (right
       212.6°–222.1°, left 189.3°–215.3°, equal at zero offset). A silently rewritten line invites a
-      third flip
-- [ ] `docs/research-claude.md:98` — the "common errors" line says parallel pilots err by "turning
+      third flip — **the parallel bullet now states the spatial reading and the opposed rejoin up
+      front, followed by three sub-bullets: the 2026-08-02 re-correction with the figure/ICAO
+      evidence and a pointer to `docs/parallel-entry-evidence.md`; the ⚠️ invalidity note with both
+      computed ranges; and the superseded 2026-07-22 text quoted verbatim as a blockquote with the
+      specific sentence that fails ("which then bears ~285") named**
+- [x] `docs/research-claude.md:98` — the "common errors" line says parallel pilots err by "turning
       toward the non-holding side instead of back through the course". That is now the *correct*
       description of the error and should be kept, but reworded so it cannot be read as endorsing
-      the old rule
-- [ ] `docs/content-audit.md` — add a new entry: what was wrong, the AIM/ICAO/figure evidence, the
-      files touched, and the regression tests, per the ledger's existing format
-- [ ] amend the existing "the parallel entry's reintercept turn was inverted app-wide" entry to
+      the old rule — **reworded to name the error as rolling *with* the pattern, with an explicit
+      parenthetical "this line describes the **error**, not the procedure"**
+- [x] `docs/content-audit.md` — add a new entry: what was wrong, the AIM/ICAO/figure evidence, the
+      files touched, and the regression tests, per the ledger's existing format — **new section
+      "## Correction — 2026-08-02 (parallel entry rejoin direction)"; the entry also records the
+      "Deliberately unchanged" list and the sim model limitation, including *why* the `-2R` bound is
+      through-rejoin-only, so the ledger itself warns against the revert path**
+- [x] amend the existing "the parallel entry's reintercept turn was inverted app-wide" entry to
       record that its reasoning was wrong and point forward to the new entry — do not delete it; the
-      failed reasoning is the useful part
-- [ ] `docs/content-audit.md:115` — the coverage table's `entries` row reads "parallel >180°" and is
+      failed reasoning is the useful part — **a ⚠️ SUPERSEDED bullet was inserted immediately above
+      it; the original is left byte-for-byte unedited, and the note flags that the regression tests
+      it lists were themselves pinning the defect**
+- [x] `docs/content-audit.md:115` — the coverage table's `entries` row reads "parallel >180°" and is
       marked `pass`. Update its verdict, or note that the verdict predates this correction
-- [ ] add a second ledger entry for the Task 5 timing-reference change (CLAUDE.md requires every
+      — **verdict now says it predates the correction, separates the facts that still pass from the
+      rejoin direction it silently blessed, and repeats the ">180° discriminates nothing" warning**
+- [x] add a second ledger entry for the Task 5 timing-reference change (CLAUDE.md requires every
       content fix to be recorded with its regression test; Task 8 otherwise covers only the rejoin
       direction)
-- [ ] run `npm test` and `npm run typecheck`
+- [x] run `npm test` and `npm run typecheck` — **577 passed / 27 files; typecheck clean (docs-only
+      task, so the suite is unchanged from Task 7 — neither file is an asserted artifact, which is
+      itself why the bad reasoning survived in them)**
 
 ### Task 9: Verify acceptance criteria
 

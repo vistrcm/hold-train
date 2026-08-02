@@ -112,7 +112,7 @@ regression test in the matching `*.test.ts`).
 | standard-vs-nonstandard | right/left; omitted → right | AIM j1, i5; JO 4-6-4 a5 | **fixed** (item 1) |
 | max-speeds | bands + protected-airspace rationale + (175) | AIM j2 | pass |
 | slow-to-holding-speed | 3-min rule; fuel-conservation power | AIM d; ACS S2 ("set appropriate power as needed for fuel conservation") | pass |
-| entries | sectors, teardrop 30°/1 min, parallel >180° | AIM j3 verbatim; sector sizes 180/70/110 depicted in FIG 5-3-4 (figure, not body text) | pass (caveat **fixed**, item 2) |
+| entries | sectors, teardrop 30°/1 min, parallel >180° | AIM j3 verbatim; sector sizes 180/70/110 depicted in FIG 5-3-4 (figure, not body text) | ⚠️ verdict predates the 2026-08-02 rejoin-direction correction. The sector, teardrop and >180° facts still pass; the **rejoin turn direction** this row silently blessed was wrong and is **fixed 2026-08-02** (see the entry at the end of this file). The ">180°" fact is true of both turn directions and must never be used to derive which one is correct |
 | fix-arrival | TO/FROM reversal, DME, GPS sequencing; five Ts | AIM g; ACS S3; five Ts labeled technique | pass |
 | leg-lengths | 1 min / 1½ min; DME distance legs | AIM j4(a), j5 | pass |
 | outbound-timing | over/abeam later; adjust subsequent | AIM j4 | pass |
@@ -244,6 +244,17 @@ geometry; timing-wind: j4, j8(c), j5; reports: 5-3-3 a1(f)/(g), i6 + P/CG + 91.1
   text on the screen while every other module signals correct with `#3fbf6f`. Added
   `--ok` and `--border` to `:root`. Regression test: "defines every custom property
   it references" in `src/styles.test.ts` (catches the whole class, not these two).
+- **⚠️ SUPERSEDED 2026-08-02 — this entry's reasoning was wrong and its "fix" introduced
+  a safety-of-flight training defect.** It is kept in full, unedited below, because the
+  failed reasoning is the useful part: the derivation it rests on is invalid (it never
+  updates the bearing to the fix for the aircraft's motion *during* the turn, so both
+  turn directions in fact exceed 180° and the AIM clause discriminates nothing), and a
+  future session reading AIM 5-3-8 j3(a) alone will re-derive the same wrong answer.
+  The turn direction was inverted back on 2026-08-02 against rendered FAA figures — see
+  **"Fixed: the parallel entry's rejoin turn rotated with the pattern instead of against
+  it"** in the 2026-08-02 section at the end of this file, and the evidence dossier at
+  `docs/parallel-entry-evidence.md`. Note also that the regression tests this entry
+  lists were themselves pinning the defect and have been rewritten.
 - **Fixed: the parallel entry's reintercept turn was inverted app-wide**
   (`src/engine/entry.ts`, `src/engine/sim.ts`, `src/ui/mapview.ts`,
   `src/modules/entry-drill.ts`, `src/content/lessons.ts`, `src/content/oral.ts`,
@@ -489,3 +500,121 @@ geometry; timing-wind: j4, j8(c), j5; reports: 5-3-3 a1(f)/(g), i6 + P/CG + 91.1
   clamped to 0. Regression tests: "clamps a negative time to 0 rather than throwing
   (backward clock skew)" and "rejects non-finite times as programming errors" in
   `src/app/store.test.ts`.
+
+## Correction — 2026-08-02 (parallel entry rejoin direction)
+
+- **Fixed: the parallel entry's rejoin turn rotated with the pattern instead of against
+  it** (`src/engine/entry.ts`, `src/engine/sim.ts`, `src/ui/mapview.ts`,
+  `src/modules/entry-drill.ts`, `src/content/lessons.ts`, `src/content/oral.ts`,
+  `src/content/anki-deck.ts`). This reverses the 2026-07-22 entry above, which flipped
+  the field the wrong way; **that entry is kept, marked superseded, because its failed
+  reasoning is what a future session will otherwise repeat.**
+
+  **What was wrong.** `entryGuidance('parallel')` returned `turnToInbound: pattern`, so a
+  standard right-turn hold was drawn and taught with a **right** rejoin. The rejoin's arc
+  centre then sits on the **nonholding** side and the whole entry track is mirrored about
+  the holding course, displacing it roughly two turn diameters onto the nonholding side.
+  For the reported case (inbound 140, left turns, heading 251) the drawn rollout was
+  misplaced by **1.72 NM** (−1.05 → +0.67 NM perpendicular offset); `sim.ts`'s whole-track
+  error was ~1.9 NM at 90 kt, scaling to ~3.2 NM at 150 kt. The nonholding side *is*
+  protected airspace, but it is the narrower allowance and is sized for the one-minute
+  outbound leg plus drift, not for an extra ~2 turn radii beyond it. This is a
+  safety-of-flight training defect in a drill tool: a pilot who rehearses it here flies it
+  that way. ACS IR.III.B.K1 / R4 / S1.
+
+  **The correct rule.** With `C` the inbound course, the rejoin turn opposes the pattern
+  and crosses back over the course onto the **holding** side: standard/right-turn hold →
+  **left** rejoin rolling out on `C − 45°`; nonstandard → **right** rejoin on `C + 45°`;
+  sweep ~225° either way. Both of a parallel entry's first two turns oppose the pattern;
+  only the final turn on reaching the fix follows it. The 45° intercept is convention, not
+  AIM text (the AIM requires only "more than 180 degrees"); it matches how the FAA figures
+  draw the rollout and is single-sourced as `PARALLEL_INTERCEPT_DEG` in `src/engine/entry.ts`.
+
+  **Evidence.** AIM 5-3-8 j3(a)'s "turn in the direction of the holding pattern through
+  more than 180 degrees" is **spatial** (toward the racetrack), not rotational, and the
+  sentence alone cannot settle it. Three FAA figures were fetched and rendered at high
+  resolution and inspected visually — AIM **FIG 5-3-4** (900 dpi from the vector PDF plus
+  the official faa.gov PNG), AIP **FIG ENR 1.5-3** (3162×2238), and IFH FAA-H-8083-15B
+  **Fig 10-6** (1000 dpi) — and all three draw the parallel rejoin crossing the course onto
+  the holding side. Fig 10-6 is decisive: in one standard-pattern figure the *teardrop*
+  rejoin is clockwise and the *parallel* rejoin counter-clockwise, so the identical AIM
+  phrase cannot be carrying rotational sense in both sub-paragraphs. ICAO Doc 8168 Vol I,
+  Part II, §6, Ch.2 (6th ed. 2018) states it in words: 2.2.4 (parallel) "turned **toward
+  the holding side**", 2.2.5 (teardrop) "turned **right**". IPH FAA-H-8083-16B contains no
+  entry-path figure and cannot discriminate — do not cite it either way. Full dossier with
+  URLs, byte sizes, page numbers, render commands and what was seen:
+  **`docs/parallel-entry-evidence.md`**.
+
+  **⚠️ The ">180°" clause must never be used to re-derive this.** `docs/research-claude.md`
+  argued that only the pattern-direction turn exceeds 180°; that arithmetic measures the
+  bearing to the fix at the *start* of the turn and never updates it for the aircraft's
+  motion *during* the turn. Computed correctly across the parallel sector: right turn
+  212.6°–222.1°, left turn 189.3°–215.3° — **both exceed 180°**, exactly equal (215.3°) at
+  zero offset by symmetry. That note is corrected in place, with the superseded derivation
+  quoted and its failure named.
+
+  **Why it spread to five modules.** The same geometry was hand-written three times
+  (`entry.ts`, `sim.ts`, `mapview.ts`) instead of derived once — against CLAUDE.md's
+  "engine is the oracle" rule. `sim.ts` even carried a *value* drift, a private
+  `PARALLEL_INTERCEPT_DEG = 30` against the engine's 45. All three now consume the exported
+  constant, and `mapview.ts`/`sim.ts` derive the rejoin sign rather than restating it.
+  Inverting the engine alone left the full suite green, because nothing cross-checked the
+  map or the sim against the oracle; that silence is what
+  `src/parallel-entry.invariants.test.ts` now closes.
+
+  **Deliberately unchanged** (verified, not overlooked): sector classification and the 70°
+  geometry (`determineEntry(251, {inboundCourse: 140, turnDirection: 'left'}).primary` is
+  still `'parallel'`); the outbound leg's nonholding side, which is the defining feature of
+  the entry; `racetrack()`; direct and teardrop, which rejoin **with** the pattern;
+  `towardHoldingSide`'s ±30°, which is the *teardrop's* AIM 5-3-8 j3(b) offset and a
+  different quantity from the parallel intercept angle; and every AIM citation.
+
+  **Known model limitation, documented not fixed.** `sim.ts` starts the aircraft
+  established on the inbound course at the fix, so its turn onto outbound is a full 180°
+  and leaves the aircraft 2R off course; from there the corrected rejoin is *tangent* to
+  the holding course rather than crossing it. The real maneuver arrives at an angle from
+  sector (a) and genuinely crosses. `flyCircuit` is only ever called with `entry: 'direct'`
+  (`src/modules/wind-lab.ts`), so the parallel branch is unreachable in the shipping app.
+  Consequence for tests: the `-2R` bound holds only **through rejoin completion**, not over
+  the whole track (whole-track minimum is −1.3022 after the fix vs −1.9099 before), and
+  asserting `-2R` whole-track would be a red test that argues a future session back into
+  the wrong turn direction.
+
+  Regression tests — "parallel: outbound course on the nonholding side, reintercept AGAINST
+  the pattern", "nonstandard mirrors: teardrop offset flips, parallel reintercept is
+  right", "direct and teardrop reintercept with the pattern, parallel against it", "the
+  golden case: inbound 140, left turns → the rejoin is a RIGHT turn", "the intercept angle
+  is 45°, single-sourced in the engine" and "A3: the parallel rejoin sweeps more than 180°
+  in the opposed direction" in `src/engine/entry.test.ts`; "parallel: outbound turn opposes
+  the pattern, and so does the reintercept" and "left-turn parallel mirrors: flies the east
+  (non-holding) side" in `src/engine/sim.test.ts`; "parallel: leg on the non-holding side,
+  >180° reintercept turn against the pattern", "parallel mirrors for a nonstandard hold"
+  and "parallel golden case: inbound 140, left turns → rollout northeast of the course" in
+  `src/ui/mapview.test.ts`; the five `flyItText` tests in `src/modules/entry-drill.test.ts`
+  including "A1: the named fix-crossing turn always matches the rejoin and opposes the
+  pattern"; "entries lesson glosses the parallel rejoin as opposite the pattern" and
+  "entries lesson names the two-turns-against structure of the parallel entry" in
+  `src/content/lessons.test.ts`; "entries item answers the parallel rejoin as opposite the
+  pattern" in `src/content/oral.test.ts`; "parallel-entry card glosses the rejoin as
+  opposite the pattern" in `src/content/anki-deck.test.ts`; and the cross-module guard
+  `src/parallel-entry.invariants.test.ts` — "sweep flag matches entryGuidance
+  turnToInbound for every course × pattern", "A2: the rejoin rolls out on the holding side
+  for every course × pattern", "every parallel-rejoin sentence states the corrected rule"
+  and "the negatives cannot match the AIM clause the modules quote verbatim".
+
+- **Fixed: the entry drill named no outbound-timing reference, and the familiar per-entry
+  split was folk knowledge** (`src/modules/entry-drill.ts`). The drill told the student to
+  fly the outbound leg "for one minute" without saying when the minute starts — the exact
+  point a parallel entry differs from a direct in practice — and the split students are
+  usually taught ("time from the fix on a parallel or teardrop, from abeam on a direct")
+  appears nowhere in the AIM. The drill now renders AIM 5-3-8 j4(b) **verbatim**,
+  re-verified against the live faa.gov `aim_html/chap5_section_3.html` (second sub-item
+  under "Timing"): "Outbound leg timing begins over/abeam the fix, whichever occurs later.
+  If the abeam position cannot be determined, start timing when turn to outbound is
+  completed." That is `OUTBOUND_TIMING_AIM`, cited as `AIM 5-3-8 j4(b)`. The AIM makes
+  **no per-entry distinction**, so the split is rendered separately as
+  `OUTBOUND_TIMING_NOTE` and explicitly labelled "a derivation from that sentence, not AIM
+  text" — per CLAUDE.md an unverifiable claim is labelled, never asserted, and presenting a
+  derivation as a citation is the same failure class this correction exists to fix.
+  Regression test: "quotes the AIM outbound-timing sentence verbatim for every entry, with
+  its citation" in `src/modules/entry-drill.test.ts`.
