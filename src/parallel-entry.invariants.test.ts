@@ -162,9 +162,13 @@ function trackRotationRad(track: readonly { e: number; n: number }[], from: numb
 
 describe('the sim flies the rejoin the engine specifies', () => {
   // `sim.ts` hand-derived this sign from `hold.turnDirection` and kept a private
-  // copy of the intercept angle that had already drifted to 30°. Both now come
-  // from `entryGuidance`, and this sweep is what keeps them there: without it a
-  // future flip of the engine's parallel rule leaves the sim stale and green,
+  // copy of the intercept angle. That copy had NOT drifted — it agreed with the
+  // map's literal at 30 until this branch single-sourced the angle and raised it
+  // to 45 for legibility, a change rather than a repair, so it is no evidence
+  // that 45 is the FAA-correct angle. It was still a second hand-written copy of
+  // geometry, which is what the SIGN did drift in across five modules. Both now
+  // come from `entryGuidance`, and this sweep is what keeps them there: without
+  // it a future flip of the engine's parallel rule leaves the sim stale and green,
   // because every parallel assertion in sim.test.ts is a hardcoded golden
   // excursion that pins the sim against itself rather than against the oracle.
   it('rejoin rotation sense matches entryGuidance turnToInbound for every course × pattern', () => {
