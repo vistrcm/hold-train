@@ -830,3 +830,56 @@ predates the 2026-08-02 rejoin-direction correction, on the same terms as the
   about), plus an exhaustiveness assertion so a renamed comment cannot retire it
   vacuously. Both halves mutation-tested: restoring `¶2.2.4` fails, and removing the
   citation entirely fails the exhaustiveness test.
+
+## Post-completion review fix — 2026-08-02 (code review iteration 4)
+
+- **Fixed: two guards were narrower than the claims they protect**
+  (`src/parallel-entry.invariants.test.ts`). Same defect class in both halves — a scope
+  hand-drawn narrower than the thing under guard, which is the hole this file's header
+  argues against, reopened one glob down.
+  1. The ICAO block's docblock said Doc 8168 "is quoted in three engine comments", but it
+     harvested from `APP_MODULES`, whose glob is `['./**/*.ts', '!./**/*.test.ts']`. The
+     third copy — the longest and most detailed of the three — is the golden-test docblock
+     at `src/engine/entry.test.ts:238`, so it was never scanned, and the exhaustiveness
+     assertion pinned exactly the two files the scan could see. The guard and its own
+     assertion agreed with each other and were both wrong about the world; that comment
+     could have drifted back to the mis-cited ¶2.2.4/¶2.2.5 with the suite green, one
+     iteration after the correction that the guard exists to hold. The glob is now taken
+     once and filtered two ways (`SOURCES` → `APP_MODULES`), because the `flyCircuit` bound
+     genuinely wants shipping modules only while this one wants every carrier; a second
+     glob would be a second copy of "what counts as a source file".
+  2. The prose scan globbed `src/content/*.ts`. `README.md` carries the longest
+     user-facing statement of the rejoin rule anywhere in the repo ("turns *against* the
+     pattern — back across the holding course onto the holding side") and was outside it.
+     A directory glob is exhaustive only over the directory it globs.
+  Widening (2) immediately caught a real hole rather than just adding coverage: both
+  regexes match **contiguous** phrases, and markdown emphasis splits them — the raw text
+  is `against* the pattern`. The dangerous half is the blacklist, which was therefore
+  strictly weaker on markdown than on TS: `the rejoin *follows the pattern*` would have
+  shipped unflagged. Prose is now normalised with `unemphasize` before matching.
+  Also folded in: the line selector and the claim extractor now share one predicate
+  (`isRejoinAssertion`), so they cannot disagree about what counts as a claim — which
+  retired the `claim !== ''` assertion that was compensating for their disagreement (it is
+  now true by construction, and an assertion that cannot fail is fake coverage). The
+  predicate excludes two kinds of non-claim: interrogatives (an Anki card front) and
+  references to the dated correction rather than the maneuver (README's re-import step
+  says "the 2026-08-02 parallel-entry rejoin fix changed a core card"; demanding that
+  sentence restate the rule would force absurd prose, and forcing absurd prose is how a
+  guard gets weakened until it guards nothing). Anchored on an ISO date adjacent to
+  fix/correction — "rejoin fix" alone would collide with the holding fix the aircraft
+  actually rejoins.
+  Regression tests: `is carried by every file the docblock says carries it` (now pinning
+  all three files) and `emphasis cannot hide a wrong gloss, or a right one`, both in
+  `src/parallel-entry.invariants.test.ts`. Four mutations, all confirmed to fail:
+  restoring `¶2.2.4` in the **test** file, deleting its citation entirely, inverting
+  README's rejoin sentence, and deleting README's rejoin sentence.
+- **Declined: the map's `L fix` return chord kinks up to ~41° at rollout on a 10 NM leg.**
+  Raised by an agent in three consecutive iterations. Not a defect: the rollout point,
+  side and sweep are all pinned against the engine and correct, the trailing chord is a
+  schematic return (the teardrop path draws the same one), and `PARALLEL_INTERCEPT_DEG =
+  45` is recorded in `CLAUDE.md` as a deliberate legibility choice made by this branch.
+  Drawing a true intercept leg — extend the rollout ray to the course, then track inbound,
+  with a case for short legs where the meeting point falls past the fix — is a change to
+  the picture and belongs to the owner, not to a review pass. The in-code comment at
+  `src/ui/mapview.ts:197` already states the tradeoff; its "~35° on a 4 NM leg" is an
+  example, not a worst case (`DME_LEG_MILES` reaches 10 NM, where the kink is ~41°).

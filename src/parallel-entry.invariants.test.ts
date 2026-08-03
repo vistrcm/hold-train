@@ -25,6 +25,9 @@
 // placement as styles.test.ts, contrast.test.ts and deploy.test.ts.
 
 import { describe, expect, it } from 'vitest'
+// README carries the rejoin rule too — see `PROSE` below. Read as source text
+// for the same reason the content modules are, and by the same idiom.
+import README from '../README.md?raw'
 // The content modules are read as source text, not imported for their values:
 // the claim under test is a sentence, and `?raw` is the idiom this repo already
 // uses on styles.css (styles.test.ts) and README.md (dashboard.test.ts). They
@@ -326,13 +329,25 @@ describe('the sim flies the rejoin the engine specifies', () => {
 // track that never rejoins — negative training — with the suite green. This is
 // the same runtime-only doc↔code coupling the repo already guards for the README
 // table (dashboard.test.ts) and the drill ids, and the same `?raw` glob idiom.
-const APP_MODULES: ReadonlyArray<{ file: string; source: string }> = Object.entries(
-  import.meta.glob<string>(['./**/*.ts', '!./**/*.test.ts'], {
+// Every `.ts` under src/, harvested ONCE and viewed two ways: the flyCircuit
+// bound below wants shipping modules only (a test may legitimately fly a
+// parallel circuit — sim.test.ts does), while the ICAO citation guard at the
+// end of this file wants every file carrying the citation, tests included.
+// One glob with two filters rather than two globs: a second glob is a second
+// copy of "what counts as a source file", and the halves drift. Vite excludes
+// the importing module from its own glob, so this file never scans itself —
+// which is what keeps its own ¶2.2.4 mentions out of ICAO_MISCITED.
+const SOURCES: ReadonlyArray<{ file: string; source: string }> = Object.entries(
+  import.meta.glob<string>('./**/*.ts', {
     query: '?raw',
     import: 'default',
     eager: true,
   }),
 ).map(([path, source]) => ({ file: path.replace('./', 'src/'), source }))
+
+const APP_MODULES: ReadonlyArray<{ file: string; source: string }> = SOURCES.filter(
+  (m) => !m.file.endsWith('.test.ts'),
+)
 
 /**
  * Text of the argument list of every `flyCircuit(...)` call in `source`, by
@@ -473,18 +488,78 @@ const CONTENT: ReadonlyArray<{ file: string; source: string }> = Object.entries(
   .map(([path, source]) => ({ file: path.replace('./', 'src/'), source }))
 
 /**
- * Source lines that make a claim about the parallel rejoin. Each content item is
- * a single-line string literal, so a line is the unit of prose here.
+ * Every prose carrier of the rejoin rule: the content modules, plus README.
  *
- * Interrogatives are dropped: an Anki card front ("which side of the course do
- * you reintercept from?") names the topic without asserting anything about it,
- * so there is no rule in it to be right or wrong about.
+ * README states the rule at more length than any content item does ("turns
+ * *against* the pattern — back across the holding course onto the holding
+ * side"), and it is the first thing a reader meets. A directory glob is only
+ * exhaustive over the directory it globs, so `src/content/*.ts` left the one
+ * carrier outside `content/` unscanned — the hand-listed-scope hole this file's
+ * header argues against, one level up. README is already an asserted artifact
+ * here (dashboard.test.ts diffs its route table, anki-export.test.ts its import
+ * steps), so `?raw` is the established idiom rather than a new coupling.
+ */
+const PROSE: ReadonlyArray<{ file: string; source: string }> = [
+  ...CONTENT,
+  { file: 'README.md', source: README },
+]
+
+/**
+ * Prose with markdown emphasis markers removed.
+ *
+ * ⚠️ Both regexes below match CONTIGUOUS phrases, and README writes the rule as
+ * "turns *against* the pattern" — so the raw text contains "against* the
+ * pattern" and CORRECT does not match it. That cuts both ways and the second way
+ * is the dangerous one: a blacklist that cannot see through emphasis is WEAKER
+ * on markdown than on TS, so "the rejoin *follows the pattern*" would ship
+ * unflagged. Normalising before matching keeps the two carriers' formats from
+ * changing what the guard can see. Pinned by `emphasis cannot hide a wrong
+ * gloss` below.
+ */
+function unemphasize(s: string): string {
+  return s.replace(/\*+/g, '')
+}
+
+/**
+ * Does this sentence ASSERT something about the rejoin, or merely name it?
+ *
+ * Two kinds of mention carry no rule to be right or wrong about:
+ *   - Interrogatives. An Anki card front ("which side of the course do you
+ *     reintercept from?") states the topic and nothing else.
+ *   - References to the dated correction rather than to the maneuver. README's
+ *     re-import step says "the 2026-08-02 parallel-entry rejoin fix changed a
+ *     core card"; demanding it restate the rule would be absurd prose, and
+ *     demanding prose be absurd is how a guard gets weakened until it guards
+ *     nothing. Anchored on an ISO date next to fix/correction, because no
+ *     sentence about the maneuver carries one — "rejoin fix" alone would collide
+ *     with the holding fix the aircraft actually rejoins.
+ *
+ * ⚠️ Shared by the line selector AND the claim extractor below, so the two
+ * cannot disagree about what counts. When they disagreed, a line could select in
+ * and then extract to nothing — which is what the deleted `not.toBe('')`
+ * assertion was compensating for.
+ */
+function isRejoinAssertion(s: string): boolean {
+  if (!/reintercept|rejoin/i.test(s)) return false
+  if (/\?['"`]?,?\s*$/.test(s.trim())) return false
+  if (/\d{4}-\d{2}-\d{2}[^.;]*\b(fix|correction)\b/i.test(s)) return false
+  return true
+}
+
+/**
+ * Source lines that make a claim about the parallel rejoin. Each content item is
+ * a single-line string literal, so a line is the unit of prose here; a README
+ * paragraph is one line too, which is why the unit narrows to sentences below.
  */
 function parallelRejoinLines(source: string): string[] {
   return source
     .split('\n')
-    .filter((l) => /parallel/i.test(l) && /reintercept|rejoin/i.test(l))
-    .filter((l) => !/\?['"`],?\s*$/.test(l))
+    .filter((l) => /parallel/i.test(l) && sentences(l).some(isRejoinAssertion))
+}
+
+/** A line split into sentences. Content prose joins clauses with `;` as well. */
+function sentences(line: string): string[] {
+  return line.split(/(?<=[.;])\s+/)
 }
 
 /**
@@ -503,21 +578,19 @@ function parallelRejoinLines(source: string): string[] {
  * WRONG stays line-scoped: it is strictly safer to blacklist over more text.
  */
 function rejoinClaim(line: string): string {
-  return line
-    .split(/(?<=[.;])\s+/)
-    .filter((s) => /reintercept|rejoin/i.test(s))
-    .join(' ')
+  return sentences(line).filter(isRejoinAssertion).join(' ')
 }
 
 /**
- * Content modules that state the parallel rejoin rule in prose today. Each must
- * keep at least one line the scan below can see; a module may be ADDED here, and
- * removing one is a deliberate act that says the prose is gone on purpose.
+ * Files that state the parallel rejoin rule in prose today. Each must keep at
+ * least one line the scan below can see; a file may be ADDED here, and removing
+ * one is a deliberate act that says the prose is gone on purpose.
  */
 const REJOIN_PROSE_CARRIERS = [
   'src/content/anki-deck.ts',
   'src/content/lessons.ts',
   'src/content/oral.ts',
+  'README.md',
 ] as const
 
 describe('no content module teaches the rejoin the wrong way', () => {
@@ -536,7 +609,7 @@ describe('no content module teaches the rejoin the wrong way', () => {
     // carriers makes a module going silent a failure rather than a subtraction.
     expect(CONTENT.length, 'no content modules were globbed').toBeGreaterThan(3)
     for (const file of REJOIN_PROSE_CARRIERS) {
-      const module = CONTENT.find((c) => c.file === file)
+      const module = PROSE.find((c) => c.file === file)
       expect(module, `${file} carries rejoin prose but was not globbed`).toBeDefined()
       expect(
         parallelRejoinLines(module!.source).length,
@@ -548,14 +621,19 @@ describe('no content module teaches the rejoin the wrong way', () => {
   })
 
   it('every parallel-rejoin sentence states the corrected rule', () => {
-    for (const { file, source } of CONTENT) {
+    for (const { file, source } of PROSE) {
       for (const line of parallelRejoinLines(source)) {
-        const claim = rejoinClaim(line)
-        expect(claim, `${file}: no rejoin sentence to scan on a line that mentions one`).not.toBe('')
+        // No `claim !== ''` assertion: the selector and the extractor now share
+        // `isRejoinAssertion`, so a selected line has at least one claim
+        // sentence BY CONSTRUCTION. An assertion that cannot fail is not
+        // documentation, it is fake coverage (CLAUDE.md) — the comment is the
+        // part worth keeping.
+        const claim = unemphasize(rejoinClaim(line))
         expect(claim, `${file}: does not state the corrected rule (${EVIDENCE})`).toMatch(CORRECT)
-        expect(line, `${file}: still glosses the rejoin as following the pattern (${EVIDENCE})`).not.toMatch(
-          WRONG,
-        )
+        expect(
+          unemphasize(line),
+          `${file}: still glosses the rejoin as following the pattern (${EVIDENCE})`,
+        ).not.toMatch(WRONG)
       }
     }
   })
@@ -594,6 +672,21 @@ describe('no content module teaches the rejoin the wrong way', () => {
     expect('in a left-turn hold the parallel reintercepts left').toMatch(WRONG)
   })
 
+  it('emphasis cannot hide a wrong gloss, or a right one', () => {
+    // Guards the guard, the markdown way. README is the one carrier written in
+    // markdown, and both regexes match contiguous phrases, so without
+    // normalisation an emphasised gloss is invisible to WRONG — the scan would
+    // be strictly weaker on the file a reader meets first. Both directions are
+    // asserted: dropping `unemphasize` fails the first pair, and a version that
+    // ate the surrounding words rather than the markers fails the second.
+    const emphasised = 'The parallel rejoin *follows the pattern*, turning right in a standard hold.'
+    expect(emphasised, 'raw markdown hides the gloss from WRONG — this is the hole').not.toMatch(WRONG)
+    expect(unemphasize(emphasised), 'WRONG must catch the same gloss once normalised').toMatch(WRONG)
+    const correct = 'The parallel reintercept turns *against* the pattern, onto the holding side.'
+    expect(correct, 'raw markdown hides the corrected rule from CORRECT too').not.toMatch(CORRECT)
+    expect(unemphasize(correct), 'CORRECT must accept the corrected rule once normalised').toMatch(CORRECT)
+  })
+
   it('the positive rejects the pre-fix wording, scoped but not line-scoped', () => {
     // Guards the guard, the other way round: a positive that the defect satisfies
     // certifies nothing. This is lessons.ts as it actually shipped before the
@@ -614,8 +707,8 @@ describe('no content module teaches the rejoin the wrong way', () => {
 /**
  * The verified location of the ICAO text, and the one it was mis-cited as.
  *
- * Doc 8168 is quoted in three engine comments as the textual half of the "do not
- * re-derive this" apparatus. Until 2026-08-02 all three cited "Vol I, Part II,
+ * Doc 8168 is quoted in three places under src/ as the textual half of the "do
+ * not re-derive this" apparatus. Until 2026-08-02 all three cited "Vol I, Part II,
  * §6, Ch.2 (Sixth Edition 2018), ¶2.2.4/¶2.2.5" and quoted the rejoin as "turned
  * TOWARD the holding side". Every part of that was wrong: the real text is
  * Vol I, Part I, §6, Ch.1 ¶1.4.4/¶1.4.5 (5th ed. 2006), mirrored in Vol II,
@@ -635,18 +728,31 @@ describe('no content module teaches the rejoin the wrong way', () => {
  * scanned: three of them now quote the wrong numbers verbatim inside superseded
  * notes explaining the error, and a guard satisfiable only by deleting the
  * correction record is the failure mode this suite already warns about.
+ *
+ * ⚠️ Harvested from SOURCES, not APP_MODULES: the third copy — the longest and
+ * most detailed of them — is the golden-test docblock in
+ * `src/engine/entry.test.ts`, and APP_MODULES excludes `*.test.ts`. Scanning two
+ * of three while the paragraph above said "three" is this file's own stated hole
+ * ("guarding two of the three leaves the third free to go stale with the suite
+ * green"), reopened one glob down. The exhaustiveness list below is what makes
+ * the count a claim the suite checks rather than a sentence in a comment.
  */
 const ICAO_VERIFIED = /1\.4\.4|1\.2\.1\.2/
 const ICAO_MISCITED = /2\.2\.[45]/
 
 describe('the ICAO 8168 citation', () => {
-  const citing = APP_MODULES.filter((m) => m.source.includes('8168'))
+  const citing = SOURCES.filter((m) => m.source.includes('8168'))
 
-  it('is carried by at least one shipping module', () => {
+  it('is carried by every file the docblock says carries it', () => {
     // Exhaustiveness: a filter that silently matches nothing passes the two
     // assertions below vacuously, which is how a renamed comment would retire
-    // this guard without failing it.
-    expect(citing.map((m) => m.file).sort()).toEqual(['src/engine/entry.ts', 'src/engine/sim.ts'])
+    // this guard without failing it. Pinned to the exact set so a NEW citation
+    // lands here as a failure naming the file, rather than going unscanned.
+    expect(citing.map((m) => m.file).sort()).toEqual([
+      'src/engine/entry.test.ts',
+      'src/engine/entry.ts',
+      'src/engine/sim.ts',
+    ])
   })
 
   for (const { file, source } of citing) {
