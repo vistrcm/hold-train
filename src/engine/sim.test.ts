@@ -227,9 +227,17 @@ describe('entry shapes', () => {
   //     entryGuidance turnToInbound for every course × pattern' — the ROTATION
   //     this integrator actually flies, measured by integrating the signed
   //     cross product of successive track segments. That is the faithful
-  //     trajectory-level sweep, and it also pins the sim against the oracle;
-  //     every assertion in this file is a golden value that pins the sim against
-  //     itself.
+  //     trajectory-level sweep, and it pins the sim against the oracle.
+  //
+  // That is a DIFFERENT failure mode from the one this file covers, not a
+  // stronger version of it, so do not retire the goldens below as redundant.
+  // Pinning the sim against the oracle cannot catch the oracle itself being
+  // wrong: sim.ts derives its turn sign from `turnToInbound`, so flipping
+  // entry.ts's parallel branch flips the sim with it and every oracle-derived
+  // assertion stays green. The goldens here are anchored on RIGHT_NORTH /
+  // LEFT_NORTH and a written-out side, which is exactly what does go red — and
+  // the every-course version of that is the pattern-anchored A2 in
+  // src/parallel-entry.invariants.test.ts.
 
   // Left-turn mirrors: the turnSign inversion is exactly the sign-convention
   // bug class the project rules flag, so both shapes get mirrored coverage.

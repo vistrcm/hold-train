@@ -883,3 +883,26 @@ predates the 2026-08-02 rejoin-direction correction, on the same terms as the
   the picture and belongs to the owner, not to a review pass. The in-code comment at
   `src/ui/mapview.ts:197` already states the tradeoff; its "~35° on a 4 NM leg" is an
   example, not a worst case (`DME_LEG_MILES` reaches 10 NM, where the kink is ~41°).
+- **2026-08-03 — the sim half of the rejoin guard could not fail on an inverted engine,
+  and its docblock said the opposite.** Both assertions in `the sim flies the rejoin the
+  engine specifies` built their expectation from `entryGuidance(...).turnToInbound` — the
+  same field `sim.ts:178` reads to derive `turnSign`. Flip `entry.ts`'s parallel branch
+  and the sim follows it, so the expectation follows too: green. Verified by mutation, not
+  argued — with the engine inverted, `rejoin rotation sense matches entryGuidance
+  turnToInbound` passes at all 24 course × pattern combinations. The map half already
+  names this hole for its sweep-flag test and answers it with a pattern-anchored `A2`
+  (`CLAUDE.md`: sign checks catch inversions, so anchor on the *pattern*, not on the field
+  under test); the sim half had no equivalent.
+  The docblock disposed of the objection by asserting that "every parallel assertion in
+  sim.test.ts is a hardcoded golden excursion that pins the sim against itself", and
+  `sim.test.ts` carried the reciprocal claim. Both are false, and inverted: those goldens
+  are anchored on `RIGHT_NORTH`/`LEFT_NORTH` plus a written-out side, so they are the only
+  assertions that *did* fail on an engine flip. The comments oversold the oracle-derived
+  sweep and wrote off the assertions actually closing the hole — an invitation to delete
+  them as redundant, which is the failure mode this ledger records twice already for
+  guards whose stated scope was wider than their real one. Both comments now state which
+  assertion catches which failure mode.
+  Regression test: `A2: the flown rejoin opposes the pattern, anchored on turnDirection`
+  in `src/parallel-entry.invariants.test.ts`, written out against `hold.turnDirection`.
+  Mutation confirmed: inverting the engine's parallel branch fails exactly the two `A2`
+  tests (map and sim) and nothing else in that file.

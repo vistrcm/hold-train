@@ -239,10 +239,21 @@ describe('the sim flies the rejoin the engine specifies', () => {
   // to 45 for legibility, a change rather than a repair, so it is no evidence
   // that 45 is the FAA-correct angle. It was still a second hand-written copy of
   // geometry, which is what the SIGN did drift in across five modules. Both now
-  // come from `entryGuidance`, and this sweep is what keeps them there: without
-  // it a future flip of the engine's parallel rule leaves the sim stale and green,
-  // because every parallel assertion in sim.test.ts is a hardcoded golden
-  // excursion that pins the sim against itself rather than against the oracle.
+  // come from `entryGuidance`, and this sweep is what keeps them there: it goes
+  // red the moment sim.ts re-derives either one privately.
+  //
+  // What it CANNOT catch is a flip of the ENGINE. sim.ts derives its turnSign
+  // from `turnToInbound` and the expectation below re-reads that same field, so
+  // an inverted engine inverts both and this test stays green — the identical
+  // by-construction hole the map's sweep-flag test carries, and the reason the
+  // map half also has A2, anchored on the pattern. The sim's A2 is the test
+  // after this one. (This comment used to dispose of that objection by claiming
+  // "every parallel assertion in sim.test.ts is a hardcoded golden excursion
+  // that pins the sim against itself". It is not: those goldens are anchored on
+  // RIGHT_NORTH / LEFT_NORTH and a written-out side, so they DO fail on an
+  // engine flip — just at two courses rather than every one. Overselling this
+  // sweep while writing off the assertions that actually close the hole is how
+  // the closing assertion gets deleted as redundant.)
   it('rejoin rotation sense matches entryGuidance turnToInbound for every course × pattern', () => {
     for (const turnDirection of PATTERNS) {
       for (const inboundCourse of COURSES) {
@@ -275,6 +286,47 @@ describe('the sim flies the rejoin the engine specifies', () => {
           Math.abs((rejoin * 180) / Math.PI),
           `${inboundCourse}°/${turnDirection}: rejoin swept less than 180°`,
         ).toBeGreaterThan(180)
+      }
+    }
+  })
+
+  // A2 for the sim, and the only assertion in this describe that survives an
+  // inverted engine: the settled rule is WRITTEN OUT against `hold.turnDirection`
+  // rather than read from the field under test. A right-hand pattern turns right,
+  // so its rejoin turns LEFT — counter-clockwise, positive under the sign
+  // convention of `trackRotationRad`. Flip `entry.ts`'s parallel branch back and
+  // sim.ts follows it (it reads the oracle), so the test above follows too and
+  // stays green; this one goes red at all 24 course × pattern combinations.
+  //
+  // Deliberately a sign check, and that is the whole job — magnitude is pinned by
+  // the intercept-angle test below, and the ">180°" bound by the sweep above.
+  it('A2: the flown rejoin opposes the pattern, anchored on turnDirection', () => {
+    for (const turnDirection of PATTERNS) {
+      for (const inboundCourse of COURSES) {
+        const hold: HoldCourse = { inboundCourse, turnDirection }
+        const r = flyCircuit(
+          hold,
+          {
+            entry: 'parallel',
+            // Not a back door to the oracle: `outboundHeading` for a parallel is
+            // the reciprocal of the inbound course (`entry.ts:192`), independent
+            // of pattern and of turnToInbound, so an inverted engine does not
+            // move it.
+            outboundHeading: entryGuidance('parallel', hold).outboundHeading,
+            inboundCrab: 0,
+            outboundSeconds: LEG_SECONDS,
+          },
+          CALM,
+        )
+        const rejoin = trackRotationRad(r.track, REJOIN_START_SAMPLE, REJOIN_END_SAMPLE)
+        const expected = turnDirection === 'right' ? 1 : -1
+        expect(
+          Math.sign(rejoin),
+          `${inboundCourse}°/${turnDirection}: a ${turnDirection}-hand pattern's parallel ` +
+            `rejoin turns ${turnDirection === 'right' ? 'left' : 'right'}, so the flown ` +
+            `rotation must be ${expected > 0 ? 'counter-clockwise' : 'clockwise'}; sim flew ` +
+            `${((rejoin * 180) / Math.PI).toFixed(1)}° (${EVIDENCE})`,
+        ).toBe(expected)
       }
     }
   })
