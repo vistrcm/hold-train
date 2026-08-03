@@ -336,6 +336,25 @@ describe('entryGuidance', () => {
       expect(entryGuidance(e, hold).source).toMatch(/AIM 5-3-8/)
     }
   })
+
+  // The parallel guidance's `turnToInbound` is the one field in this engine that
+  // j3's PROSE cannot support — "more than 180 degrees" does not discriminate the
+  // two senses (see the ⚠️ on A3 above and docs/parallel-entry-evidence.md). It
+  // comes from FIG 5-3-4, so the citation has to name the figure: a `source` of
+  // "AIM 5-3-8 j3" alone offers a rendered sentence a citation that does not
+  // support it, which is the derivation-as-citation failure CLAUDE.md's FAA-source
+  // convention exists to prevent. Asserted per entry so that widening every
+  // guidance to the figure — which would over-cite the direct and teardrop cases,
+  // whose fields ARE in the prose — does not satisfy this by accident.
+  it('the parallel guidance cites the figure its rejoin direction comes from', () => {
+    for (const h of [std(270), nonStd(270)]) {
+      expect(
+        entryGuidance('parallel', h).source,
+        'the parallel rejoin direction is figure-derived; see docs/parallel-entry-evidence.md',
+      ).toMatch(/FIG 5-3-4/)
+    }
+    expect(entryGuidance('direct', hold).source).not.toMatch(/FIG 5-3-4/)
+  })
 })
 
 describe('input validation', () => {

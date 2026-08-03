@@ -52,6 +52,21 @@ const SOURCE = 'AIM 5-3-8 j3, FIG 5-3-4; ±5° per AIM 5-3-8 j8(d)'
 const GUIDANCE_SOURCE = 'AIM 5-3-8 j3'
 
 /**
+ * The parallel entry's citation carries the FIGURE as well, and must.
+ *
+ * `turnToInbound` for a parallel is NOT in j3's prose: that text says only "turn
+ * in the direction of the holding pattern through more than 180 degrees", which
+ * this branch establishes cannot discriminate the two senses (see the parallel
+ * case below). The direction is read off FIG 5-3-4. Citing j3 alone would
+ * present a figure-derived fact as prose-derived — the same "derivation inside
+ * the cited span" failure the 2026-08-02 audit corrects — and would hand any
+ * future renderer of `guidance.source` a citation that does not support the
+ * sentence beside it. Matches the wording `questions.ts` and `anki-deck.ts`
+ * already use for entry facts.
+ */
+const PARALLEL_GUIDANCE_SOURCE = 'AIM 5-3-8 j3(a), FIG 5-3-4'
+
+/**
  * Angle the parallel entry's rejoin turn rolls out on, measured from the inbound
  * holding course toward the rejoin turn's direction — so the rollout heading is
  * `normalizeDeg(inboundCourse + PARALLEL_INTERCEPT_DEG * rejoinSign)`, giving a
@@ -192,7 +207,7 @@ export function entryGuidance(entry: Entry, hold: HoldCourse): EntryGuidance {
         outboundHeading: outboundCourse,
         side: 'nonholding',
         turnToInbound: pattern === 'right' ? 'left' : 'right',
-        source: GUIDANCE_SOURCE,
+        source: PARALLEL_GUIDANCE_SOURCE,
       }
   }
 }

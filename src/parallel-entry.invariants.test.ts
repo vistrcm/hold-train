@@ -97,8 +97,18 @@ describe('the map draws the rejoin the engine specifies', () => {
   // mapview.test.ts:214 checks the `data-turn-to-inbound` attribute, but that is
   // copied straight out of entryGuidance and so agrees vacuously — it would keep
   // passing with the arc drawn the other way round. This reads the sweep flag off
-  // the rendered ARC, so it fails the moment `mapview.ts` derives the sign from
-  // anything but the oracle (verified by substituting the old private copy).
+  // the rendered ARC, so it fails when what the map DRAWS disagrees with the
+  // oracle (verified by substituting mapview's old private copy, which was
+  // inverted).
+  //
+  // ⚠️ That is an AGREEMENT check, not a provenance check, and the distinction
+  // matters when reading a failure: a private re-derivation in `mapview.ts` that
+  // still computes the same sign passes here, and nothing in this file forbids
+  // one. What the sweep catches is the moment such a copy DRIFTS — which is the
+  // whole history it exists for, since the five-module inversion was a drift, not
+  // the mere existence of a second copy. Claiming it fires on any private
+  // derivation oversells it, and an oversold guard is one a later session trusts
+  // in place of the assertion that would actually have caught the bug.
   //
   // Now that mapview.ts reads `g.turnToInbound` directly, this test agrees by
   // construction when the ENGINE flips — that case is caught by A2 below, which
@@ -239,8 +249,17 @@ describe('the sim flies the rejoin the engine specifies', () => {
   // to 45 for legibility, a change rather than a repair, so it is no evidence
   // that 45 is the FAA-correct angle. It was still a second hand-written copy of
   // geometry, which is what the SIGN did drift in across five modules. Both now
-  // come from `entryGuidance`, and this sweep is what keeps them there: it goes
-  // red the moment sim.ts re-derives either one privately.
+  // come from `entryGuidance`, and this sweep is what keeps them AGREEING: it
+  // goes red the moment the rejoin sim.ts actually FLIES disagrees with the
+  // oracle.
+  //
+  // ⚠️ Agreement, not provenance — same caveat as the map's sweep-flag test. A
+  // private re-derivation inside sim.ts that still produces the same sign passes
+  // this, and no assertion in this file reads sim.ts's source to ban one. The
+  // guard is against drift, which is the failure that actually shipped; do not
+  // read a green run here as proof the geometry is single-sourced in CODE. That
+  // property is maintained by review, and the assertions are what make it
+  // survivable when it lapses.
   //
   // What it CANNOT catch is a flip of the ENGINE. sim.ts derives its turnSign
   // from `turnToInbound` and the expectation below re-reads that same field, so
