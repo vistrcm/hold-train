@@ -151,14 +151,30 @@ describe('entry shapes', () => {
 
   // AIM 5-3-8 j3(a): parallel turns onto the outbound heading toward the
   // NONholding side, and then BOTH the outbound turn and the rejoin oppose the
-  // pattern — the rejoin goes back toward the holding side, crossing the course.
-  // "Turn in the direction of the holding pattern" is spatial, not rotational;
-  // FIG 5-3-4 draws the teardrop rejoin clockwise and the parallel rejoin
-  // counter-clockwise in one figure. See docs/parallel-entry-evidence.md. Do NOT
-  // re-derive this from the ">180°" clause — both senses exceed 180°, so the
-  // clause does not discriminate, and reasoning from it inverted this app once.
+  // pattern — the rejoin turns back toward the holding side, and in the real
+  // maneuver it crosses the course. "Turn in the direction of the holding
+  // pattern" is spatial, not rotational; FIG 5-3-4 draws the teardrop rejoin
+  // clockwise and the parallel rejoin counter-clockwise in one figure. See
+  // docs/parallel-entry-evidence.md. Do NOT re-derive this from the ">180°"
+  // clause — both senses exceed 180°, so the clause does not discriminate, and
+  // reasoning from it inverted this app once.
+  //
+  // ⚠️ THIS MODEL DOES NOT DRAW THE CROSSING, and the assertions below pin the
+  // model, not the maneuver. `flyCircuit` starts established ON the course at
+  // the fix, so the turn onto outbound is a full 180° and the rejoin comes out
+  // TANGENT to the holding course — the track stays on the nonholding side
+  // throughout and the inbound leg diverges instead of converging. That is the
+  // KNOWN MODEL LIMITATION block in sim.ts, not a wrong turn direction. Do not
+  // "fix" the assertions below to match the prose above: an assertion that the
+  // track crosses the course is red under this initial condition, and a red test
+  // that reads like a direction defect is exactly what argues the next session
+  // back into inverting the rejoin. The DIRECTION is guarded, faithfully and at
+  // the trajectory level, in src/parallel-entry.invariants.test.ts.
   it('parallel: outbound turn opposes the pattern, and so does the reintercept', () => {
-    const R = 0.4775
+    // Derived, not written out: a rounded literal left the -2R bound below with
+    // ~1e-3 NM of slack, so any change to DT, TAS or the turn rate produced a
+    // failure that reads like a rejoin-direction regression.
+    const R = HOLD_TAS_KT / 3600 / ((TURN_RATE_DEG_PER_S * Math.PI) / 180) // ≈ 0.4775 NM
     const r = flyCircuit(RIGHT_NORTH, decisions({ entry: 'parallel' }), CALM)
     expect(r.completed).toBe(true)
     // right-turn hold → holding side east; the whole entry stays west of course
@@ -170,16 +186,20 @@ describe('entry shapes', () => {
     const throughRejoin = r.track.slice(0, 196)
     // A2: the rejoin turn stays inside the displacement the outbound turn
     // already made — it curls back toward the course, it does not bulge past it
-    expect(Math.min(...throughRejoin.map((p) => p.e))).toBeGreaterThan(-2 * R - 1e-3) // ≈ -0.9549
+    expect(Math.min(...throughRejoin.map((p) => p.e))).toBeGreaterThan(-2 * R - 0.02) // ≈ -0.9549
     expect(throughRejoin.at(-1)!.e).toBeGreaterThan(-0.2) // rollout ≈ -0.1390
     // Whole track: -1.3022 after the fix, -1.9099 before it. The straight
     // intercept leg diverges further west under this model's initial condition
     // (see the sim.ts header note), so the 2R bound above is measured through
     // rejoin completion only — asserting it over the whole track is FALSE.
     expect(Math.min(...r.track.map((p) => p.e))).toBeGreaterThan(-3 * R)
-    // honest physics: the reintercept turn rolls out on an intercept heading,
-    // so the aircraft is still on the nonholding side abeam the fix — it has
-    // not joined the course yet. Cross-track is signed toward the holding side.
+    // honest physics: the rejoin rolls out at the engine's intercept angle, but
+    // from 2R off course that heading is tangent-side of the course under this
+    // model — the aircraft is still on the nonholding side abeam the fix and has
+    // moved further from it, not closer. Cross-track is signed toward the
+    // holding side, so a divergent parallel leg reads negative and growing. The
+    // rollout HEADING itself is pinned against the engine in
+    // src/parallel-entry.invariants.test.ts.
     expect(r.inboundCrossTrackNm).toBeLessThan(-0.5)
   })
 

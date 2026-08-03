@@ -279,7 +279,15 @@ describe('entryGuidance', () => {
     expect(g.outboundHeading).toBe(320)
     expect(g.side).toBe('nonholding')
     expect(g.turnToInbound).toBe('right')
-    expect(normalizeDeg(140 + PARALLEL_INTERCEPT_DEG)).toBe(185) // rollout heading
+    // Rollout heading for this case is 185° (C + 45 for a left-turn pattern).
+    // Stated here as documentation only — it is arithmetic on a constant, and no
+    // engine function returns it. The rollout heading is BEHAVIOURALLY pinned
+    // where it is actually flown and drawn: 'rejoin rolls out on the engine
+    // intercept angle for every course × pattern' in
+    // src/parallel-entry.invariants.test.ts, and the golden case in
+    // src/ui/mapview.test.ts. Do not mistake this line for coverage of it.
+    const patternSign = -1 // nonStd(140) → left turns
+    expect(normalizeDeg(140 - PARALLEL_INTERCEPT_DEG * patternSign)).toBe(185)
   })
 
   // A3. The intercept angle is convention, not AIM text (the AIM requires only
@@ -310,8 +318,17 @@ describe('entryGuidance', () => {
         const sweep = normalizeDeg((rolloutHeading - g.outboundHeading) * rejoinSign)
         expect(sweep, `${h.turnDirection} ${c}`).toBe(225)
         expect(sweep, `${h.turnDirection} ${c}`).toBeGreaterThan(180)
-        // pin the discrimination itself, so a future simplification back to the
-        // tautological spelling fails here rather than silently going vacuous
+        // What an INVERTED engine would sweep, spelled out so the discrimination
+        // this test relies on is visible rather than implied.
+        //
+        // ⚠️ This line cannot fail on its own: `normalizeDeg(-x)` is `360 − x`,
+        // so once `sweep` is 225 this is 135 identically. It does NOT catch a
+        // rewrite of `rolloutHeading` into the tautological `c + 45 * rejoinSign`
+        // — with a CORRECT engine `rejoinSign === -patternSign`, so both
+        // spellings produce the same number and no runtime assertion can tell
+        // them apart. The guard against that rewrite is the ⚠️ above, read by a
+        // human; treat the comment as the guard and this line as its worked
+        // example, not as a second safety net.
         const inverted = normalizeDeg((rolloutHeading - g.outboundHeading) * -rejoinSign)
         expect(inverted, `${h.turnDirection} ${c}`).toBe(135)
       }

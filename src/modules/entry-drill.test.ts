@@ -265,6 +265,8 @@ describe('createEntryDrill controller', () => {
 describe('flyItText', () => {
   const GOLDEN: HoldCourse = { inboundCourse: 140, turnDirection: 'left' }
   const STANDARD: HoldCourse = { inboundCourse: 0, turnDirection: 'right' }
+  /** STANDARD's mirror — same course, opposite pattern. */
+  const NONSTANDARD: HoldCourse = { inboundCourse: 0, turnDirection: 'left' }
 
   it('golden case: heading 251 into a left-turn hold is a parallel flown with two RIGHT turns', () => {
     expect(determineEntry(251, GOLDEN).primary).toBe('parallel')
@@ -326,6 +328,31 @@ describe('flyItText', () => {
 
   it('exactly aligned with outbound: no fix-crossing turn is named at all', () => {
     const text = flyItText(entryGuidance('parallel', STANDARD), 180)
+    expect(text).toContain('roll out on 180°')
+    expect(text).not.toContain('turn right onto')
+    expect(text).not.toContain('turn left onto')
+    expect(text).not.toContain('both turns opposite the pattern')
+  })
+
+  // The two cases above are the entire reason flyItText takes `heading` rather
+  // than deriving the first turn from `turnToInbound`, and both were covered for
+  // a standard hold only. Sign-convention mirrors are this repo's top bug class
+  // and "both turns opposite the pattern" is itself a sign comparison, so a
+  // mirror-only regression in the suppression logic would ship silently.
+  it('the boundary band mirrors: a left-turn hold names the heading-driven turn too', () => {
+    const r = determineEntry(183, NONSTANDARD) // mirror of 177 into STANDARD
+    expect(r.primary).toBe('teardrop')
+    expect(r.alternates).toContain('parallel')
+    const text = flyItText(entryGuidance('parallel', NONSTANDARD), 183)
+    expect(text).toContain('turn left onto 180°') // 183 → 180 is 3° LEFT
+    expect(text).toContain('right turn through more than 180°') // the rejoin is unchanged
+    // The fix-crossing turn follows the pattern here, so the gloss must not claim
+    // both turns oppose it — the claim is false of this scenario.
+    expect(text).not.toContain('both turns opposite the pattern')
+  })
+
+  it('exactly aligned mirrors: a left-turn hold names no fix-crossing turn either', () => {
+    const text = flyItText(entryGuidance('parallel', NONSTANDARD), 180)
     expect(text).toContain('roll out on 180°')
     expect(text).not.toContain('turn right onto')
     expect(text).not.toContain('turn left onto')

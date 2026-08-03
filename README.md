@@ -60,6 +60,7 @@ No SPA-fallback rewrite is configured because the router is hash-based: the brow
 1. Open the **Anki Export** module (`#/anki`) and download `hold-train-core.tsv` (fixed deck) and/or `hold-train-misses.tsv` (built from your recorded entry-drill, written-test, and oral-prep misses).
 2. In Anki: File → Import, pick the TSV. Fields are tab-separated: front, back, tags. Enable "Allow HTML in fields" (newlines are exported as `<br>`).
 3. Core-deck and oral-miss cards are tagged with their ACS element codes, so you can filter (e.g., `IR.III.B.K1`). Entry-drill and written-test miss cards are tagged `miss` plus the drill (and, for written misses, the topic).
+4. **Re-download and re-import after a content correction.** Cards you already imported are not updated by fixes made here, so a corrected fact stays wrong in your deck until you import again. Card fronts are stable, so Anki updates the existing notes in place rather than duplicating them. Corrections are logged in `docs/content-audit.md` — the 2026-08-02 parallel-entry rejoin fix changed a core card, so re-import if you exported before then.
 
 ## Source policy
 

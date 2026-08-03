@@ -48,7 +48,10 @@ const DT = 0.1 // s per integration step
 // agreed with the map's literal (both 30) until the angle was single-sourced and
 // raised to 45, so it was never itself a drift — it was one more hand-written
 // copy of geometry that the rejoin SIGN did drift in, across five modules.
-const SAMPLE_SECONDS = 1 // ground-track sampling interval
+/** Ground-track sampling interval. Exported because the cross-module guard in
+ *  src/parallel-entry.invariants.test.ts locates the rejoin by sample index and
+ *  must derive that window from the constants rather than hand-writing it. */
+export const SAMPLE_SECONDS = 1
 /** Longest outbound leg flyCircuit will accept. Callers that *suggest* a leg
  *  time must clamp to this, or they hand the pilot a number the sim rejects. */
 export const MAX_OUTBOUND_SECONDS = 600

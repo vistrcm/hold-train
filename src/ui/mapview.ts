@@ -190,6 +190,16 @@ function entryPathD(entry: Entry, g: EntryGuidance, hold: MapHold, legNm: number
   // roll out angled into the inbound course from the holding side, at the
   // engine's intercept angle (45° — the oracle owns the convention)
   const rollout = pointAtHeading(center, normalizeDeg(c + PARALLEL_INTERCEPT_DEG * rs), rs)
+  // ⚠️ The trailing `L fix` below is a SCHEMATIC return chord, the same one the
+  // teardrop path uses — not a drawn intercept leg. Its bearing is fixed by
+  // where the rollout point lands (330.0° for the standard 1-minute case) and
+  // does not track PARALLEL_INTERCEPT_DEG, so raising the angle 30 → 45 opened a
+  // ~15° kink at rollout (~35° on a 4 NM leg). The ROLLOUT POINT is at the
+  // engine's angle and is what mapview.test.ts and the invariants sweep pin; the
+  // straight run home is illustration. Drawing a true intercept leg means
+  // extending the ray to where it meets the course and then tracking inbound,
+  // which needs a case for short legs where that meeting point falls past the
+  // fix — worth doing, but it is a change to the picture, not a review fix.
   const sweep = rs === 1 ? 1 : 0
   return (
     `M ${pt(fix, scale)} L ${pt(legEnd, scale)} ` +

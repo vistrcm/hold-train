@@ -29,9 +29,9 @@ import { describe, expect, it } from 'vitest'
 // the claim under test is a sentence, and `?raw` is the idiom this repo already
 // uses on styles.css (styles.test.ts) and README.md (dashboard.test.ts). They
 // are globbed rather than imported one by one — see `CONTENT` below.
-import { type HoldCourse, type TurnDirection, entryGuidance } from './engine/entry'
+import { PARALLEL_INTERCEPT_DEG, type HoldCourse, type TurnDirection, entryGuidance } from './engine/entry'
 import { normalizeDeg } from './engine/geometry'
-import { flyCircuit } from './engine/sim'
+import { SAMPLE_SECONDS, TURN_RATE_DEG_PER_S, flyCircuit } from './engine/sim'
 import { renderMap } from './ui/mapview'
 
 const EVIDENCE = 'see docs/parallel-entry-evidence.md — do not re-derive from the AIM sentence'
@@ -134,6 +134,22 @@ describe('the map draws the rejoin the engine specifies', () => {
 const CALM = { directionFrom: 0, speedKt: 0 }
 const LEG_SECONDS = 60
 
+// Sample indices of the rejoin, DERIVED from the constants rather than written
+// out. The window used to be the literals 120 and 195; those are only correct
+// while the fix-crossing turn is 180°, the leg is 60 s and the rejoin sweeps
+// 180 + 45. Raising PARALLEL_INTERCEPT_DEG (this branch already raised it once,
+// 30 → 45) lengthens the rejoin past a hardcoded end index, which would silently
+// truncate the window instead of failing — a hand-written copy of the geometry
+// in the very file whose thesis is that hand-written copies drift.
+const REJOIN_START_SAMPLE = (180 / TURN_RATE_DEG_PER_S + LEG_SECONDS) / SAMPLE_SECONDS
+const REJOIN_END_SAMPLE =
+  REJOIN_START_SAMPLE + (180 + PARALLEL_INTERCEPT_DEG) / TURN_RATE_DEG_PER_S / SAMPLE_SECONDS
+
+/** Compass bearing of the segment between two consecutive track samples. */
+function segmentBearing(a: { e: number; n: number }, b: { e: number; n: number }): number {
+  return normalizeDeg((Math.atan2(b.e - a.e, b.n - a.n) * 180) / Math.PI)
+}
+
 /**
  * Signed rotation of the flown ground track over one sample window, in radians:
  * positive = counter-clockwise (left), negative = clockwise (right).
@@ -186,10 +202,10 @@ describe('the sim flies the rejoin the engine specifies', () => {
           },
           CALM,
         )
-        // 180° onto outbound at 3°/s = 60 s, then the 60 s leg, then the 225°
-        // rejoin = 75 s; the track is sampled at 1 s from the fix, so the rejoin
-        // is samples 60+60 … 195.
-        const rejoin = trackRotationRad(r.track, 120, 195)
+        // 180° onto outbound at 3°/s, then the leg, then the 180 + 45 rejoin;
+        // the track is sampled at SAMPLE_SECONDS from the fix. Both bounds are
+        // computed from the constants above, not written out.
+        const rejoin = trackRotationRad(r.track, REJOIN_START_SAMPLE, REJOIN_END_SAMPLE)
         const expectedSign = g.turnToInbound === 'right' ? -1 : 1 // clockwise = negative
         expect(
           Math.sign(rejoin),
@@ -203,6 +219,85 @@ describe('the sim flies the rejoin the engine specifies', () => {
           Math.abs((rejoin * 180) / Math.PI),
           `${inboundCourse}°/${turnDirection}: rejoin swept less than 180°`,
         ).toBeGreaterThan(180)
+      }
+    }
+  })
+
+  // ⚠️ The rotation sweep above pins the rejoin's SIGN but not its MAGNITUDE:
+  // `Math.sign` and `> 180°` are both satisfied by a 210° sweep, so replacing
+  // `PARALLEL_INTERCEPT_DEG` in sim.ts with a literal 30 left the whole suite
+  // green (verified by mutation). The same mutation in mapview.ts fails, because
+  // mapview.test.ts pins the rollout POINT. This test is the sim's equivalent:
+  // it reads the heading the integrator actually flies after the rejoin and
+  // requires it to be the engine's intercept angle, so the one consumer that was
+  // single-sourced in code but not in assertion is now held to the oracle too.
+  it('rejoin rolls out on the engine intercept angle for every course × pattern', () => {
+    for (const turnDirection of PATTERNS) {
+      for (const inboundCourse of COURSES) {
+        const hold: HoldCourse = { inboundCourse, turnDirection }
+        const g = entryGuidance('parallel', hold)
+        const r = flyCircuit(
+          hold,
+          {
+            entry: 'parallel',
+            outboundHeading: g.outboundHeading,
+            inboundCrab: 0,
+            outboundSeconds: LEG_SECONDS,
+          },
+          CALM,
+        )
+        // Two samples clear of rollout, so the segment is pure straight flight
+        // and carries no share of the partial turning sample at the rollout.
+        const i = REJOIN_END_SAMPLE + 2
+        const flown = segmentBearing(r.track[i]!, r.track[i + 1]!)
+        const rejoinSign = g.turnToInbound === 'right' ? 1 : -1
+        const expected = normalizeDeg(inboundCourse + PARALLEL_INTERCEPT_DEG * rejoinSign)
+        expect(
+          flown,
+          `${inboundCourse}°/${turnDirection}: engine intercept angle is ` +
+            `${PARALLEL_INTERCEPT_DEG}° so the rollout heading is ${expected}°, ` +
+            `sim flew ${flown.toFixed(2)}° (${EVIDENCE})`,
+        ).toBeCloseTo(expected, 1)
+      }
+    }
+  })
+})
+
+// --- the sim's parallel branch is unreachable in the app ----------------------
+
+// `sim.ts`'s KNOWN MODEL LIMITATION block is bounded by a claim about callers:
+// the circuit starts established ON the inbound course, so its parallel rejoin
+// comes out TANGENT to the holding course and the inbound leg never converges.
+// That is tolerable "because flyCircuit is only ever called with entry: 'direct'".
+// Nothing asserted it. A future screen passing 'parallel' would render a ground
+// track that never rejoins — negative training — with the suite green. This is
+// the same runtime-only doc↔code coupling the repo already guards for the README
+// table (dashboard.test.ts) and the drill ids, and the same `?raw` glob idiom.
+const APP_MODULES: ReadonlyArray<{ file: string; source: string }> = Object.entries(
+  import.meta.glob<string>(['./**/*.ts', '!./**/*.test.ts'], {
+    query: '?raw',
+    import: 'default',
+    eager: true,
+  }),
+).map(([path, source]) => ({ file: path.replace('./', 'src/'), source }))
+
+describe('the sim limitation stays inside the bound it documents', () => {
+  it('no shipping module calls flyCircuit with an entry other than direct', () => {
+    const callers = APP_MODULES.filter(
+      (m) => !m.file.startsWith('src/engine/sim') && /\bflyCircuit\s*\(/.test(m.source),
+    )
+    expect(callers.length, 'the glob found no flyCircuit callers at all — scan went vacuous').toBeGreaterThan(0)
+    for (const { file, source } of callers) {
+      const entries = [...source.matchAll(/entry:\s*'([a-z]+)'/g)].map((m) => m[1])
+      expect(entries.length, `${file}: calls flyCircuit but names no entry literal`).toBeGreaterThan(0)
+      for (const e of entries) {
+        expect(
+          e,
+          `${file}: passes entry '${e}' to flyCircuit. sim.ts's parallel rejoin is ` +
+            `TANGENT to the course under this model's initial condition and never ` +
+            `converges — see the KNOWN MODEL LIMITATION block in src/engine/sim.ts. ` +
+            `Add an arrival heading to SimDecisions before shipping a non-direct entry.`,
+        ).toBe('direct')
       }
     }
   })
@@ -299,16 +394,42 @@ function rejoinClaim(line: string): string {
     .join(' ')
 }
 
+/**
+ * Content modules that state the parallel rejoin rule in prose today. Each must
+ * keep at least one line the scan below can see; a module may be ADDED here, and
+ * removing one is a deliberate act that says the prose is gone on purpose.
+ */
+const REJOIN_PROSE_CARRIERS = [
+  'src/content/anki-deck.ts',
+  'src/content/lessons.ts',
+  'src/content/oral.ts',
+] as const
+
 describe('no content module teaches the rejoin the wrong way', () => {
   it('the scan finds prose to scan at all', () => {
     // A rename or a reflow that hides the prose from this scan would make the
     // suite pass by finding nothing, which is the failure mode the raw-text
     // idiom is most prone to (cf. styles.test.ts's `is actually loaded` test).
-    // Counted across all modules, not per file: a module that says nothing about
-    // the parallel rejoin (questions.ts today) is silent, not broken.
+    // A module that says nothing about the parallel rejoin (questions.ts today)
+    // is silent, not broken — so the guard is per KNOWN CARRIER, not per file.
+    //
+    // ⚠️ A single global total is NOT enough. `> 2` happens to bind today only
+    // because the total is exactly 3 (one line each in the three carriers); as
+    // soon as a fourth rejoin sentence lands anywhere, a carrier can stop
+    // matching the selector and drop out of the scan with the suite green — the
+    // same exhaustiveness hole this file's header argues against. Naming the
+    // carriers makes a module going silent a failure rather than a subtraction.
     expect(CONTENT.length, 'no content modules were globbed').toBeGreaterThan(3)
-    const total = CONTENT.reduce((n, c) => n + parallelRejoinLines(c.source).length, 0)
-    expect(total, 'found no parallel-rejoin prose to scan in any content module').toBeGreaterThan(2)
+    for (const file of REJOIN_PROSE_CARRIERS) {
+      const module = CONTENT.find((c) => c.file === file)
+      expect(module, `${file} carries rejoin prose but was not globbed`).toBeDefined()
+      expect(
+        parallelRejoinLines(module!.source).length,
+        `${file} used to state the parallel rejoin rule and no longer does — either ` +
+          `the prose was dropped or it was reworded past the scan's selector, which ` +
+          `takes it out of the guard silently (${EVIDENCE})`,
+      ).toBeGreaterThan(0)
+    }
   })
 
   it('every parallel-rejoin sentence states the corrected rule', () => {

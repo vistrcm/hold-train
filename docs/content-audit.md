@@ -139,7 +139,12 @@ omitted-direction JO 4-6-4 a5 · 14,000-ft boundary j4(a) · radar-still-report 
 instructions except the charted holding direction and the statement 'as published'") ·
 RNAV ground-track/fly-by j7(a) · protected-side j3 · cross-fix-speed d + j2 ·
 EFC/Avianca 5-5-15 + 91.167 + AVA052 · bank-limiting j8(b)(4) · intervene j8(f) ·
-leans 8-1-5. Verdict: pass, with **fixed** items 1, 3, 4, 6, 7 above.
+leans 8-1-5. Verdict: pass, with **fixed** items 1, 3, 4, 6, 7 above — and ⚠️ this verdict
+predates the 2026-08-02 rejoin-direction correction. The sector, teardrop and >180° facts
+still pass; the parallel **rejoin turn direction** the "teardrop/parallel j3" row silently
+blessed was wrong and is **fixed 2026-08-02** (see the correction entry at the end of this
+file). ">180°" is true of both turn directions and must never be used to derive which one
+is correct.
 
 ### src/content/lessons.ts (5 lessons, 16 paragraphs)
 
@@ -147,7 +152,10 @@ Each paragraph re-verified against the paragraphs listed above (why-hold: AIM 5-
 P/CG + 91.167 + ACS; anatomy: j1/i5, j4/j5, j2/d, i; entries: j3/FIG 5-3-4, j8(d)/j3,
 thumb method explicitly labeled a field technique with AIM cited only for sector
 geometry; timing-wind: j4, j8(c), j5; reports: 5-3-3 a1(f)/(g), i6 + P/CG + 91.167,
-91.185(c)(3)). Verdict: pass, with **fixed** items 1, 2, 7 above.
+91.185(c)(3)). Verdict: pass, with **fixed** items 1, 2, 7 above — and ⚠️ this verdict
+predates the 2026-08-02 rejoin-direction correction, on the same terms as the
+`anki-deck.ts` verdict above: the "entries: j3/FIG 5-3-4" row blessed the wrong parallel
+**rejoin turn direction**, **fixed 2026-08-02**.
 
 ## Engine is the oracle — verified
 
@@ -157,9 +165,13 @@ geometry; timing-wind: j4, j8(c), j5; reports: 5-3-3 a1(f)/(g), i6 + P/CG + 91.1
   dual-keying exactly when near-boundary, no engine-acceptable distractors.
 - `entry-drill.ts`: grading and sector overlays come from `determineEntry` directly.
 - `wind-lab.ts` / `sim.ts`: entry decision is user input; turn geometry from the engine.
-- `oral.ts`, `lessons.ts`, `anki-deck.ts`: state sector *facts* (sizes, offsets) only —
-  no scenario→entry mappings anywhere (checked by review; lessons file states the rule
-  in its header comment).
+- `oral.ts`, `lessons.ts`, `anki-deck.ts`: state sector *facts* (sizes, offsets) **and**
+  the parallel rejoin's turn-direction rule in prose — engine-owned geometry restated in
+  words, which is exactly how the inverted rejoin came to ship in three content files at
+  once while every content test passed. "Checked by review" was the reasoning that left it
+  unguarded. Still no scenario→entry mappings. The prose is now pinned against the
+  engine's rule by the globbed `?raw` scan in `src/parallel-entry.invariants.test.ts`,
+  which sweeps `src/content/*.ts` rather than a hand-written file list.
 - `ALTAM` inbound course and radial-question courses are computed via
   `radialToInboundCourse`, not hand-keyed (test-enforced).
 
@@ -599,23 +611,40 @@ geometry; timing-wind: j4, j8(c), j5; reports: 5-3-3 a1(f)/(g), i6 + P/CG + 91.1
   the pattern", "nonstandard mirrors: teardrop offset flips, parallel reintercept is
   right", "direct and teardrop reintercept with the pattern, parallel against it", "the
   golden case: inbound 140, left turns → the rejoin is a RIGHT turn", "the intercept angle
-  is 45°, single-sourced in the engine" and "A3: the parallel rejoin sweeps more than 180°
-  in the opposed direction" in `src/engine/entry.test.ts`; "parallel: outbound turn opposes
+  is 45°, single-sourced in the engine" and "A3: the parallel rejoin sweeps 225°, and an
+  inverted rejoin would give 135°" in `src/engine/entry.test.ts`; "parallel: outbound turn opposes
   the pattern, and so does the reintercept" and "left-turn parallel mirrors: flies the east
   (non-holding) side" in `src/engine/sim.test.ts`; "parallel: leg on the non-holding side,
   >180° reintercept turn against the pattern", "parallel mirrors for a nonstandard hold"
   and "parallel golden case: inbound 140, left turns → rollout northeast of the course" in
-  `src/ui/mapview.test.ts`; the five `flyItText` tests in `src/modules/entry-drill.test.ts`
-  including "A1: the named fix-crossing turn always matches the rejoin and opposes the
-  pattern"; "entries lesson glosses the parallel rejoin as opposite the pattern" and
+  `src/ui/mapview.test.ts`; the nine `flyItText` tests in `src/modules/entry-drill.test.ts`
+  including "A1: the named fix-crossing turn matches the rejoin across the parallel
+  sector"; "entries lesson glosses the parallel rejoin as opposite the pattern" and
   "entries lesson names the two-turns-against structure of the parallel entry" in
   `src/content/lessons.test.ts`; "entries item answers the parallel rejoin as opposite the
   pattern" in `src/content/oral.test.ts`; "parallel-entry card glosses the rejoin as
   opposite the pattern" in `src/content/anki-deck.test.ts`; and the cross-module guard
   `src/parallel-entry.invariants.test.ts` — "sweep flag matches entryGuidance
   turnToInbound for every course × pattern", "A2: the rejoin rolls out on the holding side
-  for every course × pattern", "every parallel-rejoin sentence states the corrected rule"
+  for every course × pattern", "rejoin rotation sense matches entryGuidance turnToInbound
+  for every course × pattern" (the sim↔engine guard, and the only assertion that measures
+  the ROTATION the integrator actually flies), "rejoin rolls out on the engine intercept
+  angle for every course × pattern", "no shipping module calls flyCircuit with an entry
+  other than direct", "every parallel-rejoin sentence states the corrected rule"
   and "the negatives cannot match the AIM clause the modules quote verbatim".
+
+  **Post-review, 2026-08-02.** Mutation testing found the sim's rollout angle was
+  single-sourced in code but not in assertion: replacing `PARALLEL_INTERCEPT_DEG` in
+  `sim.ts` with a literal `30` left all 583 tests green, because the rotation guard checks
+  only `Math.sign` and `> 180°` and a 210° sweep satisfies both. The same mutation in
+  `mapview.ts` failed, so of the two consumers the branch single-sourced, only one was
+  actually held to the oracle. "rejoin rolls out on the engine intercept angle" closes it
+  by reading back the heading the integrator flies after rollout; the rejoin sample window
+  is now derived from `TURN_RATE_DEG_PER_S`/`SAMPLE_SECONDS`/`PARALLEL_INTERCEPT_DEG`
+  rather than the literals 120 and 195, which were only correct at the current constants.
+  The caller bound on the model limitation below ("only ever called with `entry: 'direct'`")
+  is likewise now asserted rather than merely stated, and the prose scan's anti-vacuity
+  guard counts per known carrier instead of one global total.
 
 - **Fixed: the entry drill named no outbound-timing reference, and the familiar per-entry
   split was folk knowledge** (`src/modules/entry-drill.ts`). The drill told the student to
