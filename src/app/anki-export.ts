@@ -198,8 +198,11 @@ export function renderAnkiExport(el: HTMLElement, options: AnkiExportOptions = {
           2026-08-02 parallel-entry rejoin fix changed a core card. Import into
           the same notetype you used before and leave Anki's existing-notes
           setting on <em>Update</em>; card fronts are stable, so matching notes
-          update rather than duplicate. Check the import preview before
-          confirming.
+          <em>should</em> update rather than duplicate — but this file is a bare
+          TSV with no <code>#notetype:</code> or <code>#deck:</code> header, so
+          update-vs-duplicate is a setting on Anki's import screen, not a
+          property of the download. Check the import preview before confirming.
+          (Unverified against a specific Anki version.)
         </li>
       </ol>
     </section>

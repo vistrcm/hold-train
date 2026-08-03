@@ -442,4 +442,24 @@ describe('anki export screen', () => {
     expect(README).toMatch(/re-?download and re-?import/i)
     expect(README).toContain('content-audit.md')
   })
+
+  // The update-vs-duplicate behaviour is Anki's, not ours, and README labels it
+  // unverified. The screen stated it flatly ("matching notes update rather than
+  // duplicate") while README hedged — so the artifact the user reads at export
+  // time presented an unverified third-party behaviour as fact, which CLAUDE.md
+  // forbids and which silently duplicates a user's deck if they pick a different
+  // notetype. The step-exists test above passed throughout: asserting a step is
+  // present is not asserting what it claims. Both sides are pinned here.
+  it('hedges the update-vs-duplicate claim on the screen, as README does', () => {
+    renderAnkiExport(el, { store: storeWithMisses(0) })
+    const steps = el.textContent ?? ''
+    expect(steps).toMatch(/should\s+update rather than duplicate/i)
+    expect(steps).toMatch(/unverified/i)
+    // the reason it is only "should": the file carries no notetype directive,
+    // so matching is scoped by the import dialog rather than by the download
+    expect(steps).toMatch(/#notetype:/)
+    expect(steps).toMatch(/import screen|import dialog/i)
+    expect(README).toMatch(/should update rather than duplicate/i)
+    expect(README).toMatch(/unverified/i)
+  })
 })

@@ -3,9 +3,13 @@
 // entry-path illustrations (teardrop 30° offset toward the holding side;
 // parallel on the non-holding side, then a >180° reintercept turned AGAINST the
 // pattern, crossing back over the holding course onto the holding side).
-// Entry directions and the parallel intercept angle come from the engine —
-// entryGuidance and PARALLEL_INTERCEPT_DEG are the oracle. Nothing about a turn
-// direction is derived here; see docs/parallel-entry-evidence.md.
+// The parallel rejoin's rotation and intercept angle come from the engine —
+// g.turnToInbound and PARALLEL_INTERCEPT_DEG are the oracle for that arc; see
+// docs/parallel-entry-evidence.md. The direct and teardrop branches still take
+// their sweep from hold.turnDirection, which is correct only because for those
+// two entries the turn to inbound IS the pattern's rotation. Don't read the
+// oracle sourcing as file-wide: it is the parallel branch that was wrong, and
+// it is the parallel branch that is pinned to the engine.
 // Shares the HSI's instrument palette (src/ui/palette.ts), so an entry keeps
 // one colour across the compass rose and the plan view.
 // Pure rendering: state in, SVG out. No internal state, no listeners.

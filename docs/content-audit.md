@@ -760,3 +760,34 @@ predates the 2026-08-02 rejoin-direction correction, on the same terms as the
   and the 2026-07 ledger entry that blessed it. Now labelled unverified and pointed at
   `docs/plans/20260802-protected-airspace-terminology.md`, so the ledger records an open
   contradiction instead of two entries that quietly disagree.
+
+## Post-completion review fix — 2026-08-02 (code review iteration 2)
+
+- **Fixed: the in-app Anki import step asserted an unverified third-party behaviour as
+  fact** (`src/app/anki-export.ts`). `README.md` hedges the update-vs-duplicate claim
+  correctly — "matching notes **should** update rather than duplicate", plus the reason
+  (`serializeDeck` emits a bare TSV with no `#notetype:`/`#deck:` header, so matching is
+  scoped by the import dialog rather than by the file) and an explicit
+  "(Unverified against a specific Anki version.)". The screen said it flatly: "card fronts
+  are stable, so matching notes update rather than duplicate." Per CLAUDE.md an unverifiable
+  claim is labelled, never asserted, and a known caveat must surface in **the UI** — and
+  README's own closing line says the screen, not the file, is what a user reads at export
+  time, so the hedge was missing from precisely the artifact that matters. A user who picks
+  a different notetype gets a silently duplicated deck. The `<li>` now carries the hedge,
+  the no-notetype-header reason, and the unverified label.
+  The step-presence test added in iteration 1 passed throughout: asserting a step **exists**
+  is not asserting what it **claims**. Regression test: "hedges the update-vs-duplicate claim
+  on the screen, as README does" in `src/app/anki-export.test.ts`, pinning `should update`,
+  `unverified`, `#notetype:` and the import-screen scoping on the screen and the hedge on
+  README. Mutation-tested by restoring the flat wording — the guard fails.
+
+- **Fixed: `mapview.ts`'s header still claimed file-wide oracle sourcing** that only the
+  parallel branch has (`src/ui/mapview.ts`). The iteration-1 fix above replaced the parallel
+  branch's hand-written sign with `g.turnToInbound` and cited the header's "Nothing about a
+  turn direction is derived here" as the thing it was making true — but `direct` (sweep from
+  `s`) and `teardrop` (`turnCenter`/`pointAtHeading`/`sweep`, all from `s`) still derive
+  rotation from `hold.turnDirection`. They agree with the engine today, because for those two
+  entries the turn to inbound **is** the pattern's rotation; the defect is the comment, which
+  told the next reader the file is oracle-driven throughout. That is the exact assumption
+  that let one sign drift across five modules. The header now scopes the claim to the
+  parallel arc and states why the other two branches are correct without it.
