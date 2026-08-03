@@ -166,7 +166,9 @@ export function flyCircuit(
   // sector BOTH senses exceed 180° (right 212.6–222.1, left 189.3–215.3), so
   // the clause cannot discriminate, and reasoning from it is what inverted this
   // app on 2026-07-22. The evidence is FIG 5-3-4 and AIP FIG ENR 1.5-3 (both
-  // rendered) plus ICAO Doc 8168 2.2.4 — see docs/parallel-entry-evidence.md.
+  // rendered) plus ICAO Doc 8168 Vol I Pt I §6 Ch 1 ¶1.4.4(b), which says the
+  // rejoin is "turned left" in a right-hand pattern — see
+  // docs/parallel-entry-evidence.md.
   // Both turns of every entry share one rotational sense, and it is the engine's
   // `turnToInbound` — read from the oracle rather than re-derived here, so a
   // change to the parallel rule cannot leave this file stale. A private copy of

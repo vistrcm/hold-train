@@ -563,8 +563,10 @@ predates the 2026-08-02 rejoin-direction correction, on the same terms as the
   rendered in this pass** — it is second-hand and carries no weight here
   (`docs/parallel-entry-evidence.md`, "Sources deliberately not cited"). The correction
   does not rest on it. ICAO Doc 8168 Vol I,
-  Part II, §6, Ch.2 (6th ed. 2018) states it in words: 2.2.4 (parallel) "turned **toward
-  the holding side**", 2.2.5 (teardrop) "turned **right**". IPH FAA-H-8083-16B contains no
+  Part I, §6, Ch.1 (5th ed. 2006) ¶1.4.4(b) states it in words and rotationally: in a
+  **right**-hand pattern the parallel rejoin is "turned **left** onto the holding side"
+  (Vol II, Part II, §4, Ch.1 ¶1.2.1.2(b), 6th ed. 2014, repeats it verbatim); ¶1.4.5(c)
+  gives the teardrop as "turned **right**". IPH FAA-H-8083-16B contains no
   entry-path figure and cannot discriminate — do not cite it either way. Full dossier with
   URLs, byte sizes, page numbers, render commands and what was seen:
   **`docs/parallel-entry-evidence.md`**.
@@ -691,7 +693,7 @@ predates the 2026-08-02 rejoin-direction correction, on the same terms as the
   caused the original defect, so it had reacquired the failure mode it was being corrected
   for. All sites now read "two figures rendered (FIG 5-3-4, AIP FIG ENR 1.5-3)", name
   FIG 5-3-4 as the discriminator, and label Fig 10-6 second-hand. The conclusion is
-  unchanged: two independently drawn figures plus ICAO Doc 8168 2.2.4 already settle it.
+  unchanged: two independently drawn figures plus ICAO Doc 8168 ¶1.4.4(b) already settle it.
 
 - **Fixed: `PARALLEL_INTERCEPT_DEG = 45` was justified by a figure measurement that says
   ≈31°** (`src/engine/entry.ts`, `docs/parallel-entry-evidence.md`, this ledger). Four
@@ -791,3 +793,40 @@ predates the 2026-08-02 rejoin-direction correction, on the same terms as the
   told the next reader the file is oracle-driven throughout. That is the exact assumption
   that let one sign drift across five modules. The header now scopes the claim to the
   parallel arc and states why the other two branches are correct without it.
+
+## Post-completion review fix — 2026-08-02 (code review iteration 3)
+
+- **Fixed: the ICAO Doc 8168 citation was wrong on volume part, chapter, paragraph,
+  edition year and quoted wording** (`docs/parallel-entry-evidence.md`, `CLAUDE.md`,
+  `docs/research-claude.md`, this ledger ×2, `src/engine/entry.ts`,
+  `src/engine/entry.test.ts`, `src/engine/sim.ts`, and the archived plan). Five artifacts
+  cited "Vol I, Part II, Section 6, Chapter 2 (Sixth Edition, 2018), ¶2.2.4/¶2.2.5" and
+  quoted the parallel rejoin as "the aircraft is turned **toward** the holding side",
+  concluding that ICAO is "spatially explicit for parallel, rotationally explicit for
+  teardrop — deliberately different wording". Verified against two rendered copies
+  (Vol I 5th ed. 2006 and Vol II 6th ed. 2014, SHA-256 and extraction command in the
+  dossier): **none of that holds.** The cited chapter exists but covers RNAV holding
+  *construction*, is numbered ¶2.1–¶2.7, has no ¶2.2.4, and says nothing about entry turn
+  direction; the only real ¶2.2.4/¶2.2.5 in that volume are Part II, Section 1, Chapter 2
+  ("Entry to procedure" / "Reversal procedures"), about approach reversals. The sixth
+  edition of Vol I is **2014**, not 2018. And the quoted phrase appears in neither volume:
+  ICAO writes "the aircraft is turned **left** onto the holding side to intercept the
+  inbound track or to return to the fix" (Vol I, Part I, §6, Ch.1 ¶1.4.4(b); Vol II,
+  Part II, §4, Ch.1 ¶1.2.1.2(b), verbatim).
+  The conclusion is **unchanged and strengthened**: "turned left" in a right-hand pattern
+  is rotationally explicit, so ICAO corroborates the corrected rejoin direction without
+  needing the spatial/rotational reading at all — and ¶1.4.4(a)/(c) independently pin the
+  other two turns (left across the fix, right only on second arrival), which is the
+  "first two turns oppose, final turn follows" structure `CLAUDE.md` states.
+  Root cause: the dossier's two FAA figures each carry a provenance table (URL, byte
+  count, SHA-256, render command) and the ICAO block carried **none** — the one source
+  exempted from the file's own standard is the one that was wrong, in the file `CLAUDE.md`
+  designates as "read this instead of re-arguing". It now carries the same table.
+  Regression test: "the ICAO 8168 citation" in `src/parallel-entry.invariants.test.ts` —
+  anchored on paragraph **numbers**, not wording ("toward the holding side" is a correct
+  description of the teardrop and would fail correct prose), scoped to `src/` only
+  (three docs now quote the wrong numbers verbatim inside superseded notes, and a guard
+  satisfiable by deleting the correction record is the failure mode this suite warns
+  about), plus an exhaustiveness assertion so a renamed comment cannot retire it
+  vacuously. Both halves mutation-tested: restoring `¶2.2.4` fails, and removing the
+  citation entirely fails the exhaustiveness test.

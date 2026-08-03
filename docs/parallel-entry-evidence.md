@@ -38,15 +38,56 @@ exceed 180°**, and they are exactly equal (215.3°) at zero offset by symmetry.
 
 ## Corroborating text (not the primary evidence, but unambiguous)
 
-ICAO Doc 8168 Vol I, Part II, Section 6, Chapter 2 (Sixth Edition, 2018) says in words what the FAA
-says only in a picture, and deliberately uses different wording for the two maneuvers:
+ICAO Doc 8168 says in words what the FAA says only in a picture. Both volumes describe the standard
+(right-hand) pattern, and both are **rotationally** explicit for the parallel rejoin:
 
-- 2.2.4 Sector 1 (parallel): "the aircraft is **turned toward the holding side** to intercept the
-  inbound track or to return directly to the fix"
-- 2.2.5 Sector 2 (offset/teardrop): "the aircraft is **turned right** to intercept the inbound
-  holding track"
+| Field | Value |
+|---|---|
+| Source A | Doc 8168 **Vol I** — Flight Procedures, **Fifth edition, 2006**. Part I — Section 6, Chapter 1 ("Holding procedures"), page I-6-1-3, **¶1.4.4 / ¶1.4.5** |
+| URL | `http://www.spilve.lv/library/procedures/Doc%208168%20Volume%20I.pdf` (third-party mirror — ICAO sells the original) |
+| Fetched | 2026-08-02, 1,728,191 bytes |
+| SHA-256 | `f3e1ef343dec06b643f849ced69858ee239e9994a120c3268ce0125098a76d44` |
+| Source B | Doc 8168 **Vol II** — Construction of Visual and Instrument Flight Procedures, **Sixth edition, 2014**. Part II — Section 4, Chapter 1, page II-4-1-1, **¶1.2.1.2 / ¶1.2.1.3** |
+| URL | `https://skybrary.aero/sites/default/files/bookshelf/5801.pdf` (SKYbrary mirror) |
+| Fetched | 2026-08-02, 6,609,654 bytes |
+| SHA-256 | `9dd010f9b351ce4290d47304062b63c622c0148d72566a0535e518d89ab43266` |
+| Extraction | `gs -q -dNOPAUSE -dBATCH -sDEVICE=txtwrite -sOutputFile=out.txt <pdf>` |
 
-Spatially explicit for parallel; rotationally explicit for teardrop.
+Vol I ¶1.4.4, "Sector 1 procedure (parallel entry)", verbatim and complete — note that it pins all
+**three** turns, not just the rejoin:
+
+> a) at the fix, the aircraft is turned **left** onto an outbound heading for the appropriate period
+> of time (see 1.4.9, "Time/distance outbound"); then
+> b) the aircraft is turned **left** onto the holding side to intercept the inbound track or to
+> return to the fix; and then
+> c) on second arrival over the holding fix, the aircraft is turned **right** to follow the holding
+> pattern.
+
+Vol I ¶1.4.5(c), "Sector 2 procedure (offset entry)": "the aircraft is turned **right** to intercept
+the inbound holding track."
+
+Vol II ¶1.2.1.2(b) states the rejoin identically — "turned **left** onto the holding side to
+intercept the inbound track or to return to the fix" — and ¶1.2.1.3(c) gives the teardrop as "turned
+**right**". Two separately drafted ICAO volumes, same wording.
+
+This is the strongest textual corroboration in the dossier, and it is stronger than the FAA figures
+because it needs no interpretation: in a **right-hand** pattern ICAO says the parallel rejoin is
+turned **left**. Left, in a right-hand hold, is unambiguously *opposite the pattern* — the exact
+claim this project ships. ¶1.4.4(a) and (c) independently confirm the rest of the structure: the
+fix-crossing turn also opposes (left), and only the final turn follows (right).
+
+⚠️ **Superseded 2026-08-02 (this file's own earlier text was wrong).** This block previously cited
+"Vol I, Part II, Section 6, Chapter 2 (Sixth Edition, 2018), ¶2.2.4/¶2.2.5" and quoted the parallel
+rejoin as "turned **toward** the holding side", concluding that ICAO was "spatially explicit for
+parallel; rotationally explicit for teardrop" — deliberately different wording for the two
+maneuvers. **All of that was false.** The cited location is real but is about *RNAV holding pattern
+construction*; it is numbered ¶2.1–¶2.7, has no ¶2.2.4, and says nothing about entry turn direction.
+(The only real ¶2.2.4/¶2.2.5 in that volume are Part II — Section 1, Chapter 2, "Entry to procedure"
+and "Reversal procedures", which concern approach reversals.) The sixth edition of Vol I is **2014**,
+not 2018. And the quoted phrase does not appear in either volume: ICAO writes "turned **left**", not
+"turned toward" — so the spatial/rotational contrast the old text built on did not exist. The error
+survived because this block, alone among the dossier's three sources, carried no fetch record; it is
+now held to the same standard as the two figures. The conclusion is unchanged and strengthened.
 
 ---
 

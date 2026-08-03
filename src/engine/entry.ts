@@ -172,9 +172,13 @@ export function entryGuidance(entry: Entry, hold: HoldCourse): EntryGuidance {
       // senses. AIP FIG ENR 1.5-3, independently drawn, reproduces it. (IFH
       // FAA-H-8083-15B Fig 10-6 is reported to agree but was never rendered by
       // this project — second-hand, and nothing here rests on it.) ICAO Doc
-      // 8168 Vol I Pt II §6 Ch 2 states it in words: 2.2.4 (parallel) "the
-      // aircraft is turned TOWARD THE HOLDING SIDE"; 2.2.5 (teardrop) "turned
-      // RIGHT". Rendered evidence: docs/parallel-entry-evidence.md.
+      // 8168 states it in words, and needs no interpretation at all: Vol I
+      // Pt I §6 Ch 1 ¶1.4.4(b) (and Vol II Pt II §4 Ch 1 ¶1.2.1.2(b), same
+      // wording) says the parallel rejoin in a RIGHT-hand pattern is "turned
+      // LEFT onto the holding side" — i.e. opposite the pattern. ¶1.4.4(a)
+      // says the fix-crossing turn is "turned left" too, and ¶1.4.4(c) that
+      // only the second-arrival turn is "turned right to follow the holding
+      // pattern". Rendered evidence: docs/parallel-entry-evidence.md.
       //
       // ⚠️ DO NOT re-derive this from "more than 180 degrees". That clause does
       // not discriminate between the two readings, and reasoning from it is what

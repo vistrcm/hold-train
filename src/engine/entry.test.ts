@@ -235,9 +235,10 @@ describe('entryGuidance', () => {
   //     (against it). Same words, opposite senses. AIP FIG ENR 1.5-3, drawn
   //     independently, reproduces it. IFH FAA-H-8083-15B Fig 10-6 is reported to
   //     agree but was never rendered here — second-hand, and not relied on.
-  //   * ICAO Doc 8168 Vol I Pt II §6 Ch 2 says it in words: 2.2.4 (parallel) "the
-  //     aircraft is TURNED TOWARD THE HOLDING SIDE"; 2.2.5 (teardrop) "turned RIGHT".
-  //     Spatial for one, rotational for the other, deliberately.
+  //   * ICAO Doc 8168 Vol I Pt I §6 Ch 1 ¶1.4.4(b) says it in words, rotationally:
+  //     in a RIGHT-hand pattern the parallel rejoin is "turned LEFT onto the holding
+  //     side". Vol II Pt II §4 Ch 1 ¶1.2.1.2(b) repeats it verbatim. ¶1.4.4(a)/(c)
+  //     pin the other two turns: left across the fix, right only on second arrival.
   //
   // ⚠️ ">180°" DOES NOT DISCRIMINATE and must never be reasoned from. The old
   // derivation below this line was the origin of a shipped defect: it measured the

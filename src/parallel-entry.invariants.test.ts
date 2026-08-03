@@ -372,7 +372,11 @@ describe('the sim limitation stays inside the bound it documents', () => {
 
   it('no shipping module calls flyCircuit with an entry other than direct', () => {
     const callers = APP_MODULES.filter(
-      (m) => !m.file.startsWith('src/engine/sim') && /\bflyCircuit\s*\(/.test(m.source),
+      // Exact path, not `startsWith`: the exemption is for the module that
+      // DEFINES flyCircuit, and a prefix would silently extend it to any future
+      // `src/engine/sim*.ts` — an exemption that grows on its own is how a
+      // guard stops covering the thing it names.
+      (m) => m.file !== 'src/engine/sim.ts' && /\bflyCircuit\s*\(/.test(m.source),
     )
     expect(
       callers.length,
@@ -603,4 +607,62 @@ describe('no content module teaches the rejoin the wrong way', () => {
     expect(rejoinClaim(preFix), 'CORRECT must reject the defective rejoin sentence').not.toMatch(CORRECT)
     expect(preFix, 'and WRONG must still catch it').toMatch(WRONG)
   })
+})
+
+// --- the ICAO citation --------------------------------------------------------
+
+/**
+ * The verified location of the ICAO text, and the one it was mis-cited as.
+ *
+ * Doc 8168 is quoted in three engine comments as the textual half of the "do not
+ * re-derive this" apparatus. Until 2026-08-02 all three cited "Vol I, Part II,
+ * §6, Ch.2 (Sixth Edition 2018), ¶2.2.4/¶2.2.5" and quoted the rejoin as "turned
+ * TOWARD the holding side". Every part of that was wrong: the real text is
+ * Vol I, Part I, §6, Ch.1 ¶1.4.4/¶1.4.5 (5th ed. 2006), mirrored in Vol II,
+ * Part II, §4, Ch.1 ¶1.2.1.2/¶1.2.1.3 (6th ed. 2014); the cited chapter covers
+ * RNAV holding *construction*, is numbered ¶2.1–¶2.7 and has no ¶2.2.4; and ICAO
+ * writes "turned LEFT onto the holding side" — rotational, not spatial. The
+ * misquote had been copied into four other artifacts from a single unverified
+ * source block, which is why this is worth pinning rather than trusting review.
+ *
+ * ⚠️ Anchored on the paragraph NUMBERS, not the wording. "toward the holding
+ * side" is a legitimate description of the *teardrop* and a CORRECT alternative
+ * above, so banning the phrase would fail correct prose — the same trap the
+ * WRONG regex documents. Paragraph numbers carry no such double meaning.
+ *
+ * ⚠️ Scoped to the file, not the sentence, and that is sound only because
+ * `2.2.4` appears nowhere in src for any other reason. Docs are deliberately NOT
+ * scanned: three of them now quote the wrong numbers verbatim inside superseded
+ * notes explaining the error, and a guard satisfiable only by deleting the
+ * correction record is the failure mode this suite already warns about.
+ */
+const ICAO_VERIFIED = /1\.4\.4|1\.2\.1\.2/
+const ICAO_MISCITED = /2\.2\.[45]/
+
+describe('the ICAO 8168 citation', () => {
+  const citing = APP_MODULES.filter((m) => m.source.includes('8168'))
+
+  it('is carried by at least one shipping module', () => {
+    // Exhaustiveness: a filter that silently matches nothing passes the two
+    // assertions below vacuously, which is how a renamed comment would retire
+    // this guard without failing it.
+    expect(citing.map((m) => m.file).sort()).toEqual(['src/engine/entry.ts', 'src/engine/sim.ts'])
+  })
+
+  for (const { file, source } of citing) {
+    it(`${file} cites the verified paragraph and not the mis-cited one`, () => {
+      expect(
+        source,
+        `${file} cites ICAO Doc 8168 without the verified paragraph. The rejoin text is ` +
+          `Vol I Pt I §6 Ch 1 ¶1.4.4(b) (or Vol II Pt II §4 Ch 1 ¶1.2.1.2(b)). ` +
+          `See docs/parallel-entry-evidence.md.`,
+      ).toMatch(ICAO_VERIFIED)
+      expect(
+        source,
+        `${file} cites ICAO Doc 8168 ¶2.2.4/¶2.2.5. That paragraph does not exist: ` +
+          `Vol I Pt II §6 Ch 2 is RNAV holding construction, numbered ¶2.1–¶2.7. ` +
+          `See docs/parallel-entry-evidence.md.`,
+      ).not.toMatch(ICAO_MISCITED)
+    })
+  }
 })

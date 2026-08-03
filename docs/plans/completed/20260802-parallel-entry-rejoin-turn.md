@@ -1,5 +1,18 @@
 # Fix the parallel entry rejoin turn direction
 
+> ⚠️ **Archived as executed. Two claims below were superseded during review — do not cite this file
+> for either.** (1) The ICAO citation ("Vol I, Part II, Section 6, Chapter 2, Sixth Edition 2018,
+> ¶2.2.4/¶2.2.5", quoting "turned **toward** the holding side") is wrong on part, chapter, paragraph,
+> edition year and wording. The real text is **Vol I, Part I, Section 6, Chapter 1, ¶1.4.4/¶1.4.5**
+> (5th ed. 2006), mirrored in **Vol II, Part II, Section 4, Chapter 1, ¶1.2.1.2/¶1.2.1.3** (6th ed.
+> 2014), and it reads "turned **left** onto the holding side" — rotational, not spatial, which makes
+> it *stronger* evidence for this plan's conclusion, not weaker. (2) "45° is chosen here because it
+> matches how the FAA figures draw the rollout" (below, under the intercept-angle note) is false and
+> is explicitly forbidden by `CLAUDE.md`: `PARALLEL_INTERCEPT_DEG = 45` is a legibility convention,
+> and the one rollout tangent actually measured in the dossier is **≈31°**. The plan's central
+> conclusion — the rejoin opposes the pattern — is unaffected and confirmed. Authoritative source of
+> truth: `docs/parallel-entry-evidence.md`.
+
 ## Overview
 
 The app draws and describes the parallel holding entry's rejoin turn as a rotation **in the same
