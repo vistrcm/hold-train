@@ -160,6 +160,13 @@ describe('CORE_DECK key facts (verified against FAA sources)', () => {
     expect(card!.back).toMatch(/first two turns/i)
     expect(card!.back).toMatch(/only the turn on reaching the fix/i)
     expect(card!.back).not.toMatch(/same way the pattern|follows the pattern|only that direction/i)
+    // The direction is settled by the FIGURE, not by j3's sentence — that is the
+    // whole thesis of docs/parallel-entry-evidence.md. Citing j3 alone for a
+    // figure-only fact presents a derivation as a citation, the exact failure
+    // the source-policy rule in CLAUDE.md names. lessons.ts and oral.ts both
+    // cite FIG 5-3-4; this card was the outlier, and no test saw it because the
+    // assertions above never read `source`.
+    expect(card!.source).toContain('FIG 5-3-4')
   })
 
   it('holding-report cards cite the verified AIM 5-3-3 a1(f), (g)', () => {

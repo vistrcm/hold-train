@@ -11,11 +11,12 @@
 //   - no-crab decisions in a crosswind → measurable drift at the fix
 
 import { describe, expect, it } from 'vitest'
-import { entryGuidance } from './entry'
+import { PARALLEL_INTERCEPT_DEG, entryGuidance } from './entry'
 import { groundSpeeds, inboundCrab, outboundHeading, outboundTimeSeconds, type Wind } from './wind'
 import {
   HOLD_TAS_KT,
   MAX_SIM_SECONDS,
+  SAMPLE_SECONDS,
   TURN_RATE_DEG_PER_S,
   flyCircuit,
   textbookDecisions,
@@ -181,9 +182,20 @@ describe('entry shapes', () => {
     for (const p of r.track) {
       expect(p.e).toBeLessThan(0.01)
     }
-    // 180° onto outbound (60 s) + 60 s leg + 225° rejoin at 3°/s (75 s) = 195 s,
-    // sampled at 1 s, so this slice is everything through rejoin completion.
-    const throughRejoin = r.track.slice(0, 196)
+    // 180° onto outbound + the 60 s leg + a (180 + PARALLEL_INTERCEPT_DEG)°
+    // rejoin, so this slice is everything through rejoin completion. DERIVED,
+    // not the literal 196: that value holds only at the current intercept angle,
+    // and this branch already moved it once (30 → 45). Raising it again would
+    // silently cut the window mid-turn — both assertions below would still pass,
+    // weaker than intended, and the whole-track bound further down would go red
+    // with a message that reads like a rejoin-direction defect. That is exactly
+    // the red test the comment block above warns future sessions about.
+    const rejoinEnd =
+      Math.ceil(
+        (180 / TURN_RATE_DEG_PER_S + 60 + (180 + PARALLEL_INTERCEPT_DEG) / TURN_RATE_DEG_PER_S) /
+          SAMPLE_SECONDS,
+      ) + 1
+    const throughRejoin = r.track.slice(0, rejoinEnd)
     // A2: the rejoin turn stays inside the displacement the outbound turn
     // already made — it curls back toward the course, it does not bulge past it
     expect(Math.min(...throughRejoin.map((p) => p.e))).toBeGreaterThan(-2 * R - 0.02) // ≈ -0.9549
@@ -237,6 +249,7 @@ describe('entry shapes', () => {
   })
 
   it('left-turn parallel mirrors: flies the east (non-holding) side', () => {
+    const R = HOLD_TAS_KT / 3600 / ((TURN_RATE_DEG_PER_S * Math.PI) / 180) // ≈ 0.4775 NM
     const r = flyCircuit(LEFT_NORTH, decisions({ entry: 'parallel' }), CALM)
     expect(r.completed).toBe(true)
     for (const p of r.track) {
@@ -247,7 +260,7 @@ describe('entry shapes', () => {
     expect(r.inboundCrossTrackNm).toBeLessThan(-0.5)
     // mirror of the standard case: the excursion peaks at 1.3022 on the
     // straight intercept leg, inside 3R — the wrong-way rejoin reached 1.9099
-    expect(Math.max(...r.track.map((p) => p.e))).toBeLessThan(3 * 0.4775)
+    expect(Math.max(...r.track.map((p) => p.e))).toBeLessThan(3 * R)
   })
 })
 

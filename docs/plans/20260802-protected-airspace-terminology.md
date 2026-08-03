@@ -16,7 +16,8 @@ but not this verification work, and which must not touch these files.
 
 ## ⚠️ This reverses a prior ledger decision — argue, do not overwrite
 
-`docs/content-audit.md:433-442` records "unprotected" as a **deliberate fix**, reasoned as: "The
+The `docs/content-audit.md` entry titled "**Fixed: the wind-lab debrief hid which side a wide
+inbound crossed on**" records "unprotected" as a **deliberate fix**, reasoned as: "The
 non-holding side is the side with no protected airspace, so the case the wording softened was
 precisely the safety-relevant one." The wording is pinned by `src/modules/wind-lab.test.ts:376`
 (`expect(debrief).toMatch(/non-holding \(unprotected\) side of the fix/)`).
@@ -34,7 +35,10 @@ flip. Task 3 must argue against the entry in the ledger itself, not quietly edit
 - `docs/research-claude.md:41` — the unsourced 8/4 NM claim
 - `src/modules/wind-lab.ts:339` — `'non-holding (unprotected) side of'`
 - `src/modules/wind-lab.test.ts:376` — pins that exact string
-- `docs/content-audit.md:433-442` — the prior decision to argue against
+- `docs/content-audit.md`, entry "**Fixed: the wind-lab debrief hid which side a wide inbound
+  crossed on**" — the prior decision to argue against. Cited by title, not by line: the ledger is
+  append-only at the top, so any new entry shifts every line number below it (this reference was
+  written as `:433-442` and the 2026-08-02 rejoin entry pushed that range onto an unrelated fix)
 
 **Dependencies:** none. No new packages (CLAUDE.md hard rule).
 
@@ -117,7 +121,7 @@ no text layer and must be rendered to images and read visually.
 - [ ] run tests — confirm the new expectation FAILS first
 - [ ] change `wind-lab.ts:339` from "non-holding (unprotected) side of" to wording that names the
       side and conveys the narrower margin without claiming the side is unprotected
-- [ ] amend `docs/content-audit.md:433-442` in place: record that the entry's goal was right and its
+- [ ] amend that same `docs/content-audit.md` entry in place: record that the entry's goal was right and its
       parenthetical wrong, with the 8260.3G citation. Do not delete the entry
 - [ ] add a new ledger entry for this correction with its regression test
 - [ ] run `npm test` and `npm run typecheck`

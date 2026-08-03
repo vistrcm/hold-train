@@ -190,6 +190,17 @@ export function renderAnkiExport(el: HTMLElement, options: AnkiExportOptions = {
         <li>In Anki, choose File → Import and pick the downloaded .tsv file.</li>
         <li>Fields are separated by tab characters: front, back, tags.</li>
         <li>Allow HTML in fields so the line breaks on card backs render.</li>
+        <li>
+          <strong>Re-download and re-import after a content correction.</strong>
+          Cards already in your deck are not updated by fixes made here, so a
+          corrected fact stays wrong in your deck until you import again.
+          Corrections are logged in <code>docs/content-audit.md</code> — the
+          2026-08-02 parallel-entry rejoin fix changed a core card. Import into
+          the same notetype you used before and leave Anki's existing-notes
+          setting on <em>Update</em>; card fronts are stable, so matching notes
+          update rather than duplicate. Check the import preview before
+          confirming.
+        </li>
       </ol>
     </section>
   `

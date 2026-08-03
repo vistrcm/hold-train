@@ -3,6 +3,7 @@
 // state). Written before the implementation (TDD).
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import README from '../../README.md?raw'
 import { CORE_DECK, type AnkiCard } from '../content/anki-deck'
 import { createStore, type Miss, type Store } from './store'
 import { ENTRIES } from '../engine/entry'
@@ -423,5 +424,22 @@ describe('anki export screen', () => {
     expect(el.textContent).not.toMatch(/no misses recorded yet/i)
     expect(el.textContent).toMatch(/not.*export/i)
     expect(el.textContent).toMatch(/wind.lab/i)
+  })
+
+  // README documents a re-import step; this screen renders the steps a user
+  // actually reads at export time, and it did not have one. A stale deck is the
+  // one place a corrected fact keeps being drilled after the fix ships — a user
+  // who exported before 2026-08-02 still rehearses the inverted parallel rejoin
+  // and nothing in the app tells them otherwise. Same runtime-only doc↔code
+  // coupling class as the README route table (dashboard.test.ts): a grep cannot
+  // see it, so it is asserted on both sides.
+  it('tells the user to re-import after a content correction, and so does README', () => {
+    renderAnkiExport(el, { store: storeWithMisses(0) })
+    const steps = el.textContent ?? ''
+    expect(steps).toMatch(/re-?import/i)
+    expect(steps).toMatch(/not updated by fixes|stays wrong/i)
+    expect(steps).toContain('content-audit.md')
+    expect(README).toMatch(/re-?download and re-?import/i)
+    expect(README).toContain('content-audit.md')
   })
 })

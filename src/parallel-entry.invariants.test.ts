@@ -31,12 +31,16 @@ import { describe, expect, it } from 'vitest'
 // are globbed rather than imported one by one — see `CONTENT` below.
 import { PARALLEL_INTERCEPT_DEG, type HoldCourse, type TurnDirection, entryGuidance } from './engine/entry'
 import { normalizeDeg } from './engine/geometry'
-import { SAMPLE_SECONDS, TURN_RATE_DEG_PER_S, flyCircuit } from './engine/sim'
+import { SAMPLE_SECONDS, TURN_RATE_DEG_PER_S, flyCircuit, textbookDecisions } from './engine/sim'
 import { renderMap } from './ui/mapview'
 
 const EVIDENCE = 'see docs/parallel-entry-evidence.md — do not re-derive from the AIM sentence'
 
-const COURSES = [0, 45, 90, 135, 180, 225, 270, 315] as const
+// 140 and 7 are here deliberately: every other entry is a multiple of 45, which
+// is also PARALLEL_INTERCEPT_DEG, so a sweep built only from them makes every
+// expected heading a multiple of 45 too — an implementation that quantised
+// headings to a 45° grid would pass. Two non-multiples break that degeneracy.
+const COURSES = [0, 7, 45, 90, 135, 140, 180, 225, 270, 315] as const
 const PATTERNS: readonly TurnDirection[] = ['right', 'left']
 
 // --- the map ↔ engine agreement sweep ----------------------------------------
@@ -57,12 +61,15 @@ interface DrawnParallel {
   sweepFlag: number
   /** Rollout point's perpendicular offset from the course, +ve toward the holding side, NM. */
   rolloutHoldingSideNm: number
+  /** Straight-line distance from arc start to arc end, in units of the arc radius. */
+  chordOverRadius: number
 }
 
 /**
- * Render the parallel entry path and read back the two facts that encode the
- * rejoin's direction. `d` = `M fix L legEnd A rr rr 0 1 sweep rollout L fix`,
- * so nums indices are 7 = large-arc, 8 = sweep flag, 9,10 = rollout point.
+ * Render the parallel entry path and read back the three facts that encode the
+ * rejoin. `d` = `M fix L legEnd A rr rr 0 1 sweep rollout L fix`, so nums
+ * indices are 2,3 = legEnd (arc start), 4 = radius, 7 = large-arc,
+ * 8 = sweep flag, 9,10 = rollout point (arc end).
  */
 function drawParallel(hold: HoldCourse): DrawnParallel {
   const el = document.createElement('div')
@@ -79,6 +86,7 @@ function drawParallel(hold: HoldCourse): DrawnParallel {
   return {
     sweepFlag: d[8]!,
     rolloutHoldingSideNm: rollout.e * holdingSide.e + rollout.n * holdingSide.n,
+    chordOverRadius: Math.hypot(d[9]! - d[2]!, d[10]! - d[3]!) / d[4]!,
   }
 }
 
@@ -127,6 +135,42 @@ describe('the map draws the rejoin the engine specifies', () => {
       }
     }
   })
+
+  // A2 and the sweep flag above are both SIGN checks: they catch an inversion
+  // and nothing else. `PARALLEL_INTERCEPT_DEG` could be swapped for a literal 30
+  // in mapview.ts and every assertion in this describe would still pass — the
+  // rollout would simply land somewhere else on the holding side. That is the
+  // same "single-sourced in code, unpinned in assertion" hole CLAUDE.md records
+  // for sim.ts, and only mapview.test.ts's one hand-computed golden pair closed
+  // it. This pins the DRAWN angle for every course × pattern.
+  //
+  // Read off the arc without re-deriving mapview's geometry: an SVG arc's chord
+  // is `2R·sin(θ/2)` for swept angle θ, so `chord/R` fixes θ, scale-free and
+  // course-free. And θ is 225° for BOTH senses — rotating from the outbound
+  // heading `C+180` to the rollout `C + 45·rs` in direction `rs` is
+  // `normalizeDeg(45 − 180·rs)`, which is 225 whether rs is +1 or −1. So this is
+  // an angle assertion that is deliberately blind to direction (A2 owns that),
+  // and it moves continuously with the constant: 45° → 1.8478, 30° → 1.9319.
+  //
+  // Tolerance is 2 decimals, not 3, and that is a floor set by the drawing, not
+  // slack: the path rounds coordinates to 0.1 px against a ~13.6 px radius, so
+  // the ratio carries ~0.001 of rounding noise. 2 decimals still separates 45°
+  // from 30° by 17× the tolerance, and even a 1° drift (1.8541) fails.
+  it('the drawn arc sweeps 180° + the engine intercept angle for every course × pattern', () => {
+    const expected = 2 * Math.sin((((180 + PARALLEL_INTERCEPT_DEG) / 2) * Math.PI) / 180)
+    for (const turnDirection of PATTERNS) {
+      for (const inboundCourse of COURSES) {
+        const drawn = drawParallel({ inboundCourse, turnDirection })
+        expect(
+          drawn.chordOverRadius,
+          `${inboundCourse}°/${turnDirection}: engine intercept angle is ` +
+            `${PARALLEL_INTERCEPT_DEG}°, so the arc sweeps ` +
+            `${180 + PARALLEL_INTERCEPT_DEG}° and its chord is ${expected.toFixed(4)}R; ` +
+            `map drew ${drawn.chordOverRadius.toFixed(4)}R (${EVIDENCE})`,
+        ).toBeCloseTo(expected, 2)
+      }
+    }
+  })
 })
 
 // --- the sim ↔ engine agreement sweep ----------------------------------------
@@ -141,9 +185,18 @@ const LEG_SECONDS = 60
 // 30 → 45) lengthens the rejoin past a hardcoded end index, which would silently
 // truncate the window instead of failing — a hand-written copy of the geometry
 // in the very file whose thesis is that hand-written copies drift.
-const REJOIN_START_SAMPLE = (180 / TURN_RATE_DEG_PER_S + LEG_SECONDS) / SAMPLE_SECONDS
-const REJOIN_END_SAMPLE =
-  REJOIN_START_SAMPLE + (180 + PARALLEL_INTERCEPT_DEG) / TURN_RATE_DEG_PER_S / SAMPLE_SECONDS
+//
+// Rounded OUTWARD, and that matters: these are array indices. The expressions
+// are integral only while PARALLEL_INTERCEPT_DEG is a multiple of the turn rate,
+// and the dossier explicitly floats ≈31° as the measured value — at 31 the end
+// index is 190.333, `track[192.333]` is `undefined`, and the `!` below turns a
+// failed assertion into an opaque "cannot read properties of undefined" while
+// the rotation window silently truncates. Widening is safe: the extra samples
+// either side are straight flight and contribute ~0 rotation.
+const REJOIN_START_SAMPLE = Math.floor((180 / TURN_RATE_DEG_PER_S + LEG_SECONDS) / SAMPLE_SECONDS)
+const REJOIN_END_SAMPLE = Math.ceil(
+  REJOIN_START_SAMPLE + (180 + PARALLEL_INTERCEPT_DEG) / TURN_RATE_DEG_PER_S / SAMPLE_SECONDS,
+)
 
 /** Compass bearing of the segment between two consecutive track samples. */
 function segmentBearing(a: { e: number; n: number }, b: { e: number; n: number }): number {
@@ -281,25 +334,83 @@ const APP_MODULES: ReadonlyArray<{ file: string; source: string }> = Object.entr
   }),
 ).map(([path, source]) => ({ file: path.replace('./', 'src/'), source }))
 
+/**
+ * Text of the argument list of every `flyCircuit(...)` call in `source`, by
+ * paren matching.
+ *
+ * Scoped to the CALL, not the file. The first version of this guard scanned the
+ * whole module for `entry: '…'` literals, which fails two ways: an unrelated
+ * `entry: 'parallel'` object elsewhere in a caller file fails it spuriously, and
+ * — demonstrated by mutation — rewriting the call site to
+ * `entry: (['direct','parallel'] as const)[1]` makes wind-lab genuinely fly a
+ * parallel circuit with this test still green, because the file's OTHER
+ * `entry: 'direct'` literals satisfied the loop. A guard that a refactor to a
+ * non-literal walks straight through is not a bound.
+ */
+function flyCircuitCallArgs(source: string): string[] {
+  const out: string[] = []
+  const re = /\bflyCircuit\s*\(/g
+  for (let m = re.exec(source); m !== null; m = re.exec(source)) {
+    const start = m.index + m[0].length
+    let depth = 1
+    let i = start
+    for (; i < source.length && depth > 0; i++) {
+      if (source[i] === '(') depth++
+      else if (source[i] === ')') depth--
+    }
+    out.push(source.slice(start, i - 1))
+  }
+  return out
+}
+
 describe('the sim limitation stays inside the bound it documents', () => {
+  const LIMITATION =
+    `sim.ts's parallel rejoin is TANGENT to the course under this model's ` +
+    `initial condition and never converges — see the KNOWN MODEL LIMITATION ` +
+    `block in src/engine/sim.ts. Add an arrival heading to SimDecisions before ` +
+    `shipping a non-direct entry.`
+
   it('no shipping module calls flyCircuit with an entry other than direct', () => {
     const callers = APP_MODULES.filter(
       (m) => !m.file.startsWith('src/engine/sim') && /\bflyCircuit\s*\(/.test(m.source),
     )
-    expect(callers.length, 'the glob found no flyCircuit callers at all — scan went vacuous').toBeGreaterThan(0)
+    expect(
+      callers.length,
+      'the glob found no flyCircuit callers at all — scan went vacuous',
+    ).toBeGreaterThan(0)
     for (const { file, source } of callers) {
-      const entries = [...source.matchAll(/entry:\s*'([a-z]+)'/g)].map((m) => m[1])
-      expect(entries.length, `${file}: calls flyCircuit but names no entry literal`).toBeGreaterThan(0)
-      for (const e of entries) {
+      const calls = flyCircuitCallArgs(source)
+      expect(calls.length, `${file}: matched as a caller but no call args parsed`).toBeGreaterThan(0)
+      for (const args of calls) {
+        // Two accepted spellings, both checkable: an inline literal, or the
+        // engine's own decision builder — whose entry is pinned at RUNTIME by
+        // the test below, since it lives inside the excluded sim.ts.
+        const inline = args.match(/entry:\s*'([a-z]+)'/)
+        const viaBuilder = /\btextbookDecisions\s*\(/.test(args)
         expect(
-          e,
-          `${file}: passes entry '${e}' to flyCircuit. sim.ts's parallel rejoin is ` +
-            `TANGENT to the course under this model's initial condition and never ` +
-            `converges — see the KNOWN MODEL LIMITATION block in src/engine/sim.ts. ` +
-            `Add an arrival heading to SimDecisions before shipping a non-direct entry.`,
-        ).toBe('direct')
+          inline !== null || viaBuilder,
+          `${file}: flyCircuit(${args.trim().slice(0, 60)}…) names its entry as ` +
+            `neither an inline literal nor textbookDecisions(), so this guard ` +
+            `cannot see which entry it flies. ${LIMITATION}`,
+        ).toBe(true)
+        if (inline) {
+          expect(inline[1], `${file}: passes entry '${inline[1]}' to flyCircuit. ${LIMITATION}`).toBe(
+            'direct',
+          )
+        }
       }
     }
+  })
+
+  // The other half of the bound: wind-lab's ghost track is
+  // `flyCircuit(hold, textbookDecisions(hold, wind), wind)`, and that entry
+  // literal lives in sim.ts — inside the module the scan above excludes. Text
+  // alone therefore validated only one of wind-lab's two calls, incidentally.
+  it('textbookDecisions builds a direct entry', () => {
+    const d = textbookDecisions({ inboundCourse: 90, turnDirection: 'right' }, CALM)
+    expect(d.entry, `textbookDecisions feeds flyCircuit unchecked by the scan. ${LIMITATION}`).toBe(
+      'direct',
+    )
   })
 })
 

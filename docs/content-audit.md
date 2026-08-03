@@ -607,6 +607,19 @@ predates the 2026-08-02 rejoin-direction correction, on the same terms as the
   asserting `-2R` whole-track would be a red test that argues a future session back into
   the wrong turn direction.
 
+  **Known drawing limitation, documented not fixed.** The parallel path's trailing `L fix`
+  in `mapview.ts` is a *schematic return chord* — the same one the teardrop path uses — not
+  a drawn intercept leg. Its bearing is fixed by where the rollout point lands and does not
+  track `PARALLEL_INTERCEPT_DEG`, so raising the angle 30 → 45 opened a ~15° kink at rollout
+  (~35° on a 4 NM leg): the picture's own intercept angle now disagrees with the constant
+  and with the `flyItText` narration beside it. The rollout **point** is at the engine's
+  angle and is what `mapview.test.ts`'s golden case and the invariants sweep pin, so the
+  *direction* this correction is about is drawn right; only the run home is illustration.
+  A real fix means extending the rollout ray to where it meets the holding course and then
+  tracking inbound, which needs a case for legs short enough that the meeting point falls
+  past the fix — a change to the picture, deferred. Reverting the constant to 30 would also
+  close it; 45 was a deliberate legibility choice, not a correctness one.
+
   Regression tests — "parallel: outbound course on the nonholding side, reintercept AGAINST
   the pattern", "nonstandard mirrors: teardrop offset flips, parallel reintercept is
   right", "direct and teardrop reintercept with the pattern, parallel against it", "the

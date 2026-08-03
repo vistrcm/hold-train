@@ -171,8 +171,17 @@ Let `C` = inbound holding course, `O` = `C + 180°`.
 | **Standard** (right turns) | **left** onto `O` | **left**, >180° (~225°) | `C − 45°` | right |
 | **Nonstandard** (left turns) | **right** onto `O` | **right**, >180° (~225°) | `C + 45°` | left |
 
-**Invariant:** the first two turns of a parallel entry oppose the pattern's turn direction; only the
-final turn at the fix follows it. The rejoin arc's centre lies on the **holding** side.
+The fix-crossing turn in that table assumes the aircraft arrives from the **parallel sector proper**.
+
+**Invariant:** the **rejoin** opposes the pattern's turn direction, unconditionally. The rejoin arc's
+centre lies on the **holding** side. The **fix-crossing** turn is a function of the aircraft's
+*heading*, not of the pattern — the two coincide throughout the parallel sector, but not inside the
+±5° teardrop/parallel band (AIM 5-3-8 j8(d)) where parallel is still an accepted answer and the
+aircraft is already all but aligned with the outbound course. At heading 177 into a standard hold on
+inbound 000 the fix-crossing turn is 3° **right**, i.e. *with* the pattern. So "the first two turns
+both oppose the pattern" is true across the sector but is **not** an unconditional rule, and code
+that states it must check: see `flyItText` in `src/modules/entry-drill.ts`, which derives the
+fix-crossing turn from the heading and suppresses the gloss when the two disagree.
 
 The `~225°` sweep and the 45° intercept are **convention, not AIM text** — the AIM requires only
 "more than 180 degrees" — and 45° is **not** what these figures were measured to draw: the one
