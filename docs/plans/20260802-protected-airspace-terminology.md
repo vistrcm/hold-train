@@ -79,22 +79,33 @@ no text layer and must be rendered to images and read visually.
 **Files:**
 - Create: `docs/holding-protected-airspace.md`
 
-- [ ] establish which order is **current**. Check FAA's directives index for Order 7130.3A ("Holding
+- [x] establish which order is **current**. Check FAA's directives index for Order 7130.3A ("Holding
       Pattern Criteria") and Order 8260.3B — confirm both are cancelled/superseded and that
       **Order 8260.3G** (eff. 07/01/2024) chapter 16 is the live criteria
-- [ ] download 8260.3G and locate **Table 16-6-1 "Holding Pattern Dimensions (NM)"** and para
-      **16-6-2 "Basic Primary Area Construction"**
-- [ ] extract the table. If the PDF has no text layer, render the page and read it visually
-- [ ] verify **at least three rows independently**, and check the structural identity that the two
+      (7130.3A: cancelled 2016-03-14 by 8260.3C; 8260.3B: cancelled 2016-03-14 by 8260.3C;
+      8260.3G: Active, eff. 2024-07-01 — all from faa.gov directives index, checked 2026-08-03)
+- [x] download 8260.3G and locate **Table 16-6-1 "Holding Pattern Dimensions (NM)"** and para
+      **16-6-2 "Basic Primary Area Construction"** (table on printed page 16-18, PDF page 409)
+- [x] extract the table. If the PDF has no text layer, render the page and read it visually
+      (PDF has a text layer — gs txtwrite; table page and figure pages also rendered and read
+      visually as a cross-check)
+- [x] verify **at least three rows independently**, and check the structural identity that the two
       perpendicular columns sum to Total Width (and the three along-course columns to Total Length)
-- [ ] confirm which column is which side. The order does **not** use the words "holding side" /
+      (patterns 4, 8, 16, 31 verified digit-by-digit against the rendered page; length identity
+      exact 28/28; width identity exact 27/28 — pattern 16 prints 21.1 vs 8.2+12.8=21.0, a
+      rounding artifact in the published table, visually confirmed as-printed)
+- [x] confirm which column is which side. The order does **not** use the words "holding side" /
       "non-holding side" — the mapping is an inference. 16-6-2 is written for the right-hand pattern
       ("for left-hand pattern reverse the instructions"); record the reasoning explicitly and label
-      the side mapping as derived
-- [ ] write `docs/holding-protected-airspace.md` with the verified table, the citation at
+      the side mapping as derived (derivation recorded in the doc; M-E = holding side, L-I/M-H =
+      non-holding side; corroborated by ¶2-8-9's prose use of "holding side")
+- [x] write `docs/holding-protected-airspace.md` with the verified table, the citation at
       sub-paragraph granularity, and the derivation for the side mapping
-- [ ] ⚠️ if the values cannot be verified, say so and label them unverified — do not carry the
-      prior numbers forward as though checked
+- [x] ⚠️ if the values cannot be verified, say so and label them unverified — do not carry the
+      prior numbers forward as though checked (the prior "template 1 = 2.6/4.1" row is NOT in the
+      current order — ¶16-3-1 retired pattern sizes 1–3; recorded as historical/unverified in the
+      doc. Patterns 8 and 31 hypothesis values confirmed; 38.5–40% fraction confirmed over the 28
+      current patterns)
 
 ### Task 2: Correct the research note
 
