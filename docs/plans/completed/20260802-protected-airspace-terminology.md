@@ -165,12 +165,15 @@ no text layer and must be rendered to images and read visually.
 
 ### Task 5: [Final] Update documentation
 
-- [ ] add a CLAUDE.md note if a durable convention emerged
-- [ ] remove the "unverified — pending" caveat from
+- [x] add a CLAUDE.md note if a durable convention emerged (two: both-sides-protected /
+      never-"unprotected" with the 8260.3G citation, and the amend-in-place ledger rule)
+- [x] remove the "unverified — pending" caveat from
       `docs/plans/completed/20260802-parallel-entry-rejoin-turn.md`'s Overview if that plan has
-      already completed, or from the live plan if not
-- [ ] run `npm test` and `npm run typecheck`
-- [ ] move this plan to `docs/plans/completed/`
+      already completed, or from the live plan if not (replaced with the verified finding and a
+      pointer to `docs/holding-protected-airspace.md`)
+- [x] run `npm test` and `npm run typecheck` (614/614 pass; tsc clean)
+- [x] move this plan to `docs/plans/completed/` (the three `docs/content-audit.md` references to
+      the live path updated to the `completed/` path in the same commit)
 
 ## Post-Completion
 

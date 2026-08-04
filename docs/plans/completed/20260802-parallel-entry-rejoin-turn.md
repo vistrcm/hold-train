@@ -26,9 +26,10 @@ whole-track error at 90 kt is ~1.9 NM, scaling to ~3.2 NM at 150 kt. The nonhold
 protected airspace, but it is the narrower of the two, and that allowance is sized for the parallel
 entry's one-minute outbound leg plus wind drift — not for an extra ~2 turn-radii excursion beyond it.
 
-> Exact FAA template widths are **unverified** by this project and are deliberately not quoted here;
-> `docs/plans/20260802-protected-airspace-terminology.md` verifies them. The safety argument does not
-> depend on the numbers, only on the nonholding allowance being the narrower one.
+> Template widths were verified 2026-08-03 against FAA Order 8260.3G Table 16-6-1 — see
+> `docs/holding-protected-airspace.md`. Both sides are protected; the nonholding side is the
+> narrower primary area (38.5–40% of total width across all 28 current patterns), which is what
+> the safety argument depends on.
 
 This is a **safety-of-flight training defect**. It is a drill tool: a pilot who rehearses this here
 will fly it that way. ACS elements IR.III.B.K1 / R4 / S1 cover exactly this.

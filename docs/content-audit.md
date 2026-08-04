@@ -545,7 +545,8 @@ predates the 2026-08-02 rejoin-direction correction, on the same terms as the
   behind that asymmetry are unverified by this project** (`docs/research-claude.md` sources
   the 8/4 NM framing to a CFII, not to the FAA), and both the claim and the "unprotected"
   wording this ledger blessed at the 2026-07 entry above (`src/modules/wind-lab.ts`) are
-  pending in `docs/plans/20260802-protected-airspace-terminology.md`. This is a
+  pending in `docs/plans/completed/20260802-protected-airspace-terminology.md` (since
+  resolved — see the 2026-08-03 protected-airspace correction entry). This is a
   safety-of-flight training defect in a drill tool: a pilot who rehearses it here flies it
   that way. ACS IR.III.B.K1 / R4 / S1.
 
@@ -771,8 +772,9 @@ predates the 2026-08-02 rejoin-direction correction, on the same terms as the
 - **Fixed: the protected-airspace asymmetry was asserted without a source** in the correction
   entry above, contradicting both `src/modules/wind-lab.ts`'s shipped "unprotected" wording
   and the 2026-07 ledger entry that blessed it. Now labelled unverified and pointed at
-  `docs/plans/20260802-protected-airspace-terminology.md`, so the ledger records an open
-  contradiction instead of two entries that quietly disagree.
+  `docs/plans/completed/20260802-protected-airspace-terminology.md`, so the ledger records an open
+  contradiction instead of two entries that quietly disagree (since resolved — see the
+  2026-08-03 protected-airspace correction entry).
 
 ## Post-completion review fix — 2026-08-02 (code review iteration 2)
 
@@ -1073,9 +1075,9 @@ Two guard-integrity defects, same class as iteration 4's, likewise unrecorded at
   screen). It was true while the front was the frozen snapshot question; once miss cards are rebuilt
   from live content, a correction that rewords a *question* changes the front and imports as a new
   note. Both sides scoped, and identically — `anki-export.test.ts` pins them against each other.
-- **Fixed: a stale plan path** (`docs/plans/20260802-protected-airspace-terminology.md`), which
-  pointed at the pre-`completed/` location of the rejoin plan while line 142 of the same file
-  already used the new one.
+- **Fixed: a stale plan path** (`docs/plans/completed/20260802-protected-airspace-terminology.md`,
+  then still live under `docs/plans/`), which pointed at the pre-`completed/` location of the
+  rejoin plan while line 142 of the same file already used the new one.
 - **Recorded, not fixed:** the map's parallel-entry return leg is still drawn as a straight chord
   to the fix rather than at the rollout heading, so the picture kinks up to ~35–41° on long legs
   (raising `PARALLEL_INTERCEPT_DEG` 30 → 45 widened it from ~5°). Deferral is deliberate and
