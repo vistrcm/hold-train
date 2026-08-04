@@ -133,15 +133,22 @@ no text layer and must be rendered to images and read visually.
 - Modify: `src/modules/wind-lab.ts`
 - Modify: `docs/content-audit.md`
 
-- [ ] update `wind-lab.test.ts:376` to expect the corrected wording, keeping a test that the debrief
+- [x] update `wind-lab.test.ts:376` to expect the corrected wording, keeping a test that the debrief
       still **names the side** — that is what the 2026-07-22 fix was for and it must not regress
-- [ ] run tests — confirm the new expectation FAILS first
-- [ ] change `wind-lab.ts:339` from "non-holding (unprotected) side of" to wording that names the
+      (test renamed to "names the non-holding side …"; also asserts the 8260.3G citation renders
+      and that "unprotected" never appears; the "names the holding side" companion unchanged)
+- [x] run tests — confirm the new expectation FAILS first (confirmed: 1 failed | 33 passed before
+      the string change)
+- [x] change `wind-lab.ts:339` from "non-holding (unprotected) side of" to wording that names the
       side and conveys the narrower margin without claiming the side is unprotected
-- [ ] amend that same `docs/content-audit.md` entry in place: record that the entry's goal was right and its
+      (now "non-holding side of the fix — where the protected airspace is narrower
+      (<cite>FAA Order 8260.3G Table 16-6-1</cite>)"; the code comment carrying the
+      "no protected airspace" rationale corrected too, as was the test docblock)
+- [x] amend that same `docs/content-audit.md` entry in place: record that the entry's goal was right and its
       parenthetical wrong, with the 8260.3G citation. Do not delete the entry
-- [ ] add a new ledger entry for this correction with its regression test
-- [ ] run `npm test` and `npm run typecheck`
+- [x] add a new ledger entry for this correction with its regression test
+      ("## Correction — 2026-08-03 (protected-airspace terminology)")
+- [x] run `npm test` and `npm run typecheck` (614/614 pass; tsc clean)
 
 ### Task 4: Verify acceptance criteria
 

@@ -463,6 +463,17 @@ predates the 2026-08-02 rejoin-direction correction, on the same terms as the
   unprotected side when the inbound crossing is off the holding side" and "names
   the holding side when the inbound crossing is on it" in
   `src/modules/wind-lab.test.ts`.
+  **⚠️ Amended 2026-08-03 — this entry's goal was right, its rationale wrong.**
+  The debrief must name the side (that stands, and the tests keep standing for
+  it), but "the side with no protected airspace" is false: FAA Order 8260.3G
+  (eff. 2024-07-01) Table 16-6-1 with ¶16-6-2/¶16-3-2 shows the primary
+  protected area spans **both** sides of the holding course, the non-holding
+  side being the narrower half (38.5–40% of total width across all 28 current
+  patterns; see `docs/holding-protected-airspace.md`). The rationale rested on
+  no FAA source — the same unsourced CFII claim behind the 8/4 NM figure in
+  `docs/research-claude.md`. Superseded by the 2026-08-03 correction entry
+  "the wind-lab debrief called the non-holding side unprotected" below; the
+  "(unprotected)" parenthetical is retired there.
 - **Fixed: the Anki core deck lost its ATC phraseology quotes on import**
   (`src/app/anki-export.ts`). `escapeField` neutralized tabs and newlines but not
   double quotes, and Anki's text importer is an RFC4180 reader: a field that
@@ -1223,3 +1234,27 @@ deck — the one place the app cannot reach to correct anything.
   legibility convention raised from 30 and single-sourced — "a **change**, not the repair of a
   drift" — with the explicit note that only the *direction* is evidence-backed and the 45 must
   never be justified by the figures. The report's own premise is what the docblock already says.
+
+## Correction — 2026-08-03 (protected-airspace terminology)
+
+This section **reverses part of a prior ledger decision**, argued in place rather than silently
+edited past: the 2026-07-22 entry "the wind-lab debrief hid which side a wide inbound crossed on"
+now carries an amendment note pointing here.
+
+- **Fixed: the wind-lab debrief called the non-holding side unprotected**
+  (`src/modules/wind-lab.ts`). The debrief rendered a negative inbound cross-track as
+  "non-holding (unprotected) side of the fix". The prior entry's *goal* was right and is
+  preserved — the debrief must name which side the crossing fell on, never soften it to a
+  neutral "off the fix" — but its parenthetical taught a false model: per FAA Order 8260.3G
+  (eff. 2024-07-01) ¶16-3-2 and Table 16-6-1, the primary protected area spans **both** sides
+  of the holding course, and a 2 NM secondary area surrounds its whole perimeter (¶16-2-1.b).
+  The non-holding side is the **narrower** protected area — 38.5–40% of total width across all
+  28 current patterns (derived; the side mapping is an inference from ¶16-6-2, recorded with
+  the full verified table in `docs/holding-protected-airspace.md`). Straying there matters
+  because the margin is smaller, not because it is absent. Now renders "non-holding side of
+  the fix — where the protected airspace is narrower (FAA Order 8260.3G Table 16-6-1)".
+  The same false model was corrected at its source in `docs/research-claude.md` (the unsourced
+  CFII "8 NM vs 4 NM" claim) in the preceding task of this plan. Regression tests: "names the
+  non-holding side when the inbound crossing is off the holding side" (which now also asserts
+  the debrief carries the 8260.3G citation and **never** says "unprotected") and "names the
+  holding side when the inbound crossing is on it" in `src/modules/wind-lab.test.ts`.
