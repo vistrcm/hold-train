@@ -155,7 +155,18 @@ function entryMissCard(drill: string, s: Record<string, unknown>): AnkiCard | nu
       : live.alternates
   const also = alternates.length > 0 ? ` (also acceptable: ${alternates.join(', ')})` : ''
   const chosen = str(s['chosen'])
-  const missed = chosen === null ? '' : `\nYou answered: ${chosen}.`
+  // Re-grade the frozen choice against the RE-RESOLVED answer before printing
+  // it. "Correct entry: X. You answered: Y." asserts Y ≠ X — the two lines are
+  // one claim, so re-deriving `expected`/`alternates` and leaving `chosen`
+  // frozen made the card able to contradict itself in one breath ("Correct
+  // entry: teardrop. You answered: teardrop.") after exactly the engine
+  // correction this rebuild exists to propagate. Both clauses matter: the ±5°
+  // band means a choice can become acceptable with the primary unmoved.
+  // Applied to the frozen path too, keyed on what the card RENDERS rather than
+  // on which path built it — the same rule as the citation below, and the
+  // frozen path reaches it through a hand-edited store.
+  const cleared = chosen !== null && (chosen === expected || alternates.includes(chosen))
+  const missed = chosen === null || cleared ? '' : `\nYou answered: ${chosen}.`
   // "As published" clearances state neither course nor turns — the snapshot's
   // plate line is what makes the card answerable away from the drill.
   const chart = str(s['chartNote'])

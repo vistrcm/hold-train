@@ -536,6 +536,72 @@ describe('missesToCards', () => {
     expect(withoutAlt!.source).toContain('AIM 5-3-8 j3')
   })
 
+  // The rebuild re-resolves THREE of the four things an entry card renders —
+  // the expected entry, its alternates, and the citation that follows them —
+  // and left the fourth, the student's own answer, frozen and never re-graded.
+  // Those four are one claim, not four fields: "Correct entry: X. You answered:
+  // Y." ASSERTS Y ≠ X. After exactly the correction this rebuild exists to
+  // propagate, the re-derived X can BE the frozen Y, and the card contradicts
+  // itself in one breath — a card telling the student they missed this while
+  // printing their answer as the correct one, in the deck they will drill
+  // unsupervised. Re-resolving three parts of one claim and freezing the fourth
+  // produces a sentence neither the old engine nor the corrected one would ever
+  // have produced.
+  //
+  // Keyed on what the card RENDERS, not on which path built it, exactly as the
+  // ±5° citation above is: the `alternates` clause is the second way a choice
+  // becomes acceptable without the primary moving at all, so a check of
+  // `chosen !== expected` alone would still ship the contradiction.
+  it('drops the "You answered" line when the re-derived answer clears the choice', () => {
+    // Sector geometry hand-derived, NOT read from determineEntry (see above):
+    // right-turn hold on course 000, direct spans −70°–110° and teardrop
+    // 110°–180° (AIM 5-3-8 j3). Heading 140 is teardrop, 30° clear of both
+    // boundaries. Heading 112 is teardrop too but 2° off the direct boundary,
+    // so ±5° (j8(d)) also accepts direct.
+    const nowPrimary: Miss = {
+      drill: 'entry',
+      at: 17,
+      scenario: {
+        clearanceText: 'Hold north of ABCDE as published.',
+        heading: 140,
+        holdSpec: { inboundCourse: 0, turnDirection: 'right' },
+        chosen: 'teardrop',
+        expected: 'parallel',
+      },
+    }
+    const nowAlternate: Miss = {
+      drill: 'entry',
+      at: 18,
+      scenario: {
+        clearanceText: 'Hold north of ABCDE as published.',
+        heading: 112,
+        holdSpec: { inboundCourse: 0, turnDirection: 'right' },
+        chosen: 'direct',
+        expected: 'parallel',
+      },
+    }
+    // The converse, and the assertion that keeps this from being satisfiable by
+    // dropping the line unconditionally: a choice the corrected engine still
+    // calls wrong keeps it.
+    const stillWrong: Miss = {
+      drill: 'entry',
+      at: 19,
+      scenario: {
+        clearanceText: 'Hold north of ABCDE as published.',
+        heading: 140,
+        holdSpec: { inboundCourse: 0, turnDirection: 'right' },
+        chosen: 'direct',
+        expected: 'parallel',
+      },
+    }
+    const [primaryCard, alternateCard, wrongCard] = missesToCards([nowPrimary, nowAlternate, stillWrong])
+    expect(primaryCard!.back, 'card claims the correct answer was also the miss').toBe('Correct entry: teardrop.')
+    expect(alternateCard!.back, 'card renders the choice as both acceptable and missed').toBe(
+      'Correct entry: teardrop (also acceptable: direct).',
+    )
+    expect(wrongCard!.back).toBe('Correct entry: teardrop.\nYou answered: direct.')
+  })
+
   // `heading` is the OTHER argument the re-derivation feeds the engine, and it
   // reached `determineEntry` unguarded while its co-argument `inboundCourse` was
   // range-checked by `snapshotHold` for exactly this reason. `courseText` — the

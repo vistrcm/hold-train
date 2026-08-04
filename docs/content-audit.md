@@ -1180,3 +1180,46 @@ deck — the one place the app cannot reach to correct anything.
   rule`. Mutation-confirmed six ways, including appending a direction-free wrong gloss to README —
   which the suite passed before this change.
 - **Not re-fixed:** the mapview rollout kink, reported a fourth time. Unchanged deliberate deferral.
+
+## Post-completion review fixes — 2026-08-03 (code review iteration 9)
+
+- **Fixed: a rebuilt entry miss card could assert the student's answer was both correct and
+  missed** (`src/app/anki-export.ts`). `entryMissCard` re-resolves the answer from the live engine
+  so a sector correction reaches decks already recorded — but it re-resolved **three** of the four
+  things the card renders (`expected`, `alternates`, and the citation that follows them) and left
+  the fourth, the frozen `chosen`, never re-graded. Those four are one claim, not four fields:
+  "Correct entry: X.\nYou answered: Y." *asserts* Y ≠ X. After exactly the correction the rebuild
+  exists to propagate, the re-derived X can **be** the frozen Y, and the card renders "Correct
+  entry: teardrop.\nYou answered: teardrop." — a card telling the student they missed this while
+  printing their answer as the right one, in the deck they drill unsupervised. Re-resolving part of
+  a claim and freezing the rest produces a sentence neither the old engine nor the corrected one
+  would ever have produced. The choice is now re-graded against the re-resolved answer and the
+  "You answered" line dropped when it clears; **both** clauses are load-bearing, since the ±5°
+  band (j8(d)) lets a choice become acceptable with the primary unmoved, so `chosen !== expected`
+  alone still ships the contradiction on that path. Keyed on what the card **renders**, not on
+  which path built it — the same rule as the citation fix in iteration 8, and the frozen path
+  reaches it through a hand-edited store. Regression: `drops the "You answered" line when the
+  re-derived answer clears the choice`, whose third fixture pins the converse so the guard is not
+  satisfiable by dropping the line unconditionally. Mutation-confirmed four ways (each clause
+  dropped, unconditional suppression, and a full revert).
+- **Not a defect: the parallel rejoin arc now runs within 0.15 NM of the racetrack's outbound-end
+  turn.** Reported as a legibility regression, and the measurement is right — inverting the rejoin
+  moved its turn centre from 1.11 NM the far side of the course (arcs disjoint) to 0.15 NM from the
+  racetrack arc's own centre, so the two equal-radius circles now **intersect**. But that
+  near-coincidence is a *true property of the corrected maneuver*, not a drawing artifact: the
+  parallel entry's rejoin circle genuinely almost coincides with the pattern's outbound-end turn
+  circle, which is why the entry rejoins as cleanly as it does. The proposed fix — raise
+  `PARALLEL_OFFSET_NM` — provably cannot work: the centre separation *equals* the offset, so
+  separating two radius-0.48 circles needs an offset above `2R = 0.96 NM`, i.e. a parallel leg drawn
+  further off course than the racetrack's own outbound leg sits on the other side. Drawing them
+  apart would be drawing a maneuver that does not happen, which is the negative training this
+  project exists to avoid. Distinguishability is carried by visual treatment, which is already
+  there and unaffected by proximity: the entry track is `PALETTE.entry.parallel` (`#2f6fd0`),
+  2 px, `stroke-dasharray="5 3"`; the racetrack is `PALETTE.ink` (`#10161c`), 1.8 px, solid.
+  Recorded so the next iteration re-measures the geometry rather than re-litigating it.
+- **Not re-fixed:** the mapview rollout kink, reported a fifth time. Unchanged deliberate deferral.
+- **Declined: `PARALLEL_INTERCEPT_DEG = 45` as an out-of-scope change** away from the ≈31° measured
+  in `docs/parallel-entry-evidence.md`. Already settled and recorded in CLAUDE.md as a deliberate
+  legibility convention raised from 30 and single-sourced — "a **change**, not the repair of a
+  drift" — with the explicit note that only the *direction* is evidence-backed and the 45 must
+  never be justified by the figures. The report's own premise is what the docblock already says.
