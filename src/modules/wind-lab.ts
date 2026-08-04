@@ -333,10 +333,16 @@ export function renderWindLab(el: HTMLElement, options: WindLabOptions = {}): vo
     const inbound = d.sim.completed
       ? `${Math.round(d.sim.inboundSeconds)} s (target ${TARGET_INBOUND_S} s), ` +
         // Name the side. Drifting to the NON-holding side is the safety-relevant
-        // error — that is the side with no protected airspace — so it is exactly
-        // the case the debrief must not soften into a neutral "off the fix".
+        // error — both sides are protected, but that side's area is the narrower
+        // (8260.3G Table 16-6-1; docs/holding-protected-airspace.md) — so it is
+        // exactly the case the debrief must not soften into a neutral "off the
+        // fix". Nor may it be called "unprotected": that overclaims the danger
+        // and teaches the wrong model of why the margin matters.
         `crossing ${Math.abs(Math.round(d.sim.inboundCrossTrackNm * 100) / 100)} NM ` +
-        `${d.sim.inboundCrossTrackNm >= 0 ? 'holding side of' : 'non-holding (unprotected) side of'} the fix`
+        (d.sim.inboundCrossTrackNm >= 0
+          ? 'holding side of the fix'
+          : 'non-holding side of the fix — where the protected airspace is narrower ' +
+            '(<cite>FAA Order 8260.3G Table 16-6-1</cite>)')
       : 'never reached the fix'
 
     debriefEl.className = `lab-debrief ${d.correct ? 'is-correct' : 'is-wrong'}`

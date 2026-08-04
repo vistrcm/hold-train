@@ -217,6 +217,20 @@ describe('content-audit regressions (Task 17, verified against FAA sources)', ()
     }
   })
 
+  // Both sides of the holding course are protected (FAA Order 8260.3G
+  // ¶16-3-2 / Table 16-6-1; docs/holding-protected-airspace.md); "the
+  // protected side" — even in a distractor — presumes one side is not.
+  // A distractor's job is to be a wrong *answer*, not wrong *terminology*
+  // the reader absorbs while rejecting it.
+  it('no question, option, or explanation teaches a one-side-protected model', () => {
+    for (const q of QUESTIONS) {
+      // source included: written-test renders it with the explanation.
+      const text = [q.question, ...q.options, q.explanation, q.source].join(' ')
+      expect(text, q.id).not.toMatch(/unprotected/i)
+      expect(text, q.id).not.toMatch(/protected side/i)
+    }
+  })
+
   it('every "hold <direction> ... on the NNN radial" stem agrees with the engine cardinal', () => {
     // The TO/FROM drill grades this exact mapping with cardinalFromCourse, and
     // it can generate any 10° radial — so a stem that calls the 160 radial

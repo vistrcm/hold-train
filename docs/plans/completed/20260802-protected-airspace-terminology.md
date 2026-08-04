@@ -79,37 +79,52 @@ no text layer and must be rendered to images and read visually.
 **Files:**
 - Create: `docs/holding-protected-airspace.md`
 
-- [ ] establish which order is **current**. Check FAA's directives index for Order 7130.3A ("Holding
+- [x] establish which order is **current**. Check FAA's directives index for Order 7130.3A ("Holding
       Pattern Criteria") and Order 8260.3B — confirm both are cancelled/superseded and that
       **Order 8260.3G** (eff. 07/01/2024) chapter 16 is the live criteria
-- [ ] download 8260.3G and locate **Table 16-6-1 "Holding Pattern Dimensions (NM)"** and para
-      **16-6-2 "Basic Primary Area Construction"**
-- [ ] extract the table. If the PDF has no text layer, render the page and read it visually
-- [ ] verify **at least three rows independently**, and check the structural identity that the two
+      (7130.3A: cancelled 2016-03-14 by 8260.3C; 8260.3B: cancelled 2016-03-14 by 8260.3C;
+      8260.3G: Active, eff. 2024-07-01 — all from faa.gov directives index, checked 2026-08-03)
+- [x] download 8260.3G and locate **Table 16-6-1 "Holding Pattern Dimensions (NM)"** and para
+      **16-6-2 "Basic Primary Area Construction"** (table on printed page 16-18, PDF page 409)
+- [x] extract the table. If the PDF has no text layer, render the page and read it visually
+      (PDF has a text layer — gs txtwrite; table page and figure pages also rendered and read
+      visually as a cross-check)
+- [x] verify **at least three rows independently**, and check the structural identity that the two
       perpendicular columns sum to Total Width (and the three along-course columns to Total Length)
-- [ ] confirm which column is which side. The order does **not** use the words "holding side" /
+      (patterns 4, 8, 16, 31 verified digit-by-digit against the rendered page; length identity
+      exact 28/28; width identity exact 27/28 — pattern 16 prints 21.1 vs 8.2+12.8=21.0, a
+      rounding artifact in the published table, visually confirmed as-printed)
+- [x] confirm which column is which side. The order does **not** use the words "holding side" /
       "non-holding side" — the mapping is an inference. 16-6-2 is written for the right-hand pattern
       ("for left-hand pattern reverse the instructions"); record the reasoning explicitly and label
-      the side mapping as derived
-- [ ] write `docs/holding-protected-airspace.md` with the verified table, the citation at
+      the side mapping as derived (derivation recorded in the doc; M-E = holding side, L-I/M-H =
+      non-holding side; corroborated by ¶2-8-9's prose use of "holding side")
+- [x] write `docs/holding-protected-airspace.md` with the verified table, the citation at
       sub-paragraph granularity, and the derivation for the side mapping
-- [ ] ⚠️ if the values cannot be verified, say so and label them unverified — do not carry the
-      prior numbers forward as though checked
+- [x] ⚠️ if the values cannot be verified, say so and label them unverified — do not carry the
+      prior numbers forward as though checked (the prior "template 1 = 2.6/4.1" row is NOT in the
+      current order — ¶16-3-1 retired pattern sizes 1–3; recorded as historical/unverified in the
+      doc. Patterns 8 and 31 hypothesis values confirmed; 38.5–40% fraction confirmed over the 28
+      current patterns)
 
 ### Task 2: Correct the research note
 
 **Files:**
 - Modify: `docs/research-claude.md`
 
-- [ ] replace the 8/4 NM claim at `:41` with the verified finding, citing 8260.3G Table 16-6-1 and
+- [x] replace the 8/4 NM claim at `:41` with the verified finding, citing 8260.3G Table 16-6-1 and
       linking `docs/holding-protected-airspace.md`
-- [ ] state plainly that **both sides are protected** and that there is no single pair of numbers —
+- [x] state plainly that **both sides are protected** and that there is no single pair of numbers —
       the area scales with template (altitude/speed)
-- [ ] keep a dated note that the previous figure was sourced to a CFII, not the FAA, so the
+- [x] keep a dated note that the previous figure was sourced to a CFII, not the FAA, so the
       correction is not silently rewritten
-- [ ] note that "non-maneuvering side" is **not** an FAA term — it originates in an Aeronautical
+- [x] note that "non-maneuvering side" is **not** an FAA term — it originates in an Aeronautical
       Charting Forum submission by an outside consultant (ACF Control # 03-01-247)
-- [ ] run `npm test` and `npm run typecheck`
+      (➕ corrected during verification: the term IS in the current AIM, but only for procedure
+      turns — AIM 5-4-9 a, checked 2026-08-03 against the faa.gov AIM; AIM holding text uses
+      "holding side"/"non-holding side". The ACF 03-01-247 origin could not be located on faa.gov
+      or the open web and is recorded as unverified, per the citation convention)
+- [x] run `npm test` and `npm run typecheck` (614/614 pass; tsc clean)
 
 ### Task 3: Fix the wind-lab debrief wording without losing the prior fix's intent
 
@@ -118,33 +133,47 @@ no text layer and must be rendered to images and read visually.
 - Modify: `src/modules/wind-lab.ts`
 - Modify: `docs/content-audit.md`
 
-- [ ] update `wind-lab.test.ts:376` to expect the corrected wording, keeping a test that the debrief
+- [x] update `wind-lab.test.ts:376` to expect the corrected wording, keeping a test that the debrief
       still **names the side** — that is what the 2026-07-22 fix was for and it must not regress
-- [ ] run tests — confirm the new expectation FAILS first
-- [ ] change `wind-lab.ts:339` from "non-holding (unprotected) side of" to wording that names the
+      (test renamed to "names the non-holding side …"; also asserts the 8260.3G citation renders
+      and that "unprotected" never appears; the "names the holding side" companion unchanged)
+- [x] run tests — confirm the new expectation FAILS first (confirmed: 1 failed | 33 passed before
+      the string change)
+- [x] change `wind-lab.ts:339` from "non-holding (unprotected) side of" to wording that names the
       side and conveys the narrower margin without claiming the side is unprotected
-- [ ] amend that same `docs/content-audit.md` entry in place: record that the entry's goal was right and its
+      (now "non-holding side of the fix — where the protected airspace is narrower
+      (<cite>FAA Order 8260.3G Table 16-6-1</cite>)"; the code comment carrying the
+      "no protected airspace" rationale corrected too, as was the test docblock)
+- [x] amend that same `docs/content-audit.md` entry in place: record that the entry's goal was right and its
       parenthetical wrong, with the 8260.3G citation. Do not delete the entry
-- [ ] add a new ledger entry for this correction with its regression test
-- [ ] run `npm test` and `npm run typecheck`
+- [x] add a new ledger entry for this correction with its regression test
+      ("## Correction — 2026-08-03 (protected-airspace terminology)")
+- [x] run `npm test` and `npm run typecheck` (614/614 pass; tsc clean)
 
 ### Task 4: Verify acceptance criteria
 
-- [ ] no user-visible string calls the nonholding side "unprotected"
-- [ ] the wind-lab debrief still names which side an inbound crossing fell on
-- [ ] every protected-airspace figure in `docs/` cites 8260.3G at sub-paragraph granularity or is
-      labelled unverified
-- [ ] full suite: `npm test`; type check: `npm run typecheck`
-- [ ] no runtime dependencies added
+- [x] no user-visible string calls the nonholding side "unprotected" (grep of `src/`: the word
+      survives only in code comments and the test's negative assertion
+      `expect(debrief).not.toMatch(/unprotected/)`)
+- [x] the wind-lab debrief still names which side an inbound crossing fell on
+      (`wind-lab.test.ts` "names the non-holding side …" and "names the holding side …" both pass)
+- [x] every protected-airspace figure in `docs/` cites 8260.3G at sub-paragraph granularity or is
+      labelled unverified (remaining "8 NM / 4 NM" strings in docs are the correction notes quoting
+      the retracted claim; other NM figures are unrelated chart-hold/DME facts)
+- [x] full suite: `npm test` (614/614); type check: `npm run typecheck` (clean)
+- [x] no runtime dependencies added (`package.json` has no `dependencies` key)
 
 ### Task 5: [Final] Update documentation
 
-- [ ] add a CLAUDE.md note if a durable convention emerged
-- [ ] remove the "unverified — pending" caveat from
+- [x] add a CLAUDE.md note if a durable convention emerged (two: both-sides-protected /
+      never-"unprotected" with the 8260.3G citation, and the amend-in-place ledger rule)
+- [x] remove the "unverified — pending" caveat from
       `docs/plans/completed/20260802-parallel-entry-rejoin-turn.md`'s Overview if that plan has
-      already completed, or from the live plan if not
-- [ ] run `npm test` and `npm run typecheck`
-- [ ] move this plan to `docs/plans/completed/`
+      already completed, or from the live plan if not (replaced with the verified finding and a
+      pointer to `docs/holding-protected-airspace.md`)
+- [x] run `npm test` and `npm run typecheck` (614/614 pass; tsc clean)
+- [x] move this plan to `docs/plans/completed/` (the three `docs/content-audit.md` references to
+      the live path updated to the `completed/` path in the same commit)
 
 ## Post-Completion
 

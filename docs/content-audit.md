@@ -463,6 +463,20 @@ predates the 2026-08-02 rejoin-direction correction, on the same terms as the
   unprotected side when the inbound crossing is off the holding side" and "names
   the holding side when the inbound crossing is on it" in
   `src/modules/wind-lab.test.ts`.
+  **⚠️ Amended 2026-08-03 — this entry's goal was right, its rationale wrong.**
+  The debrief must name the side (that stands, and the tests keep standing for
+  it — the first is renamed "names the non-holding side when the inbound
+  crossing is off the holding side" by the 2026-08-03 correction, so the
+  "names the unprotected side …" title cited above no longer exists in
+  `wind-lab.test.ts`), but "the side with no protected airspace" is false: FAA Order 8260.3G
+  (eff. 2024-07-01) Table 16-6-1 with ¶16-6-2/¶16-3-2 shows the primary
+  protected area spans **both** sides of the holding course, the non-holding
+  side being the narrower half (38.5–40% of total width across all 28 current
+  patterns; see `docs/holding-protected-airspace.md`). The rationale rested on
+  no FAA source — the same unsourced CFII claim behind the 8/4 NM figure in
+  `docs/research-claude.md`. Superseded by the 2026-08-03 correction entry
+  "the wind-lab debrief called the non-holding side unprotected" below; the
+  "(unprotected)" parenthetical is retired there.
 - **Fixed: the Anki core deck lost its ATC phraseology quotes on import**
   (`src/app/anki-export.ts`). `escapeField` neutralized tabs and newlines but not
   double quotes, and Anki's text importer is an RFC4180 reader: a field that
@@ -534,7 +548,8 @@ predates the 2026-08-02 rejoin-direction correction, on the same terms as the
   behind that asymmetry are unverified by this project** (`docs/research-claude.md` sources
   the 8/4 NM framing to a CFII, not to the FAA), and both the claim and the "unprotected"
   wording this ledger blessed at the 2026-07 entry above (`src/modules/wind-lab.ts`) are
-  pending in `docs/plans/20260802-protected-airspace-terminology.md`. This is a
+  pending in `docs/plans/completed/20260802-protected-airspace-terminology.md` (since
+  resolved — see the 2026-08-03 protected-airspace correction entry). This is a
   safety-of-flight training defect in a drill tool: a pilot who rehearses it here flies it
   that way. ACS IR.III.B.K1 / R4 / S1.
 
@@ -760,8 +775,9 @@ predates the 2026-08-02 rejoin-direction correction, on the same terms as the
 - **Fixed: the protected-airspace asymmetry was asserted without a source** in the correction
   entry above, contradicting both `src/modules/wind-lab.ts`'s shipped "unprotected" wording
   and the 2026-07 ledger entry that blessed it. Now labelled unverified and pointed at
-  `docs/plans/20260802-protected-airspace-terminology.md`, so the ledger records an open
-  contradiction instead of two entries that quietly disagree.
+  `docs/plans/completed/20260802-protected-airspace-terminology.md`, so the ledger records an open
+  contradiction instead of two entries that quietly disagree (since resolved — see the
+  2026-08-03 protected-airspace correction entry).
 
 ## Post-completion review fix — 2026-08-02 (code review iteration 2)
 
@@ -1062,9 +1078,9 @@ Two guard-integrity defects, same class as iteration 4's, likewise unrecorded at
   screen). It was true while the front was the frozen snapshot question; once miss cards are rebuilt
   from live content, a correction that rewords a *question* changes the front and imports as a new
   note. Both sides scoped, and identically — `anki-export.test.ts` pins them against each other.
-- **Fixed: a stale plan path** (`docs/plans/20260802-protected-airspace-terminology.md`), which
-  pointed at the pre-`completed/` location of the rejoin plan while line 142 of the same file
-  already used the new one.
+- **Fixed: a stale plan path** (`docs/plans/completed/20260802-protected-airspace-terminology.md`,
+  then still live under `docs/plans/`), which pointed at the pre-`completed/` location of the
+  rejoin plan while line 142 of the same file already used the new one.
 - **Recorded, not fixed:** the map's parallel-entry return leg is still drawn as a straight chord
   to the fix rather than at the rollout heading, so the picture kinks up to ~35–41° on long legs
   (raising `PARALLEL_INTERCEPT_DEG` 30 → 45 widened it from ~5°). Deferral is deliberate and
@@ -1223,3 +1239,89 @@ deck — the one place the app cannot reach to correct anything.
   legibility convention raised from 30 and single-sourced — "a **change**, not the repair of a
   drift" — with the explicit note that only the *direction* is evidence-backed and the 45 must
   never be justified by the figures. The report's own premise is what the docblock already says.
+
+## Correction — 2026-08-03 (protected-airspace terminology)
+
+This section **reverses part of a prior ledger decision**, argued in place rather than silently
+edited past: the 2026-07-22 entry "the wind-lab debrief hid which side a wide inbound crossed on"
+now carries an amendment note pointing here.
+
+- **Fixed: the wind-lab debrief called the non-holding side unprotected**
+  (`src/modules/wind-lab.ts`). The debrief rendered a negative inbound cross-track as
+  "non-holding (unprotected) side of the fix". The prior entry's *goal* was right and is
+  preserved — the debrief must name which side the crossing fell on, never soften it to a
+  neutral "off the fix" — but its parenthetical taught a false model: per FAA Order 8260.3G
+  (eff. 2024-07-01) ¶16-3-2 and Table 16-6-1, the primary protected area spans **both** sides
+  of the holding course, and a 2 NM secondary area surrounds its whole perimeter (¶16-2-1.b).
+  The non-holding side is the **narrower** protected area — 38.5–40% of total width across all
+  28 current patterns (derived; the side mapping is an inference from ¶16-6-2, recorded with
+  the full verified table in `docs/holding-protected-airspace.md`). Straying there matters
+  because the margin is smaller, not because it is absent. Now renders "non-holding side of
+  the fix — where the protected airspace is narrower (FAA Order 8260.3G Table 16-6-1)".
+  The same false model was corrected at its source in `docs/research-claude.md` (the unsourced
+  CFII "8 NM vs 4 NM" claim) in the preceding task of this plan. Regression tests: "names the
+  non-holding side when the inbound crossing is off the holding side" (which now also asserts
+  the debrief carries the 8260.3G citation and **never** says "unprotected") and "names the
+  holding side when the inbound crossing is on it" in `src/modules/wind-lab.test.ts`.
+
+## Post-completion review fixes — 2026-08-03 (code review iteration, protected-airspace terminology)
+
+The correction above fixed the one string that used the *word* "unprotected"; its acceptance
+check was a grep for that literal, and three content strings expressed the same one-side-
+protected model without the word — the same "scope narrower than the claim reads as coverage"
+failure this ledger records for the rejoin prose scan.
+
+- **Fixed: the Anki safe-default entry card still taught the one-side-protected model**
+  (`src/content/anki-deck.ts`). The SAFETY-CRITICAL card read "Stay on the holding
+  (protected) side. The entry sectors exist because obstacle protection is built around the
+  holding side; a sloppy entry on the protected side beats a tidy one outside it" — labelling
+  only the holding side protected, claiming protection is built around that side alone, and
+  equating the non-holding side with "outside" protection. All three clauses contradict FAA
+  Order 8260.3G ¶16-3-2 / Table 16-6-1 (both sides protected; non-holding side the narrower
+  area — `docs/holding-protected-airspace.md`). This card exports into the student's Anki
+  deck, the one place the app cannot reach to correct anything, so the stale model would have
+  been rehearsed indefinitely. The card's front is unchanged, so a re-import updates the
+  existing note rather than duplicating it. Regression tests: "safe-default entry card: both
+  sides protected, holding side favored as the wider area" and "no card teaches a
+  one-side-protected model" (deck-wide scan banning `unprotected` and the "protected side"
+  framing) in `src/content/anki-deck.test.ts`.
+- **Fixed: the oral protected-side item never answered its own question**
+  (`src/content/oral.ts`). `protected-side` asks "where is the protected airspace?" and the
+  answer named only the holding side's design intent, leaving "both sides are protected"
+  unstated — an invitation to fill the gap with the folklore model. The answer now opens with
+  "On both sides", names the non-holding side as the narrower portion, and the source adds
+  8260.3G ¶16-3-2 / Table 16-6-1. Regression tests: "protected-side item states both sides
+  are protected, non-holding narrower, citing 8260.3G" and the item-wide scan "no item calls
+  a side unprotected or names 'the protected side'" in `src/content/oral.test.ts`.
+- **Fixed: a written-bank distractor named "the protected side"**
+  (`src/content/questions.ts`). `pattern-standard-turns` offered "Turns toward the protected
+  side, either direction" — a wrong *answer* is a distractor's job, but "the protected side"
+  is wrong *terminology* the reader absorbs while rejecting it. Now "Turns toward the holding
+  side, either direction". Regression test: "no question, option, or explanation teaches a
+  one-side-protected model" in `src/content/questions.test.ts`; `src/content/lessons.test.ts`
+  carries the same scan ("no lesson teaches a one-side-protected model") so every content
+  bank has its own guard.
+- **Hardened the wind-lab guards from the same review**
+  (`src/modules/wind-lab.test.ts`): the "unprotected" blacklist now scans the whole screen's
+  `textContent` case-insensitively in both side-naming tests (it was scoped to `.lab-debrief`
+  in one branch, case-sensitively); the non-holding test pins that no raw `<cite` markup
+  leaks into rendered text (the debrief renders via `innerHTML`, and the adjacent error paths
+  use `textContent` — a regression would show literal tags while every substring assertion
+  stayed green); the holding-side test bans "narrower" (attached to that branch it would
+  invert the corrected model and contains no "non-holding" for the existing negative to
+  catch).
+- **Dossier precision** (`docs/holding-protected-airspace.md`): the 38.5–40.0% span is now
+  labelled as rounded to 0.1%, with the exact span 38.49% (pattern 28) – 40.00% (pattern 5)
+  recorded — re-deriving the fractions from the table previously landed strictly below the
+  published lower bound and read as a transcription error. The amended 2026-07-22 entry above
+  also now records the test rename its citation predates.
+- **Fixed: `docs/research-claude.md` carried the one-side-protected model twice past its own
+  Task-2 correction.** Line 41 was corrected because the plan named it; §17's safety bullet
+  ("wandering onto the non-holding side … does not [keep the airplane inside protected
+  airspace]") and the SAFETY-CRITICAL Anki call-out ("stay on the holding/protected side")
+  restated the same model in prose with no NM figures, so the acceptance sweep — `src/`
+  strings plus docs *figures* citing 8260.3G — never touched them. The call-out line is
+  explicitly Anki-ready, i.e. a re-seed path for the exact defect the plan removed. Both now
+  state both-sides-protected / non-holding-narrower with the 8260.3G Table 16-6-1 citation.
+  No regression test: the content-bank scans cover `src/content/` and the wind-lab screen,
+  not `docs/` — docs prose remains guarded only by review.

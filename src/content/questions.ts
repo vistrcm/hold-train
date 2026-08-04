@@ -656,7 +656,7 @@ const STATIC_QUESTIONS: readonly WrittenQuestion[] = [
     id: 'pattern-standard-turns',
     topic: 'pattern',
     question: 'A standard holding pattern uses:',
-    options: ['Right turns', 'Left turns', 'Turns toward the protected side, either direction'],
+    options: ['Right turns', 'Left turns', 'Turns toward the holding side, either direction'],
     answerIndex: 0,
     explanation:
       'Standard pattern: right turns. Nonstandard pattern: left turns — flown only when ' +

@@ -143,8 +143,8 @@ export const CORE_DECK: readonly AnkiCard[] = [
   // ── SAFETY-CRITICAL ────────────────────────────────────────────────────
   {
     front: 'Unsure of the entry crossing the fix — what is the safe default?',
-    back: 'Stay on the holding (protected) side. The entry sectors exist because obstacle protection is built around the holding side; a sloppy entry on the protected side beats a tidy one outside it.',
-    source: 'AIM 5-3-8 j3 (entries derived from the obstacle-protection area design)',
+    back: 'Stay on the holding side. Both sides of the holding course are protected, but the non-holding side is the narrower area, and the entries were designed around the pattern — a sloppy entry that stays tight to the holding side beats a tidy one that strays wide.',
+    source: 'AIM 5-3-8 j3 (entries derived from the obstacle-protection area design); FAA Order 8260.3G Table 16-6-1 (both sides protected; non-holding side narrower)',
     tags: ['safety', 'entry', 'IR.III.B.S1'],
   },
   {

@@ -250,9 +250,10 @@ export const ORAL_ITEMS: readonly OralItem[] = [
     id: 'protected-side',
     question: 'Holding side versus non-holding side — where is the protected airspace?',
     answer:
-      'The racetrack is flown on the holding side of the holding course. Protected airspace was designed around the pattern and its recommended entries at the maximum holding speeds, so fly the recommended entries, keep maneuvering tight to the pattern, and favor the holding side. The parallel entry is the only maneuvering on the non-holding side, and it stays inside the designed protection only when flown as recommended.',
+      'On both sides: the primary protected area spans both sides of the holding course, with the non-holding side the narrower portion. The racetrack is flown on the holding side, where the margin is wider, and the protection was designed around the pattern and its recommended entries at the maximum holding speeds — so fly the recommended entries, keep maneuvering tight to the pattern, and favor the holding side. The parallel entry is the only maneuvering on the non-holding side, and it stays inside the designed protection only when flown as recommended.',
     acs: ['IR.III.B.K1', 'IR.III.B.R4'],
-    source: 'AIM 5-3-8 j3 (entries derived from the obstacle-protection area design)',
+    source:
+      'AIM 5-3-8 j3 (entries derived from the obstacle-protection area design); FAA Order 8260.3G ¶16-3-2 and Table 16-6-1 (primary area spans both sides; non-holding side narrower)',
   },
   {
     id: 'g1000-published-hold',

@@ -362,18 +362,30 @@ describe('renderWindLab (screen)', () => {
     expect(store.loadState().drills['wind-lab']?.attempts).toBe(1)
   })
 
-  // The non-holding side is the UNPROTECTED side — the whole reason the hold has
-  // a side at all. sim.ts signs inboundCrossTrackNm for exactly this (positive =
-  // holding side), so the debrief must not collapse the negative case to a
-  // neutral "0.8 NM off the fix" and hide which side the drift was toward.
-  it('names the unprotected side when the inbound crossing is off the holding side', () => {
+  // Both sides of the holding course are protected — the non-holding side is the
+  // NARROWER protected area (8260.3G Table 16-6-1; docs/holding-protected-airspace.md),
+  // not an unprotected one. sim.ts signs inboundCrossTrackNm for exactly this
+  // (positive = holding side), so the debrief must not collapse the negative case
+  // to a neutral "0.8 NM off the fix" and hide which side the drift was toward —
+  // but it also must not claim the side is unprotected, which teaches the wrong
+  // model of why straying there matters.
+  it('names the non-holding side when the inbound crossing is off the holding side', () => {
     const { el } = setup(5)
     const good = textbookNumbers(5)
     // +40° of outbound heading error walks the circuit across the course.
     fill(el, { ...good, outboundHeading: (good.outboundHeading + 40) % 360 })
     el.querySelector<HTMLButtonElement>('.lab-fly')!.click()
     const debrief = el.querySelector('.lab-debrief')!.textContent!
-    expect(debrief).toMatch(/non-holding \(unprotected\) side of the fix/)
+    expect(debrief).toMatch(/non-holding side of the fix — where the protected airspace is narrower/)
+    expect(debrief).toContain('8260.3G Table 16-6-1')
+    // Whole screen, case-insensitive: a blacklist scoped to one element in one
+    // branch is the "scope narrower than the claim" hole this repo has hit
+    // before — "Unprotected" in the scenario line or hint text would ship.
+    expect(el.textContent!).not.toMatch(/unprotected/i)
+    // The debrief renders via innerHTML; regressed to textContent the <cite>
+    // tags become visible prose and the textContent assertions above still
+    // pass, so pin that no raw markup leaks into the rendered text.
+    expect(debrief).not.toContain('<cite')
   })
 
   it('names the holding side when the inbound crossing is on it', () => {
@@ -384,6 +396,11 @@ describe('renderWindLab (screen)', () => {
     const debrief = el.querySelector('.lab-debrief')!.textContent!
     expect(debrief).toMatch(/holding side of the fix/)
     expect(debrief).not.toMatch(/non-holding/)
+    // "narrower" attached to this branch would teach that the HOLDING side is
+    // the narrower area — the corrected model inverted — and contains no
+    // "non-holding" for the line above to catch.
+    expect(debrief).not.toMatch(/narrower/i)
+    expect(el.textContent!).not.toMatch(/unprotected/i)
   })
 
   // A sign flip in crabText would swap every crab callout in the app with no
