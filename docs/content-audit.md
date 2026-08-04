@@ -465,7 +465,10 @@ predates the 2026-08-02 rejoin-direction correction, on the same terms as the
   `src/modules/wind-lab.test.ts`.
   **⚠️ Amended 2026-08-03 — this entry's goal was right, its rationale wrong.**
   The debrief must name the side (that stands, and the tests keep standing for
-  it), but "the side with no protected airspace" is false: FAA Order 8260.3G
+  it — the first is renamed "names the non-holding side when the inbound
+  crossing is off the holding side" by the 2026-08-03 correction, so the
+  "names the unprotected side …" title cited above no longer exists in
+  `wind-lab.test.ts`), but "the side with no protected airspace" is false: FAA Order 8260.3G
   (eff. 2024-07-01) Table 16-6-1 with ¶16-6-2/¶16-3-2 shows the primary
   protected area spans **both** sides of the holding course, the non-holding
   side being the narrower half (38.5–40% of total width across all 28 current
@@ -1260,3 +1263,55 @@ now carries an amendment note pointing here.
   non-holding side when the inbound crossing is off the holding side" (which now also asserts
   the debrief carries the 8260.3G citation and **never** says "unprotected") and "names the
   holding side when the inbound crossing is on it" in `src/modules/wind-lab.test.ts`.
+
+## Post-completion review fixes — 2026-08-03 (code review iteration, protected-airspace terminology)
+
+The correction above fixed the one string that used the *word* "unprotected"; its acceptance
+check was a grep for that literal, and three content strings expressed the same one-side-
+protected model without the word — the same "scope narrower than the claim reads as coverage"
+failure this ledger records for the rejoin prose scan.
+
+- **Fixed: the Anki safe-default entry card still taught the one-side-protected model**
+  (`src/content/anki-deck.ts`). The SAFETY-CRITICAL card read "Stay on the holding
+  (protected) side. The entry sectors exist because obstacle protection is built around the
+  holding side; a sloppy entry on the protected side beats a tidy one outside it" — labelling
+  only the holding side protected, claiming protection is built around that side alone, and
+  equating the non-holding side with "outside" protection. All three clauses contradict FAA
+  Order 8260.3G ¶16-3-2 / Table 16-6-1 (both sides protected; non-holding side the narrower
+  area — `docs/holding-protected-airspace.md`). This card exports into the student's Anki
+  deck, the one place the app cannot reach to correct anything, so the stale model would have
+  been rehearsed indefinitely. The card's front is unchanged, so a re-import updates the
+  existing note rather than duplicating it. Regression tests: "safe-default entry card: both
+  sides protected, holding side favored as the wider area" and "no card teaches a
+  one-side-protected model" (deck-wide scan banning `unprotected` and the "protected side"
+  framing) in `src/content/anki-deck.test.ts`.
+- **Fixed: the oral protected-side item never answered its own question**
+  (`src/content/oral.ts`). `protected-side` asks "where is the protected airspace?" and the
+  answer named only the holding side's design intent, leaving "both sides are protected"
+  unstated — an invitation to fill the gap with the folklore model. The answer now opens with
+  "On both sides", names the non-holding side as the narrower portion, and the source adds
+  8260.3G ¶16-3-2 / Table 16-6-1. Regression tests: "protected-side item states both sides
+  are protected, non-holding narrower, citing 8260.3G" and the item-wide scan "no item calls
+  a side unprotected or names 'the protected side'" in `src/content/oral.test.ts`.
+- **Fixed: a written-bank distractor named "the protected side"**
+  (`src/content/questions.ts`). `pattern-standard-turns` offered "Turns toward the protected
+  side, either direction" — a wrong *answer* is a distractor's job, but "the protected side"
+  is wrong *terminology* the reader absorbs while rejecting it. Now "Turns toward the holding
+  side, either direction". Regression test: "no question, option, or explanation teaches a
+  one-side-protected model" in `src/content/questions.test.ts`; `src/content/lessons.test.ts`
+  carries the same scan ("no paragraph teaches a one-side-protected model") so every content
+  bank has its own guard.
+- **Hardened the wind-lab guards from the same review**
+  (`src/modules/wind-lab.test.ts`): the "unprotected" blacklist now scans the whole screen's
+  `textContent` case-insensitively in both side-naming tests (it was scoped to `.lab-debrief`
+  in one branch, case-sensitively); the non-holding test pins that no raw `<cite` markup
+  leaks into rendered text (the debrief renders via `innerHTML`, and the adjacent error paths
+  use `textContent` — a regression would show literal tags while every substring assertion
+  stayed green); the holding-side test bans "narrower" (attached to that branch it would
+  invert the corrected model and contains no "non-holding" for the existing negative to
+  catch).
+- **Dossier precision** (`docs/holding-protected-airspace.md`): the 38.5–40.0% span is now
+  labelled as rounded to 0.1%, with the exact span 38.49% (pattern 28) – 40.00% (pattern 5)
+  recorded — re-deriving the fractions from the table previously landed strictly below the
+  published lower bound and read as a transcription error. The amended 2026-07-22 entry above
+  also now records the test rename its citation predates.

@@ -131,4 +131,17 @@ describe('required lesson content', () => {
     expect(text).toMatch(/first two turns/i)
     expect(text).toMatch(/only the turn on reaching the fix/i)
   })
+
+  // Both sides of the holding course are protected (FAA Order 8260.3G
+  // ¶16-3-2 / Table 16-6-1; docs/holding-protected-airspace.md). Every
+  // content bank carries this scan — the guarded siblings did not stop the
+  // unguarded one from shipping the folklore model.
+  it('no paragraph teaches a one-side-protected model', () => {
+    for (const lesson of LESSONS) {
+      for (const p of lesson.paragraphs) {
+        expect(p.text, lesson.id).not.toMatch(/unprotected/i)
+        expect(p.text, lesson.id).not.toMatch(/protected side/i)
+      }
+    }
+  })
 })

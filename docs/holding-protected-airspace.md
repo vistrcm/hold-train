@@ -119,8 +119,12 @@ the holding pattern" (¶2-8-9) — though never as a label on these columns.
 - **There is no fixed "8 NM vs 4 NM".** Across the current patterns the non-holding half-width
   runs 3.5–22.5 NM and the holding half-width 5.3–34.5 NM, scaling with pattern number
   (altitude / airspeed / fix distance, Table 16-3-1). No row matches a fixed 8/4 pair.
-- The non-holding half-width is consistently **38.5–40.0% of total width** across all 28
-  current patterns (computed from the table above; derived, not stated in the order).
+- The non-holding half-width is consistently **38.5–40.0% of total width** (rounded to 0.1%)
+  across all 28 current patterns (computed from the table above; derived, not stated in the
+  order). Exact span: 38.49% (pattern 28, 18.9 / 49.1) to 40.00% (pattern 5, 3.8 / 9.5) —
+  pattern 28 is the one row strictly below 38.5% before rounding, so re-deriving the fractions
+  from the table lands just outside the rounded range; that is this rounding, not a
+  transcription error.
 
 ## Reconciliation with the earlier unverified numbers
 
@@ -133,7 +137,8 @@ non-holding side 38.5–40% of total width "across all 31 templates".
   (¶16-3-1: "Pattern sizes one to three are no longer in use"). The 2.6/4.1/6.7 figures
   presumably come from cancelled 7130.3A Table 3 and are **unverified** — treat them as
   historical, never cite them as current.
-- The 38.5–40% span: confirmed, but over the 28 current patterns, not 31 templates.
+- The 38.5–40% span: confirmed as a 0.1%-rounded span (exact minimum 38.49%, pattern 28), and
+  over the 28 current patterns, not 31 templates.
 
 ## Method notes (for the next verification)
 

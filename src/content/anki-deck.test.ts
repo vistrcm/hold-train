@@ -169,6 +169,34 @@ describe('CORE_DECK key facts (verified against FAA sources)', () => {
     expect(card!.source).toContain('FIG 5-3-4')
   })
 
+  // The safe-default card once read "the holding (protected) side … obstacle
+  // protection is built around the holding side … beats a tidy one outside
+  // it" — the one-side-protected folklore retired 2026-08-03 against FAA Order
+  // 8260.3G ¶16-3-2 / Table 16-6-1 (both sides are protected; the non-holding
+  // side is merely the narrower area — docs/holding-protected-airspace.md).
+  // The plan's acceptance grep for the literal "unprotected" could not see it:
+  // the card implied the claim without the word. Cards export into the
+  // student's Anki deck, the one place the app cannot reach to correct
+  // anything, so the deck gets its own guard.
+  it('safe-default entry card: both sides protected, holding side favored as the wider area', () => {
+    const card = CORE_DECK.find((c) => /safe default/i.test(c.front))
+    expect(card).toBeDefined()
+    expect(card!.back).toMatch(/both sides[\s\S]*protected/i)
+    expect(card!.back).toMatch(/narrower/i)
+    expect(card!.source).toContain('8260.3G')
+    expect(card!.source).toContain('Table 16-6-1')
+  })
+
+  it('no card teaches a one-side-protected model', () => {
+    for (const card of CORE_DECK) {
+      const text = `${card.front} ${card.back}`
+      expect(text, card.front).not.toMatch(/unprotected/i)
+      // "protected side" (as opposed to "protected airspace") is the framing
+      // that smuggles the claim in without the word.
+      expect(text, card.front).not.toMatch(/protected side/i)
+    }
+  })
+
   it('holding-report cards cite the verified AIM 5-3-3 a1(f), (g)', () => {
     const cards = CORE_DECK.filter((c) => /report/i.test(c.front))
     expect(cards.length).toBeGreaterThanOrEqual(2)

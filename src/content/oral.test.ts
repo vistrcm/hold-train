@@ -100,6 +100,28 @@ describe('required content presence', () => {
     }
   })
 
+  // The protected-side item asks exactly the question FAA Order 8260.3G
+  // settles (docs/holding-protected-airspace.md); an answer that omits "both
+  // sides are protected" invites the folklore one-side-protected model to
+  // fill the gap. Same guard class as the anki deck's: assert the settled
+  // fact, ban the retired framing.
+  it('protected-side item states both sides are protected, non-holding narrower, citing 8260.3G', () => {
+    const item = ORAL_ITEMS.find((i) => i.id === 'protected-side')
+    expect(item).toBeDefined()
+    expect(item!.answer).toMatch(/both sides[\s\S]*protected/i)
+    expect(item!.answer).toMatch(/narrower/i)
+    expect(item!.source).toContain('8260.3G')
+    expect(item!.source).toContain('Table 16-6-1')
+  })
+
+  it('no item calls a side unprotected or names "the protected side"', () => {
+    for (const item of ORAL_ITEMS) {
+      const text = `${item.question} ${item.answer} ${item.caveat ?? ''}`
+      expect(text, item.id).not.toMatch(/unprotected/i)
+      expect(text, item.id).not.toMatch(/protected side/i)
+    }
+  })
+
   it('fact items cite FAA primary sources (AIM, CFR, ACS, JO 7110.65, or NTSB)', () => {
     for (const item of ORAL_ITEMS) {
       const cited = /AIM|14 CFR|FAA-S-ACS-8C|7110\.65|NTSB|P\/CG|Garmin/.test(item.source)
