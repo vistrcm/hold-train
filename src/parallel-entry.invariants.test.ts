@@ -33,7 +33,7 @@ import README from '../README.md?raw'
 // uses on styles.css (styles.test.ts) and README.md (dashboard.test.ts). They
 // are globbed rather than imported one by one — see `CONTENT` below.
 import { PARALLEL_INTERCEPT_DEG, type HoldCourse, type TurnDirection, entryGuidance } from './engine/entry'
-import { normalizeDeg } from './engine/geometry'
+import { angleDiff, normalizeDeg } from './engine/geometry'
 import { SAMPLE_SECONDS, TURN_RATE_DEG_PER_S, flyCircuit, textbookDecisions } from './engine/sim'
 import { renderMap } from './ui/mapview'
 
@@ -66,6 +66,8 @@ interface DrawnParallel {
   rolloutHoldingSideNm: number
   /** Straight-line distance from arc start to arc end, in units of the arc radius. */
   chordOverRadius: number
+  /** Compass bearing of the chord from arc start to arc end, degrees. */
+  chordBearingDeg: number
 }
 
 /**
@@ -90,6 +92,8 @@ function drawParallel(hold: HoldCourse): DrawnParallel {
     sweepFlag: d[8]!,
     rolloutHoldingSideNm: rollout.e * holdingSide.e + rollout.n * holdingSide.n,
     chordOverRadius: Math.hypot(d[9]! - d[2]!, d[10]! - d[3]!) / d[4]!,
+    // SVG y grows downward, so north is -y: compass bearing = atan2(Δx, -Δy).
+    chordBearingDeg: normalizeDeg((Math.atan2(d[9]! - d[2]!, d[3]! - d[10]!) * 180) / Math.PI),
   }
 }
 
@@ -165,6 +169,16 @@ describe('the map draws the rejoin the engine specifies', () => {
   // an angle assertion that is deliberately blind to direction (A2 owns that),
   // and it moves continuously with the constant: 45° → 1.8478, 30° → 1.9319.
   //
+  // ⚠️ `chord/R` fixes θ only UP TO REFLECTION about 180°, because
+  // `sin(θ/2) = sin(180° − θ/2)`: a 135° sweep has the identical chord as a 225°
+  // one (2·sin 67.5° = 2·sin 112.5° = 1.8478). Mis-signing mapview's rollout to
+  // `normalizeDeg(c − PARALLEL_INTERCEPT_DEG·rs)` sweeps 135°, and left this
+  // whole FILE green (18/18, mutation-run 2026-08-03) — it keeps the sweep flag,
+  // and its rollout still lands on the holding side, so A2 passes too. One
+  // hand-computed golden pair in mapview.test.ts was the only thing that failed,
+  // i.e. one course × pattern out of the twenty this sweep exists to cover.
+  // The test BELOW closes that: chord LENGTH is unsigned, chord BEARING is not.
+  //
   // Tolerance is 2 decimals, not 3, and that is a floor set by the drawing, not
   // slack: the path rounds coordinates to 0.1 px against a ~13.6 px radius, so
   // the ratio carries ~0.001 of rounding noise. 2 decimals still separates 45°
@@ -181,6 +195,40 @@ describe('the map draws the rejoin the engine specifies', () => {
             `${180 + PARALLEL_INTERCEPT_DEG}° and its chord is ${expected.toFixed(4)}R; ` +
             `map drew ${drawn.chordOverRadius.toFixed(4)}R (${EVIDENCE})`,
         ).toBeCloseTo(expected, 2)
+      }
+    }
+  })
+
+  // The signed half of the angle check. A chord subtends its arc symmetrically,
+  // so the chord from a turn that starts on heading `h0` and sweeps θ in
+  // direction `rs` runs at `h0 + rs·θ/2` — no reflection ambiguity, and still
+  // read from the same two endpoints, so no second copy of mapview's geometry.
+  //
+  // ⚠️ What this does and does not own. `rs` is read from the ORACLE, so an
+  // engine flip moves expectation and drawing together and this passes — A2,
+  // anchored on `hold.turnDirection`, is what fails then. This owns the case A2
+  // and `chord/R` are jointly blind to: the map drawing a DIFFERENT angle, in
+  // the engine's own direction. Correct = h0 + 112.5·rs; the mis-signed rollout
+  // above = h0 + 67.5·rs (45° out); a literal 30 = h0 + 105·rs (7.5° out).
+  //
+  // 1° tolerance is a floor set by the drawing, like the 2 decimals above: 0.1 px
+  // of endpoint rounding across a ~25 px chord is ~0.3° of bearing noise. The
+  // smallest defect it must catch is 7.5×.
+  it('the drawn arc turns the oracle’s way, by 180° + the engine intercept angle', () => {
+    for (const turnDirection of PATTERNS) {
+      for (const inboundCourse of COURSES) {
+        const hold: HoldCourse = { inboundCourse, turnDirection }
+        const g = entryGuidance('parallel', hold)
+        const rs = g.turnToInbound === 'right' ? 1 : -1
+        const drawn = drawParallel(hold)
+        const expected = normalizeDeg(g.outboundHeading + (rs * (180 + PARALLEL_INTERCEPT_DEG)) / 2)
+        expect(
+          Math.abs(angleDiff(expected, drawn.chordBearingDeg)),
+          `${inboundCourse}°/${turnDirection}: a ${180 + PARALLEL_INTERCEPT_DEG}° rejoin ` +
+            `from outbound ${g.outboundHeading}° turning ${g.turnToInbound} puts the arc's ` +
+            `chord on ${expected.toFixed(1)}°; map drew ` +
+            `${drawn.chordBearingDeg.toFixed(1)}° (${EVIDENCE})`,
+        ).toBeLessThan(1)
       }
     }
   })
@@ -432,8 +480,15 @@ const APP_MODULES: ReadonlyArray<{ file: string; source: string }> = SOURCES.fil
  * parallel circuit with this test still green, because the file's OTHER
  * `entry: 'direct'` literals satisfied the loop. A guard that a refactor to a
  * non-literal walks straight through is not a bound.
+ *
+ * ⚠️ Counts raw parens; it does not lex strings, template literals, regexes or
+ * comments. A `)` inside a string in the argument list would mis-slice the call.
+ * That is tolerated rather than fixed (a lexer here would be more machinery than
+ * the bound is worth), but it is NOT allowed to fail silently: an unbalanced
+ * scan throws below instead of returning a truncated slice that the entry check
+ * would then read as clean.
  */
-function flyCircuitCallArgs(source: string): string[] {
+function flyCircuitCallArgs(source: string, file: string): string[] {
   const out: string[] = []
   const re = /\bflyCircuit\s*\(/g
   for (let m = re.exec(source); m !== null; m = re.exec(source)) {
@@ -443,6 +498,13 @@ function flyCircuitCallArgs(source: string): string[] {
     for (; i < source.length && depth > 0; i++) {
       if (source[i] === '(') depth++
       else if (source[i] === ')') depth--
+    }
+    if (depth !== 0) {
+      throw new Error(
+        `${file}: unbalanced parens after the flyCircuit( at index ${m.index}, so this ` +
+          `guard cannot bound that call. Fixing the paren scan is the fix; a silent ` +
+          `truncation here reads as coverage.`,
+      )
     }
     out.push(source.slice(start, i - 1))
   }
@@ -469,25 +531,38 @@ describe('the sim limitation stays inside the bound it documents', () => {
       'the glob found no flyCircuit callers at all — scan went vacuous',
     ).toBeGreaterThan(0)
     for (const { file, source } of callers) {
-      const calls = flyCircuitCallArgs(source)
+      const calls = flyCircuitCallArgs(source, file)
       expect(calls.length, `${file}: matched as a caller but no call args parsed`).toBeGreaterThan(0)
       for (const args of calls) {
         // Two accepted spellings, both checkable: an inline literal, or the
         // engine's own decision builder — whose entry is pinned at RUNTIME by
         // the test below, since it lives inside the excluded sim.ts.
-        const inline = args.match(/entry:\s*'([a-z]+)'/)
-        const viaBuilder = /\btextbookDecisions\s*\(/.test(args)
-        expect(
-          inline !== null || viaBuilder,
-          `${file}: flyCircuit(${args.trim().slice(0, 60)}…) names its entry as ` +
-            `neither an inline literal nor textbookDecisions(), so this guard ` +
-            `cannot see which entry it flies. ${LIMITATION}`,
-        ).toBe(true)
-        if (inline) {
-          expect(inline[1], `${file}: passes entry '${inline[1]}' to flyCircuit. ${LIMITATION}`).toBe(
-            'direct',
-          )
+        //
+        // ⚠️ EVERY `entry:` in the call is checked, and textbookDecisions() does
+        // NOT excuse one. The previous version read only the FIRST match and
+        // short-circuited on `viaBuilder`, so
+        // `{ ...textbookDecisions(h, w), entry: (['direct','parallel'] as const)[1] }`
+        // left this file green at 18/18 while wind-lab genuinely flew a parallel
+        // circuit (mutation-run 2026-08-03) — the exact escape the docblock above
+        // claims to have closed, reopened one level in. A spread is a DEFAULT,
+        // and the key written after it wins; a guard that stops reading at the
+        // builder cannot see the override that follows it.
+        const entries = [...args.matchAll(/\bentry:\s*(?:'([a-z]+)')?/g)]
+        for (const e of entries) {
+          expect(
+            e[1],
+            `${file}: flyCircuit(…) names its entry with a non-literal expression ` +
+              `(${args.slice(e.index, e.index + 40).trim()}…), so this guard cannot see ` +
+              `which entry it flies. ${LIMITATION}`,
+          ).toBeDefined()
+          expect(e[1], `${file}: passes entry '${e[1]}' to flyCircuit. ${LIMITATION}`).toBe('direct')
         }
+        expect(
+          entries.length > 0 || /\btextbookDecisions\s*\(/.test(args),
+          `${file}: flyCircuit(${args.trim().slice(0, 60)}…) names no entry at all and ` +
+            `does not go through textbookDecisions(), so this guard cannot see which ` +
+            `entry it flies. ${LIMITATION}`,
+        ).toBe(true)
       }
     }
   })
