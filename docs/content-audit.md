@@ -1299,7 +1299,7 @@ failure this ledger records for the rejoin prose scan.
   is wrong *terminology* the reader absorbs while rejecting it. Now "Turns toward the holding
   side, either direction". Regression test: "no question, option, or explanation teaches a
   one-side-protected model" in `src/content/questions.test.ts`; `src/content/lessons.test.ts`
-  carries the same scan ("no paragraph teaches a one-side-protected model") so every content
+  carries the same scan ("no lesson teaches a one-side-protected model") so every content
   bank has its own guard.
 - **Hardened the wind-lab guards from the same review**
   (`src/modules/wind-lab.test.ts`): the "unprotected" blacklist now scans the whole screen's
