@@ -11,11 +11,12 @@
 //   - no-crab decisions in a crosswind → measurable drift at the fix
 
 import { describe, expect, it } from 'vitest'
-import { entryGuidance } from './entry'
+import { PARALLEL_INTERCEPT_DEG, type Entry, entryGuidance } from './entry'
 import { groundSpeeds, inboundCrab, outboundHeading, outboundTimeSeconds, type Wind } from './wind'
 import {
   HOLD_TAS_KT,
   MAX_SIM_SECONDS,
+  SAMPLE_SECONDS,
   TURN_RATE_DEG_PER_S,
   flyCircuit,
   textbookDecisions,
@@ -26,6 +27,14 @@ import {
 const RIGHT_NORTH: SimHold = { inboundCourse: 0, turnDirection: 'right' }
 const LEFT_NORTH: SimHold = { inboundCourse: 0, turnDirection: 'left' }
 const CALM: Wind = { directionFrom: 0, speedKt: 0 }
+
+// Standard-rate turn radius. Derived, not written out: a rounded literal left
+// the -2R bounds below with ~1e-3 NM of slack, so any change to DT, TAS or the
+// turn rate produced a failure that reads like a rejoin-direction regression.
+// File-level because two tests need it — replacing one literal with two copies
+// of the expression re-creates the drift surface one level up, which is the
+// failure mode this branch exists to fix.
+const TURN_RADIUS_NM = HOLD_TAS_KT / 3600 / ((TURN_RATE_DEG_PER_S * Math.PI) / 180) // ≈ 0.4775
 
 function decisions(partial: Partial<SimDecisions> = {}): SimDecisions {
   return { entry: 'direct', outboundHeading: 180, inboundCrab: 0, outboundSeconds: 60, ...partial }
@@ -150,35 +159,89 @@ describe('entry shapes', () => {
   })
 
   // AIM 5-3-8 j3(a): parallel turns onto the outbound heading toward the
-  // NONholding side, then reintercepts "in the direction of the holding pattern
-  // through more than 180 degrees". The two turns oppose each other — that is
-  // the whole shape of the entry, and why it is the only maneuver the AIM puts
-  // on the nonholding side.
-  it('parallel: outbound turn opposes the pattern, reintercept turn follows it', () => {
+  // NONholding side, and then BOTH the outbound turn and the rejoin oppose the
+  // pattern — the rejoin turns back toward the holding side, and in the real
+  // maneuver it crosses the course. "Turn in the direction of the holding
+  // pattern" is spatial, not rotational; FIG 5-3-4 draws the teardrop rejoin
+  // clockwise and the parallel rejoin counter-clockwise in one figure. See
+  // docs/parallel-entry-evidence.md. Do NOT re-derive this from the ">180°"
+  // clause — both senses exceed 180°, so the clause does not discriminate, and
+  // reasoning from it inverted this app once.
+  //
+  // ⚠️ THIS MODEL DOES NOT DRAW THE CROSSING, and the assertions below pin the
+  // model, not the maneuver. `flyCircuit` starts established ON the course at
+  // the fix, so the turn onto outbound is a full 180° and the rejoin comes out
+  // TANGENT to the holding course — the track stays on the nonholding side
+  // throughout and the inbound leg diverges instead of converging. That is the
+  // KNOWN MODEL LIMITATION block in sim.ts, not a wrong turn direction. Do not
+  // "fix" the assertions below to match the prose above: an assertion that the
+  // track crosses the course is red under this initial condition, and a red test
+  // that reads like a direction defect is exactly what argues the next session
+  // back into inverting the rejoin. The DIRECTION is guarded, faithfully and at
+  // the trajectory level, in src/parallel-entry.invariants.test.ts.
+  it('parallel: outbound turn opposes the pattern, and so does the reintercept', () => {
     const r = flyCircuit(RIGHT_NORTH, decisions({ entry: 'parallel' }), CALM)
     expect(r.completed).toBe(true)
     // right-turn hold → holding side east; the whole entry stays west of course
     for (const p of r.track) {
       expect(p.e).toBeLessThan(0.01)
     }
-    // honest physics: the reintercept turn rolls out on an intercept heading,
-    // so the aircraft is still on the nonholding side abeam the fix — it has
-    // not joined the course yet. Cross-track is signed toward the holding side.
+    // 180° onto outbound + the 60 s leg + a (180 + PARALLEL_INTERCEPT_DEG)°
+    // rejoin, so this slice is everything through rejoin completion. DERIVED,
+    // not the literal 196: that value holds only at the current intercept angle,
+    // and this branch already moved it once (30 → 45). Raising it again would
+    // silently cut the window mid-turn — both assertions below would still pass,
+    // weaker than intended, and the whole-track bound further down would go red
+    // with a message that reads like a rejoin-direction defect. That is exactly
+    // the red test the comment block above warns future sessions about.
+    const rejoinEnd =
+      Math.ceil(
+        (180 / TURN_RATE_DEG_PER_S + 60 + (180 + PARALLEL_INTERCEPT_DEG) / TURN_RATE_DEG_PER_S) /
+          SAMPLE_SECONDS,
+      ) + 1
+    const throughRejoin = r.track.slice(0, rejoinEnd)
+    // A2: the rejoin turn stays inside the displacement the outbound turn
+    // already made — it curls back toward the course, it does not bulge past it
+    expect(Math.min(...throughRejoin.map((p) => p.e))).toBeGreaterThan(-2 * TURN_RADIUS_NM - 0.02) // ≈ -0.9549
+    expect(throughRejoin.at(-1)!.e).toBeGreaterThan(-0.2) // rollout ≈ -0.1390
+    // Whole track: -1.3022 after the fix, -1.9099 before it. The straight
+    // intercept leg diverges further west under this model's initial condition
+    // (see the sim.ts header note), so the 2R bound above is measured through
+    // rejoin completion only — asserting it over the whole track is FALSE.
+    expect(Math.min(...r.track.map((p) => p.e))).toBeGreaterThan(-3 * TURN_RADIUS_NM)
+    // honest physics: the rejoin rolls out at the engine's intercept angle, but
+    // from 2R off course that heading is tangent-side of the course under this
+    // model — the aircraft is still on the nonholding side abeam the fix and has
+    // moved further from it, not closer. Cross-track is signed toward the
+    // holding side, so a divergent parallel leg reads negative and growing. The
+    // rollout HEADING itself is pinned against the engine in
+    // src/parallel-entry.invariants.test.ts.
     expect(r.inboundCrossTrackNm).toBeLessThan(-0.5)
   })
 
-  it('parallel reintercept sweeps more than 180° (the AIM 5-3-8 j3(a) overshoot)', () => {
-    // A pure sign flip would leave an exactly-180° turn, which rolls out
-    // parallel to the course 2R off and never intercepts. Measure the turn by
-    // the track's westward excursion: the >180° loop reaches further from the
-    // course than the 2R the outbound turn alone produces.
-    const r = flyCircuit(RIGHT_NORTH, decisions({ entry: 'parallel' }), CALM)
-    const westmost = Math.min(...r.track.map((p) => p.e))
-    // R ≈ 0.4775 (file header). Outbound turn alone ends 2R west and an
-    // opposite-direction reintercept loops back east, never passing 2R. The
-    // pattern-direction loop centers at 3R and reaches ~4R.
-    expect(westmost).toBeLessThan(-3 * 0.4775)
-  })
+  // The former 'parallel reintercept sweeps more than 180°' test lived here. It
+  // measured the sweep by the track's westward excursion, which measures the
+  // DEFECT, not the sweep: only the wrong-way loop reaches past 2R. Do not
+  // restore an excursion proxy here.
+  //
+  // A3 is asserted in two places instead, neither of them an excursion:
+  //   * src/engine/entry.test.ts, 'A3: the parallel rejoin sweeps 225°, and an
+  //     inverted rejoin would give 135°' — the heading algebra;
+  //   * src/parallel-entry.invariants.test.ts, 'rejoin rotation sense matches
+  //     entryGuidance turnToInbound for every course × pattern' — the ROTATION
+  //     this integrator actually flies, measured by integrating the signed
+  //     cross product of successive track segments. That is the faithful
+  //     trajectory-level sweep, and it pins the sim against the oracle.
+  //
+  // That is a DIFFERENT failure mode from the one this file covers, not a
+  // stronger version of it, so do not retire the goldens below as redundant.
+  // Pinning the sim against the oracle cannot catch the oracle itself being
+  // wrong: sim.ts derives its turn sign from `turnToInbound`, so flipping
+  // entry.ts's parallel branch flips the sim with it and every oracle-derived
+  // assertion stays green. The goldens here are anchored on RIGHT_NORTH /
+  // LEFT_NORTH and a written-out side, which is exactly what does go red — and
+  // the every-course version of that is the pattern-anchored A2 in
+  // src/parallel-entry.invariants.test.ts.
 
   // Left-turn mirrors: the turnSign inversion is exactly the sign-convention
   // bug class the project rules flag, so both shapes get mirrored coverage.
@@ -206,7 +269,9 @@ describe('entry shapes', () => {
     // cross-track is signed toward the holding side, so a nonholding-side
     // rollout is negative in both the standard and nonstandard case
     expect(r.inboundCrossTrackNm).toBeLessThan(-0.5)
-    expect(Math.max(...r.track.map((p) => p.e))).toBeGreaterThan(3 * 0.4775)
+    // mirror of the standard case: the excursion peaks at 1.3022 on the
+    // straight intercept leg, inside 3R — the wrong-way rejoin reached 1.9099
+    expect(Math.max(...r.track.map((p) => p.e))).toBeLessThan(3 * TURN_RADIUS_NM)
   })
 })
 
@@ -248,6 +313,23 @@ describe('limits and validation', () => {
     expect(() => flyCircuit(RIGHT_NORTH, decisions(), { directionFrom: 0, speedKt: -1 })).toThrow(
       RangeError,
     )
+    // `entry` is the one decision field that had no check. It became load-bearing
+    // when the turn sign started coming from `entryGuidance(decisions.entry, …)`:
+    // an out-of-domain value falls through that exhaustive switch, returns
+    // undefined, and surfaces as `TypeError: Cannot read properties of undefined`
+    // from inside the integrator instead of as a RangeError naming the field.
+    // Matched on the MESSAGE, not just the class: the justification above is
+    // that the caller gets an error NAMING the field rather than a TypeError
+    // from three frames deeper, and `toThrow(RangeError)` alone is satisfied by
+    // any of the sibling checks throwing for an unrelated reason — so it would
+    // pass even if this check were deleted and something else rejected the
+    // input first.
+    expect(() => flyCircuit(RIGHT_NORTH, decisions({ entry: 'Parallel' as Entry }), CALM)).toThrow(
+      /entry must be one of/,
+    )
+    expect(() =>
+      flyCircuit(RIGHT_NORTH, decisions({ entry: undefined as unknown as Entry }), CALM),
+    ).toThrow(/entry must be one of/)
   })
 
   it('samples the ground track about once per second', () => {

@@ -4,6 +4,7 @@ import {
   determineEntry,
   entryGuidance,
   ENTRIES,
+  PARALLEL_INTERCEPT_DEG,
   type Entry,
   type HoldCourse,
   type SectorArc,
@@ -225,31 +226,111 @@ describe('entryGuidance', () => {
   // PATTERN through more than 180 degrees, and return to the holding fix or
   // intercept the holding course inbound."
   //
-  // Drawn out (inbound 270, right turns, outbound 090): the aircraft parallels
-  // outbound on the south (nonholding) side, ending south-east of the fix. The
-  // fix then bears roughly 285. A RIGHT turn 090 -> 285 is 195 deg (more than
-  // 180); a LEFT turn is 165 deg (less than 180). Only the pattern direction
-  // satisfies the AIM's "more than 180 degrees", so the two clauses agree.
-  it('parallel: outbound course on the nonholding side, reintercept WITH the pattern', () => {
+  // ⚠️ "In the direction of the holding pattern" is SPATIAL (toward the racetrack,
+  // i.e. back across the holding course onto the holding side), NOT rotational.
+  // The rejoin turn therefore opposes the pattern's turn direction. Evidence, all
+  // rendered and visually inspected — see docs/parallel-entry-evidence.md:
+  //   * AIM FIG 5-3-4 draws, in ONE standard-pattern figure, the teardrop rejoin
+  //     CLOCKWISE (with the pattern) and the parallel rejoin COUNTER-CLOCKWISE
+  //     (against it). Same words, opposite senses. AIP FIG ENR 1.5-3, drawn
+  //     independently, reproduces it. IFH FAA-H-8083-15B Fig 10-6 is reported to
+  //     agree but was never rendered here — second-hand, and not relied on.
+  //   * ICAO Doc 8168 Vol I Pt I §6 Ch 1 ¶1.4.4(b) says it in words, rotationally:
+  //     in a RIGHT-hand pattern the parallel rejoin is "turned LEFT onto the holding
+  //     side". Vol II Pt II §4 Ch 1 ¶1.2.1.2(b) repeats it verbatim. ¶1.4.4(a)/(c)
+  //     pin the other two turns: left across the fix, right only on second arrival.
+  //
+  // ⚠️ ">180°" DOES NOT DISCRIMINATE and must never be reasoned from. The old
+  // derivation below this line was the origin of a shipped defect: it measured the
+  // bearing to the fix at the START of the turn and never updated it for the
+  // aircraft's motion DURING the turn. Computed correctly across the parallel
+  // sector, right turns sweep 212.6°–222.1° and left turns 189.3°–215.3° — both
+  // exceed 180°, and they are exactly equal (215.3°) at zero offset by symmetry.
+  it('parallel: outbound course on the nonholding side, reintercept AGAINST the pattern', () => {
     const g = entryGuidance('parallel', hold)
     expect(g.outboundHeading).toBe(90)
     expect(g.side).toBe('nonholding')
-    expect(g.turnToInbound).toBe('right')
+    expect(g.turnToInbound).toBe('left')
   })
 
-  it('nonstandard mirrors: teardrop offset flips, parallel reintercept is left', () => {
+  it('nonstandard mirrors: teardrop offset flips, parallel reintercept is right', () => {
     expect(entryGuidance('teardrop', nonStd(270)).outboundHeading).toBe(120)
     expect(entryGuidance('teardrop', nonStd(270)).turnToInbound).toBe('left')
-    expect(entryGuidance('parallel', nonStd(270)).turnToInbound).toBe('left')
+    expect(entryGuidance('parallel', nonStd(270)).turnToInbound).toBe('right')
     expect(entryGuidance('direct', nonStd(270)).turnToInbound).toBe('left')
   })
 
-  it('every entry reintercepts in the pattern direction (AIM 5-3-8 j3)', () => {
+  it('direct and teardrop reintercept with the pattern, parallel against it', () => {
     for (const inbound of [0, 45, 90, 180, 270, 315]) {
       for (const h of [std(inbound), nonStd(inbound)]) {
+        const opposed = h.turnDirection === 'right' ? 'left' : 'right'
         for (const e of ENTRIES) {
-          expect(entryGuidance(e, h).turnToInbound).toBe(h.turnDirection)
+          const expected = e === 'parallel' ? opposed : h.turnDirection
+          expect(entryGuidance(e, h).turnToInbound, `${e} ${h.turnDirection} ${inbound}`)
+            .toBe(expected)
         }
+      }
+    }
+  })
+
+  it('the golden case: inbound 140, left turns → the rejoin is a RIGHT turn', () => {
+    // "Hold northwest of the Delta NDB on the one four zero bearing to the
+    // station, left turns", aircraft heading 251°. Holding side northeast.
+    const g = entryGuidance('parallel', nonStd(140))
+    expect(g.outboundHeading).toBe(320)
+    expect(g.side).toBe('nonholding')
+    expect(g.turnToInbound).toBe('right')
+    // The rollout heading for this case is 185° (C + 45 for a left-turn
+    // pattern). NOT asserted here: no engine function returns it, so any
+    // expect() spelling would be arithmetic on a constant — a line that cannot
+    // fail reads as coverage it does not provide. The rollout heading is pinned
+    // BEHAVIOURALLY where it is flown and drawn: 'rejoin rolls out on the engine
+    // intercept angle for every course × pattern' and 'the drawn arc sweeps 180°
+    // + the engine intercept angle' in src/parallel-entry.invariants.test.ts,
+    // plus the golden case in src/ui/mapview.test.ts.
+  })
+
+  // A3. The intercept angle is convention, not AIM text (the AIM requires only
+  // "more than 180 degrees") and is NOT a measurement of the figures — the one
+  // rollout tangent measured in docs/parallel-entry-evidence.md is ≈31°. 45° is a
+  // drawing choice for legibility; do not justify it by claiming the FAA draws it.
+  // It lives in the engine so the map and the sim cannot drift from it.
+  it('the intercept angle is 45°, single-sourced in the engine', () => {
+    expect(PARALLEL_INTERCEPT_DEG).toBe(45)
+  })
+
+  // ⚠️ The rollout heading below is derived from the PATTERN, not from
+  // `g.turnToInbound`. That is the whole point. Deriving it from `turnToInbound`
+  // — `normalizeDeg(c + 45 * rejoinSign)`, the obvious spelling — makes the test
+  // a tautology: the outer `* rejoinSign` cancels the inner one
+  // (45·rs² − 180·rs = 45 − 180·rs), so the sweep is 225 for BOTH senses and an
+  // inverted engine passes. This version fixes the rollout at `C − 45·pattern`
+  // (offset away from the pattern's turn direction, which is what "the rejoin
+  // converges from the holding side" means as a heading) and measures the sweep
+  // in the engine's direction, so an inverted `turnToInbound` yields 135°.
+  it('A3: the parallel rejoin sweeps 225°, and an inverted rejoin would give 135°', () => {
+    for (const c of [0, 45, 90, 135, 180, 225, 270, 315, 140]) {
+      for (const h of [std(c), nonStd(c)]) {
+        const g = entryGuidance('parallel', h)
+        const patternSign = h.turnDirection === 'right' ? 1 : -1
+        const rejoinSign = g.turnToInbound === 'right' ? 1 : -1
+        const rolloutHeading = normalizeDeg(c - PARALLEL_INTERCEPT_DEG * patternSign)
+        const sweep = normalizeDeg((rolloutHeading - g.outboundHeading) * rejoinSign)
+        expect(sweep, `${h.turnDirection} ${c}`).toBe(225)
+        // NOT also asserted `> 180`: the line above fixes `sweep` at exactly
+        // 225, so a `toBeGreaterThan(180)` beside it cannot fail. The AIM bound
+        // it was standing in for is implied by the equality and restated in the
+        // comment — fake coverage is worse than none (CLAUDE.md), and this file
+        // already deletes two other assertions for the same reason.
+        // What an INVERTED engine would sweep is 135° — `normalizeDeg(-x)` is
+        // `360 − x`, so it is 360 − 225 by construction. NOT asserted: once the
+        // line above has fixed `sweep` at 225, an expect() on it can never fail,
+        // and it would not catch the rewrite that actually threatens this test
+        // (spelling `rolloutHeading` as the tautological `c + 45 * rejoinSign`)
+        // — with a CORRECT engine `rejoinSign === -patternSign`, so both
+        // spellings produce identical numbers and no runtime assertion can
+        // separate them. The guard against that rewrite is the ⚠️ above, read
+        // by a human. A dead expect() beside it only disguises that.
       }
     }
   })
@@ -257,6 +338,32 @@ describe('entryGuidance', () => {
   it('every guidance cites an FAA source', () => {
     for (const e of ENTRIES) {
       expect(entryGuidance(e, hold).source).toMatch(/AIM 5-3-8/)
+    }
+  })
+
+  // The parallel guidance's `turnToInbound` is the one field in this engine that
+  // j3's PROSE cannot support — "more than 180 degrees" does not discriminate the
+  // two senses (see the ⚠️ on A3 above and docs/parallel-entry-evidence.md). It
+  // comes from FIG 5-3-4, so the citation has to name the figure: a `source` of
+  // "AIM 5-3-8 j3" alone offers a rendered sentence a citation that does not
+  // support it, which is the derivation-as-citation failure CLAUDE.md's FAA-source
+  // convention exists to prevent. Asserted per entry so that widening every
+  // guidance to the figure — which would over-cite the direct and teardrop cases,
+  // whose fields ARE in the prose — does not satisfy this by accident.
+  it('the parallel guidance cites the figure its rejoin direction comes from', () => {
+    for (const h of [std(270), nonStd(270)]) {
+      expect(
+        entryGuidance('parallel', h).source,
+        'the parallel rejoin direction is figure-derived; see docs/parallel-entry-evidence.md',
+      ).toMatch(/FIG 5-3-4/)
+    }
+    // Both other entries, not just `direct`: the docblock above claims the
+    // per-entry negative stops "widening every guidance to the figure" from
+    // satisfying this by accident, and with only `direct` asserted, widening the
+    // TEARDROP alone walked through. A guard narrower than the claim in its own
+    // comment reads as coverage it does not have.
+    for (const e of ENTRIES.filter((x) => x !== 'parallel')) {
+      expect(entryGuidance(e, hold).source, `${e} over-cites the figure`).not.toMatch(/FIG 5-3-4/)
     }
   })
 })

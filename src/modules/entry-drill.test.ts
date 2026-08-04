@@ -1,13 +1,24 @@
 import { describe, expect, it } from 'vitest'
 import { createStore, type Store } from '../app/store'
 import { generateClearance, PUBLISHED_HOLDS } from '../engine/clearance'
-import { determineEntry, ENTRIES, type Entry } from '../engine/entry'
+import {
+  determineEntry,
+  ENTRIES,
+  entryGuidance,
+  type Entry,
+  type HoldCourse,
+} from '../engine/entry'
+import { normalizeDeg } from '../engine/geometry'
 import {
   COCKPIT_TARGET_SECONDS,
   createEntryDrill,
   entryDrillScreen,
+  flyItText,
   generateScenario,
   gradeEntryAnswer,
+  OUTBOUND_TIMING_AIM,
+  OUTBOUND_TIMING_NOTE,
+  OUTBOUND_TIMING_SOURCE,
   renderEntryDrill,
 } from './entry-drill'
 import { courseText } from '../format'
@@ -246,6 +257,125 @@ describe('createEntryDrill controller', () => {
   })
 })
 
+// The parallel entry is the only entry whose FIRST turn — the one across the fix
+// onto outbound — opposes the pattern, and the drill never named it. A learner who
+// only reads "then right turn through more than 180°" cannot see that a left-turn
+// hold is flown with TWO right turns; the shape is what the corrected geometry is
+// for. See docs/parallel-entry-evidence.md.
+describe('flyItText', () => {
+  const GOLDEN: HoldCourse = { inboundCourse: 140, turnDirection: 'left' }
+  const STANDARD: HoldCourse = { inboundCourse: 0, turnDirection: 'right' }
+  /** STANDARD's mirror — same course, opposite pattern. */
+  const NONSTANDARD: HoldCourse = { inboundCourse: 0, turnDirection: 'left' }
+
+  it('golden case: heading 251 into a left-turn hold is a parallel flown with two RIGHT turns', () => {
+    expect(determineEntry(251, GOLDEN).primary).toBe('parallel')
+    const text = flyItText(entryGuidance('parallel', GOLDEN), 251)
+    expect(text).toContain('turn right onto 320°')
+    expect(text).toContain('nonholding side')
+    expect(text).toContain('right turn through more than 180°')
+    expect(text).toContain('both turns opposite the pattern')
+    // A left-turn hold, yet not one left turn in the entry until back at the fix.
+    expect(text).not.toContain('left')
+  })
+
+  it('standard hold mirrors it: a right-turn hold is entered with two LEFT turns', () => {
+    // heading 250 is mid-sector for inbound 000 / right turns.
+    expect(determineEntry(250, STANDARD).primary).toBe('parallel')
+    const text = flyItText(entryGuidance('parallel', STANDARD), 250)
+    expect(text).toContain('turn left onto 180°')
+    expect(text).toContain('nonholding side')
+    expect(text).toContain('left turn through more than 180°')
+    expect(text).toContain('both turns opposite the pattern')
+    expect(text).not.toContain('right')
+  })
+
+  it('A1: the named fix-crossing turn matches the rejoin across the parallel sector', () => {
+    for (const inboundCourse of [0, 45, 90, 135, 180, 225, 270, 315, 140]) {
+      for (const turnDirection of ['right', 'left'] as const) {
+        const hold = { inboundCourse, turnDirection }
+        const g = entryGuidance('parallel', hold)
+        const opposed = turnDirection === 'right' ? 'left' : 'right'
+        expect(g.turnToInbound).toBe(opposed)
+        // sweep the sector interior (d = 185…285 measured pattern-ward), not just
+        // one heading: the fix-crossing turn is heading-dependent, so a single
+        // sample cannot show it holds throughout.
+        for (const d of [185, 200, 235, 270, 285]) {
+          const m = turnDirection === 'right' ? d : -d
+          const heading = normalizeDeg(inboundCourse + m)
+          expect(determineEntry(heading, hold).primary, `${inboundCourse} ${d}`).toBe('parallel')
+          expect(flyItText(g, heading), `${inboundCourse} ${d}`).toContain(
+            `turn ${opposed} onto ${courseText(g.outboundHeading)}`,
+          )
+        }
+      }
+    }
+  })
+
+  // The ±5° boundary band (AIM 5-3-8 j8(d)) is where parallel is an ACCEPTED
+  // answer but the aircraft is already all but aligned with outbound, so the
+  // fix-crossing turn runs the other way. Naming the opposed turn here would
+  // teach a turn the pilot must not make.
+  it('at the teardrop/parallel boundary the named turn follows the heading, not the pattern', () => {
+    const r = determineEntry(177, STANDARD)
+    expect(r.primary).toBe('teardrop')
+    expect(r.alternates).toContain('parallel') // parallel is graded correct here
+    const text = flyItText(entryGuidance('parallel', STANDARD), 177)
+    expect(text).toContain('turn right onto 180°') // 177 → 180 is 3° RIGHT
+    expect(text).not.toContain('both turns opposite the pattern')
+    expect(text).toContain('left turn through more than 180°') // the rejoin is unchanged
+  })
+
+  it('exactly aligned with outbound: no fix-crossing turn is named at all', () => {
+    const text = flyItText(entryGuidance('parallel', STANDARD), 180)
+    expect(text).toContain('roll out on 180°')
+    expect(text).not.toContain('turn right onto')
+    expect(text).not.toContain('turn left onto')
+    expect(text).not.toContain('both turns opposite the pattern')
+  })
+
+  // The two cases above are the entire reason flyItText takes `heading` rather
+  // than deriving the first turn from `turnToInbound`, and both were covered for
+  // a standard hold only. Sign-convention mirrors are this repo's top bug class
+  // and "both turns opposite the pattern" is itself a sign comparison, so a
+  // mirror-only regression in the suppression logic would ship silently.
+  it('the boundary band mirrors: a left-turn hold names the heading-driven turn too', () => {
+    const r = determineEntry(183, NONSTANDARD) // mirror of 177 into STANDARD
+    expect(r.primary).toBe('teardrop')
+    expect(r.alternates).toContain('parallel')
+    const text = flyItText(entryGuidance('parallel', NONSTANDARD), 183)
+    expect(text).toContain('turn left onto 180°') // 183 → 180 is 3° LEFT
+    expect(text).toContain('right turn through more than 180°') // the rejoin is unchanged
+    // The fix-crossing turn follows the pattern here, so the gloss must not claim
+    // both turns oppose it — the claim is false of this scenario.
+    expect(text).not.toContain('both turns opposite the pattern')
+  })
+
+  it('exactly aligned mirrors: a left-turn hold names no fix-crossing turn either', () => {
+    const text = flyItText(entryGuidance('parallel', NONSTANDARD), 180)
+    expect(text).toContain('roll out on 180°')
+    expect(text).not.toContain('turn right onto')
+    expect(text).not.toContain('turn left onto')
+    expect(text).not.toContain('both turns opposite the pattern')
+  })
+
+  it('teardrop keeps the pattern direction and the holding side, with no >180° script', () => {
+    const text = flyItText(entryGuidance('teardrop', STANDARD), 130)
+    // 180 outbound offset 30° toward the holding side (east of a 000 inbound).
+    expect(text).toContain('outbound heading 150°')
+    expect(text).toContain('on the holding side') // not satisfied by 'nonholding side'
+    expect(text).toContain('right turn')
+    expect(text).not.toContain('more than 180°')
+  })
+
+  it('direct turns with the pattern at the fix and gets no >180° script', () => {
+    const text = flyItText(entryGuidance('direct', STANDARD), 30)
+    expect(text).toContain('outbound heading 180°')
+    expect(text).toContain('right turn')
+    expect(text).not.toContain('more than 180°')
+  })
+})
+
 describe('renderEntryDrill screen', () => {
   function setup(mode: 'learn' | 'cockpit', seed = 42) {
     const el = document.createElement('div')
@@ -334,6 +464,37 @@ describe('renderEntryDrill screen', () => {
     expect(verdict).toContain('Parallel also acceptable')
     // The parallel's signature instruction must not be attached to a direct entry.
     expect(el.querySelector('.entry-guidance')!.textContent).not.toContain('more than 180°')
+  })
+
+  it('renders the engine-derived fly-it line verbatim, naming the fix-crossing turn', () => {
+    const { el } = setup('learn', DUAL_KEYED_SEED)
+    const scenario = generateScenario(DUAL_KEYED_SEED)
+    expect(scenario.result.primary).toBe('parallel')
+    answerButton(el, 'parallel').click()
+
+    const guidance = el.querySelector('.entry-guidance')!.textContent!
+    expect(guidance).toBe(flyItText(entryGuidance('parallel', scenario.holdSpec), scenario.heading))
+    expect(guidance).toMatch(/cross the fix, turn (left|right) onto/)
+  })
+
+  // The AIM states ONE timing rule for all three entries. The familiar
+  // "parallel and teardrop time from the fix, direct times from abeam" split is a
+  // derivation from it, so it may be explained but never cited as the rule.
+  it('quotes the AIM outbound-timing sentence verbatim for every entry, with its citation', () => {
+    for (const seed of [42, DUAL_KEYED_SEED, CHARTED_SEED]) {
+      const { el } = setup('learn', seed)
+      answerButton(el, generateScenario(seed).result.primary).click()
+      const timing = el.querySelector('.entry-outbound-timing')!.textContent!
+      expect(timing).toContain(OUTBOUND_TIMING_AIM)
+      expect(timing).toContain(OUTBOUND_TIMING_SOURCE)
+      // The derivation must render in full and OUTSIDE the cited span: matching
+      // the bare word 'derivation' would pass even if the note were folded into
+      // the quotation, which is the thing the split exists to prevent.
+      expect(timing).toContain(OUTBOUND_TIMING_NOTE)
+      expect(OUTBOUND_TIMING_AIM).not.toContain(OUTBOUND_TIMING_NOTE)
+      expect(OUTBOUND_TIMING_NOTE.toLowerCase()).toContain('derivation')
+    }
+    expect(OUTBOUND_TIMING_SOURCE).toBe('AIM 5-3-8 j4(b)')
   })
 
   it('wrong answer: names the expected entry and records the miss', () => {

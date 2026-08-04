@@ -1,8 +1,15 @@
 // Map view: north-up plan view of a holding pattern — racetrack on the
 // holding side, fix marker, ownship, flown ground track vs ghost track, and
 // entry-path illustrations (teardrop 30° offset toward the holding side;
-// parallel on the non-holding side with a >180° pattern-direction reintercept).
-// Entry directions come from entryGuidance — the engine is the oracle.
+// parallel on the non-holding side, then a >180° reintercept turned AGAINST the
+// pattern, crossing back over the holding course onto the holding side).
+// The parallel rejoin's rotation and intercept angle come from the engine —
+// g.turnToInbound and PARALLEL_INTERCEPT_DEG are the oracle for that arc; see
+// docs/parallel-entry-evidence.md. The direct and teardrop branches still take
+// their sweep from hold.turnDirection, which is correct only because for those
+// two entries the turn to inbound IS the pattern's rotation. Don't read the
+// oracle sourcing as file-wide: it is the parallel branch that was wrong, and
+// it is the parallel branch that is pinned to the engine.
 // Shares the HSI's instrument palette (src/ui/palette.ts), so an entry keeps
 // one colour across the compass rose and the plan view.
 // Pure rendering: state in, SVG out. No internal state, no listeners.
@@ -12,7 +19,13 @@
 // chosen per hold so the racetrack plus entry turns fit at any leg length.
 
 import type { LegSpec } from '../engine/clearance'
-import { type Entry, type EntryGuidance, type TurnDirection, entryGuidance } from '../engine/entry'
+import {
+  type Entry,
+  type EntryGuidance,
+  PARALLEL_INTERCEPT_DEG,
+  type TurnDirection,
+  entryGuidance,
+} from '../engine/entry'
 import { assertCourse, normalizeDeg } from '../engine/geometry'
 import { courseText } from '../format'
 import { PALETTE } from './palette'
@@ -164,15 +177,34 @@ function entryPathD(entry: Entry, g: EntryGuidance, hold: MapHold, legNm: number
     )
   }
 
-  // parallel: outbound on the non-holding side, then a >180° turn in the
-  // pattern's direction back to an intercept (AIM 5-3-8 j3(a))
+  // parallel: outbound on the non-holding side, then a >180° turn AGAINST the
+  // pattern's rotation, crossing back over the holding course onto the holding
+  // side (AIM 5-3-8 j3(a); see the entryGuidance 'parallel' case in
+  // src/engine/entry.ts and docs/parallel-entry-evidence.md — the AIM's "in the
+  // direction of the holding pattern" is spatial, not rotational, and FIG 5-3-4
+  // draws this arc counter-clockwise in a standard right-turn pattern).
+  // Rejoin sign READ FROM THE ENGINE, not re-derived from the pattern here.
+  // `g.turnToInbound` already encodes "opposite the pattern" for a parallel; a
+  // local `s === 1 ? -1 : 1` is a second copy of the engine's rule, and three
+  // copies of this geometry are how it came to be wrong in five modules at once.
+  const rs: 1 | -1 = g.turnToInbound === 'right' ? 1 : -1
   const nonHoldingSide = unit(normalizeDeg(c - 90 * s))
   const legEnd = add(add(fix, unit(g.outboundHeading), legNm), nonHoldingSide, PARALLEL_OFFSET_NM)
-  const center = turnCenter(legEnd, g.outboundHeading, s)
-  // roll out angled 30° into the inbound course, converging from the
-  // non-holding side
-  const rollout = pointAtHeading(center, normalizeDeg(c + 30 * s), s)
-  const sweep = s === 1 ? 1 : 0
+  const center = turnCenter(legEnd, g.outboundHeading, rs)
+  // roll out angled into the inbound course from the holding side, at the
+  // engine's intercept angle (45° — the oracle owns the convention)
+  const rollout = pointAtHeading(center, normalizeDeg(c + PARALLEL_INTERCEPT_DEG * rs), rs)
+  // ⚠️ The trailing `L fix` below is a SCHEMATIC return chord, the same one the
+  // teardrop path uses — not a drawn intercept leg. Its bearing is fixed by
+  // where the rollout point lands (330.0° for the standard 1-minute case) and
+  // does not track PARALLEL_INTERCEPT_DEG, so raising the angle 30 → 45 opened a
+  // ~15° kink at rollout (~35° on a 4 NM leg). The ROLLOUT POINT is at the
+  // engine's angle and is what mapview.test.ts and the invariants sweep pin; the
+  // straight run home is illustration. Drawing a true intercept leg means
+  // extending the ray to where it meets the course and then tracking inbound,
+  // which needs a case for short legs where that meeting point falls past the
+  // fix — worth doing, but it is a change to the picture, not a review fix.
+  const sweep = rs === 1 ? 1 : 0
   return (
     `M ${pt(fix, scale)} L ${pt(legEnd, scale)} ` +
     `A ${rr} ${rr} 0 1 ${sweep} ${pt(rollout, scale)} L ${pt(fix, scale)}`

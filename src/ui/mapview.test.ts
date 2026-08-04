@@ -242,24 +242,53 @@ describe('entry-path illustration (engine is the oracle)', () => {
     expect(d[8]).toBe(1) // sweep: right turn
   })
 
-  it('parallel: leg on the non-holding side, >180° reintercept turn with the pattern', () => {
-    // course 360, right turns → holding side east; parallel leg west of course line.
-    // AIM 5-3-8 j3(a) turns "in the direction of the holding pattern through more
-    // than 180 degrees" — so a right-turn hold reintercepts clockwise, not counter.
+  // Parallel entry path: `d` = M fix L legEnd A rr rr 0 1 sweep rollout L fix,
+  // so nums indices are 2,3 = leg end (A4: the non-holding side), 7 = large-arc,
+  // 8 = sweep flag (A1: opposes the pattern), 9,10 = rollout point (A2: back on
+  // the HOLDING side). The arc centre is not assertable — SVG arcs are
+  // endpoint-parameterized — so A2 is measured at the rollout endpoint.
+  //
+  // ⚠️ The rejoin turn OPPOSES the pattern. AIM 5-3-8 j3(a)'s "turn in the
+  // direction of the holding pattern" is spatial (toward the racetrack), not
+  // rotational; FIG 5-3-4 draws the teardrop rejoin clockwise and the parallel
+  // rejoin counter-clockwise in the same standard-pattern figure. Do not
+  // re-derive from ">180°" — it does not discriminate. See
+  // docs/parallel-entry-evidence.md before touching a sweep flag here.
+  it('parallel: leg on the non-holding side, >180° reintercept turn against the pattern', () => {
+    // course 360, right turns → holding side east; parallel leg west of course line,
+    // then a counter-clockwise rejoin that crosses back over the course to the east.
     const el = render({ holdSpec: hold(), entryPath: 'parallel' })
     const d = nums(el.querySelector('.map-entry path')!.getAttribute('d'))
-    expect(d[2]).toBeLessThan(100) // west = non-holding side
-    expect(d[7]).toBe(1) // large-arc: more than 180°
-    expect(d[8]).toBe(1) // sweep: right turn, with the right-turn pattern
+    expect(d[2]).toBeLessThan(100) // A4: west = non-holding side
+    expect(d[7]).toBe(1) // large-arc flag — a constant in the path template, not evidence
+    expect(d[8]).toBe(0) // A1: sweep counter-clockwise, against the right-turn pattern
+    expect(d[9]).toBeGreaterThan(100) // A2: rolls out east = holding side
   })
 
   it('parallel mirrors for a nonstandard hold', () => {
-    // course 360, left turns → holding side west; parallel leg east, left reintercept
+    // course 360, left turns → holding side west; parallel leg east, right rejoin
     const el = render({ holdSpec: hold({ turnDirection: 'left' }), entryPath: 'parallel' })
     const d = nums(el.querySelector('.map-entry path')!.getAttribute('d'))
-    expect(d[2]).toBeGreaterThan(100)
+    expect(d[2]).toBeGreaterThan(100) // A4: east = non-holding side
     expect(d[7]).toBe(1)
-    expect(d[8]).toBe(0)
+    expect(d[8]).toBe(1) // A1: clockwise, against the left-turn pattern
+    expect(d[9]).toBeLessThan(100) // A2: rolls out west = holding side
+  })
+
+  it('parallel golden case: inbound 140, left turns → rollout northeast of the course', () => {
+    // "Hold northwest of the Delta NDB on the one four zero bearing, left turns."
+    // Holding side northeast (140 − 90 = 050). Outbound 320 on the southwest side,
+    // then a RIGHT (clockwise) rejoin rolling out on 185° (= 140 + 45), 0.67 NM
+    // northeast of the course — scale 28.57, centre 100 → (93.3, 62.3).
+    const el = render({
+      holdSpec: hold({ inboundCourse: 140, turnDirection: 'left' }),
+      entryPath: 'parallel',
+    })
+    const d = nums(el.querySelector('.map-entry path')!.getAttribute('d'))
+    expect(d[7]).toBe(1) // large-arc
+    expect(d[8]).toBe(1) // sweep: clockwise, opposing the left-turn pattern
+    expect(d[9]).toBeCloseTo(93.3, 0)
+    expect(d[10]).toBeCloseTo(62.3, 0)
   })
 
   it('direct: follows the racetrack turn at the fix', () => {

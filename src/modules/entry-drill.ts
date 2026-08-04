@@ -23,7 +23,9 @@ import {
   type Entry,
   type EntryGuidance,
   type EntryResult,
+  type TurnDirection,
 } from '../engine/entry'
+import { angleDiff } from '../engine/geometry'
 import { renderHSI, type HSIProps } from '../ui/hsi'
 import { renderMap } from '../ui/mapview'
 import { courseText } from '../format'
@@ -113,6 +115,62 @@ export function chartNote(holdSpec: HoldSpec): string {
   return (
     `Practice plate (fictitious fix) — ${holdSpec.fix}: inbound course ` +
     `${courseText(holdSpec.inboundCourse)}, ${holdSpec.turnDirection} turns, ${leg}.`
+  )
+}
+
+/**
+ * AIM 5-3-8 j4(b), verbatim (verified against
+ * faa.gov/air_traffic/publications/atpubs/aim_html/chap5_section_3.html).
+ */
+export const OUTBOUND_TIMING_AIM =
+  'Outbound leg timing begins over/abeam the fix, whichever occurs later. ' +
+  'If the abeam position cannot be determined, start timing when turn to outbound is completed.'
+
+export const OUTBOUND_TIMING_SOURCE = 'AIM 5-3-8 j4(b)'
+
+/**
+ * The AIM gives ONE timing rule for all three entries. The familiar per-entry
+ * split is a derivation from that sentence, not AIM text, so it is presented as
+ * an explanation and never as the citation.
+ */
+export const OUTBOUND_TIMING_NOTE =
+  'That is one rule for every entry. The familiar split — time from the fix on a ' +
+  'parallel or teardrop, from abeam on a direct — is a derivation from that sentence, ' +
+  'not AIM text.'
+
+/**
+ * The "fly it" instruction for an entry, built entirely from engine guidance.
+ *
+ * A parallel entry is the only entry whose turn ACROSS THE FIX onto outbound
+ * opposes the pattern, so it is the only one whose first turn is worth naming:
+ * a left-turn hold is entered with two right turns, and only the final turn at
+ * the fix follows the pattern (see docs/parallel-entry-evidence.md).
+ *
+ * ⚠️ That first turn is taken FROM THE AIRCRAFT'S HEADING, so it is derived from
+ * `heading`, not from `turnToInbound`. Throughout the parallel sector proper the
+ * two agree — that agreement is the structure worth teaching — but inside the
+ * ±5° teardrop/parallel boundary band (AIM 5-3-8 j8(d)) parallel is an accepted
+ * answer while the aircraft is already all but aligned with the outbound course:
+ * at heading 177 into a standard hold on inbound 000, the turn onto 180 is a 3°
+ * turn to the RIGHT, and "turn left onto 180°" would be negative training. The
+ * "both turns opposite the pattern" gloss is therefore stated only when it is
+ * true of the scenario in front of the learner.
+ */
+export function flyItText(g: EntryGuidance, heading: number): string {
+  const outbound = courseText(g.outboundHeading)
+  if (g.entry === 'parallel') {
+    const first = angleDiff(heading, g.outboundHeading)
+    const firstTurn: TurnDirection | null = first === 0 ? null : first > 0 ? 'right' : 'left'
+    const cross = firstTurn ? `turn ${firstTurn} onto ${outbound}` : `roll out on ${outbound}`
+    return (
+      `Fly it: cross the fix, ${cross} on the ${g.side} side, then ${g.turnToInbound} turn ` +
+      `through more than 180° back to the inbound course` +
+      (firstTurn === g.turnToInbound ? ' — both turns opposite the pattern.' : '.')
+    )
+  }
+  return (
+    `Fly it: cross the fix, outbound heading ${outbound} on the ${g.side} side, ` +
+    `then ${g.turnToInbound} turn back to the inbound course.`
   )
 }
 
@@ -305,10 +363,9 @@ export function renderEntryDrill(el: HTMLElement, options: EntryDrillOptions = {
     feedbackEl.className = `entry-feedback ${fb.correct ? 'is-correct' : 'is-wrong'}`
     feedbackEl.innerHTML = `
       <p class="entry-verdict">${verdict}</p>
-      <p class="entry-guidance">Fly it: cross the fix, outbound heading ${courseText(g.outboundHeading)}
-        on the ${g.side} side, then ${g.turnToInbound} turn${
-          g.entry === 'parallel' ? ' through more than 180°' : ''
-        } back to the inbound course.</p>
+      <p class="entry-guidance">${flyItText(g, drill.scenario.heading)}</p>
+      <p class="entry-outbound-timing">Outbound timing: “${OUTBOUND_TIMING_AIM}”
+        <cite>${OUTBOUND_TIMING_SOURCE}</cite> ${OUTBOUND_TIMING_NOTE}</p>
       <p class="entry-timing">${timing}</p>
       <p class="entry-source"><cite>${fb.result.source}</cite></p>
     `

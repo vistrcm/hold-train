@@ -9,15 +9,29 @@
 // j8 (drift correction) and j4 (adjust outbound legs for the 1-minute
 // inbound). The circuit starts at the fix heading the inbound course; the
 // entry choice sets the turn directions (parallel turns onto outbound against
-// the pattern, then reintercepts with it through more than 180° per AIM 5-3-8
-// j3(a)), the decisions set everything else. The inbound leg is flown
-// straight on the rollout heading until crossing the line abeam the fix, so
-// the debrief can report honest timing and cross-track — including a
-// teardrop that does not re-intercept by itself.
+// the pattern and rejoins against it too, back toward the holding side — see
+// `PARALLEL_INTERCEPT_DEG` in ./entry and docs/parallel-entry-evidence.md),
+// the decisions set everything else. The inbound leg is flown straight on the
+// rollout heading until crossing the line abeam the fix, so the debrief can
+// report honest timing and cross-track — including a teardrop that does not
+// re-intercept by itself.
+//
+// KNOWN MODEL LIMITATION (documented, deliberately not fixed). The circuit
+// starts established ON the inbound course at the fix, so the turn onto
+// outbound is a full 180° and leaves the aircraft 2R (~0.95 NM) off course.
+// From there the corrected rejoin is TANGENT to the holding course rather than
+// crossing it, and the inbound leg therefore does not converge. The real
+// maneuver does not do this because the aircraft arrives at an angle from
+// sector (a) — at heading 250 with inbound 360 the fix-crossing turn is only
+// 70°, leaving ~0.31 NM offset, and the rejoin then genuinely crosses.
+// Modelling it would mean adding an arrival heading to SimDecisions; no screen
+// needs it, because `flyCircuit` is only ever called with `entry: 'direct'`
+// (src/modules/wind-lab.ts). The rejoin DIRECTION here is still correct, so
+// this file cannot teach the wrong rule to whatever calls it next.
 //
 // Frame: NM east/north of the holding fix (the map view's MapPoint shape).
 
-import type { Entry, TurnDirection } from './entry'
+import { ENTRIES, PARALLEL_INTERCEPT_DEG, type Entry, type TurnDirection, entryGuidance } from './entry'
 import { assertCourse, normalizeDeg } from './geometry'
 import { inboundCrab, outboundHeading, outboundTimeSeconds, type Wind } from './wind'
 
@@ -29,12 +43,15 @@ export const TURN_RATE_DEG_PER_S = 3
 export const MAX_SIM_SECONDS = 900
 
 const DT = 0.1 // s per integration step
-// Angle the parallel entry's reintercept turn rolls out on, measured into the
-// inbound course. Any positive angle makes the pattern-direction turn exceed
-// 180° as AIM 5-3-8 j3(a) requires; 30° matches the teardrop offset the same
-// paragraph specifies, so the two entries roll out on the same intercept.
-const PARALLEL_INTERCEPT_DEG = 30
-const SAMPLE_SECONDS = 1 // ground-track sampling interval
+// The parallel rejoin's rollout angle is NOT defined here — it is imported from
+// ./entry, the oracle. This file used to hold a private copy of it; the copy
+// agreed with the map's literal (both 30) until the angle was single-sourced and
+// raised to 45, so it was never itself a drift — it was one more hand-written
+// copy of geometry that the rejoin SIGN did drift in, across five modules.
+/** Ground-track sampling interval. Exported because the cross-module guard in
+ *  src/parallel-entry.invariants.test.ts locates the rejoin by sample index and
+ *  must derive that window from the constants rather than hand-writing it. */
+export const SAMPLE_SECONDS = 1
 /** Longest outbound leg flyCircuit will accept. Callers that *suggest* a leg
  *  time must clamp to this, or they hand the pilot a number the sim rejects. */
 export const MAX_OUTBOUND_SECONDS = 600
@@ -91,6 +108,15 @@ export function textbookDecisions(hold: SimHold, wind: Wind, tasKt = HOLD_TAS_KT
 }
 
 function assertDecisions(d: SimDecisions): void {
+  // `entryGuidance`'s switch is exhaustive over `Entry`, so it has no fallthrough
+  // return and hands back `undefined` for anything outside the union — which the
+  // turn-sign read below dereferences immediately. Without this the caller gets
+  // `TypeError: Cannot read properties of undefined` from inside the integrator
+  // instead of a RangeError naming the field, and TS's exhaustiveness proof does
+  // not survive a cast, a widened type or a deserialized value.
+  if (!ENTRIES.includes(d.entry)) {
+    throw new RangeError(`entry must be one of ${ENTRIES.join(', ')}, got ${String(d.entry)}`)
+  }
   assertCourse(d.outboundHeading, 'outboundHeading')
   if (!Number.isFinite(d.inboundCrab) || Math.abs(d.inboundCrab) > MAX_CRAB_DEG) {
     throw new RangeError(`inboundCrab must be within ±${MAX_CRAB_DEG}°, got ${d.inboundCrab}`)
@@ -137,18 +163,34 @@ export function flyCircuit(
   const c = hold.inboundCourse
   const pattern: 1 | -1 = hold.turnDirection === 'right' ? 1 : -1
   const isParallel = decisions.entry === 'parallel'
-  // AIM 5-3-8 j3(a). The parallel entry's two turns oppose each other: the turn
-  // onto the outbound heading is made toward the non-holding side (against the
-  // pattern), and the reintercept is "in the direction of the holding pattern
-  // through more than 180 degrees". Direct and teardrop turn with the pattern
-  // throughout.
-  const outboundTurnSign: 1 | -1 = isParallel ? (pattern === 1 ? -1 : 1) : pattern
-  const reinterceptTurnSign: 1 | -1 = pattern
+  // AIM 5-3-8 j3(a). The parallel entry's first TWO turns both oppose the
+  // pattern: the turn onto outbound goes toward the nonholding side, and the
+  // rejoin turns back the same rotational way, "in the direction of the holding
+  // pattern" — spatial, toward the racetrack — crossing the course onto the
+  // holding side. Only the last turn, at the fix, follows the pattern. Direct
+  // and teardrop turn with the pattern throughout, so the rejoin sign is just
+  // the outbound sign for every entry.
+  //
+  // Do NOT re-derive this from ">180 degrees": computed correctly across the
+  // sector BOTH senses exceed 180° (right 212.6–222.1, left 189.3–215.3), so
+  // the clause cannot discriminate, and reasoning from it is what inverted this
+  // app on 2026-07-22. The evidence is FIG 5-3-4 and AIP FIG ENR 1.5-3 (both
+  // rendered) plus ICAO Doc 8168 Vol I Pt I §6 Ch 1 ¶1.4.4(b), which says the
+  // rejoin is "turned left" in a right-hand pattern — see
+  // docs/parallel-entry-evidence.md.
+  // Both turns of every entry share one rotational sense, and it is the engine's
+  // `turnToInbound` — read from the oracle rather than re-derived here, so a
+  // change to the parallel rule cannot leave this file stale. A private copy of
+  // this sign is exactly how the map, the sim and the engine came to disagree
+  // about this maneuver. (The intercept angle below is single-sourced for the
+  // same reason, but it had not in fact diverged — see the note at DT.)
+  const turnSign: 1 | -1 = entryGuidance(decisions.entry, hold).turnToInbound === 'right' ? 1 : -1
   // Parallel rolls out on an intercept heading angled back into the course, not
   // on the inbound heading itself — turning to the inbound heading would be
   // exactly 180°, which rolls out parallel to the course and never intercepts.
+  // The angle is the engine's, so the map cannot draw a different one.
   const rolloutHeading = normalizeDeg(
-    c + (isParallel ? PARALLEL_INTERCEPT_DEG * pattern : 0) + decisions.inboundCrab,
+    c + (isParallel ? PARALLEL_INTERCEPT_DEG * turnSign : 0) + decisions.inboundCrab,
   )
 
   // integrator state
@@ -193,12 +235,12 @@ export function flyCircuit(
   }
 
   // 1: turn from the inbound course heading to the decided outbound heading
-  turnTo(decisions.outboundHeading, outboundTurnSign)
+  turnTo(decisions.outboundHeading, turnSign)
   // 2: outbound leg
   flyStraight(decisions.outboundSeconds)
-  // 3: turn to the crab-corrected inbound heading (parallel: to the intercept
-  // heading, through more than 180°)
-  turnTo(rolloutHeading, reinterceptTurnSign)
+  // 3: turn to the crab-corrected inbound heading (parallel: back toward the
+  // holding side, onto the intercept heading, through 225°)
+  turnTo(rolloutHeading, turnSign)
 
   // 4: fly straight until crossing the line abeam the fix
   const alongE = Math.sin(c * DEG)

@@ -112,4 +112,23 @@ describe('required lesson content', () => {
     expect(boundary.text).toMatch(/good operating limits/)
     expect(boundary.source).toContain('j8(d)')
   })
+
+  // The parallel rejoin turns AGAINST the pattern; the evidence is in
+  // docs/parallel-entry-evidence.md and must not be re-derived from the AIM
+  // sentence, which is ambiguous. The AIM's own clause is quoted verbatim here
+  // and legitimately contains "in the direction of the holding pattern", so the
+  // negatives below anchor on the gloss wording, never on the quotation.
+  it('entries lesson glosses the parallel rejoin as opposite the pattern', () => {
+    const text = lessonText('entries')
+    expect(text).toContain('turn in the direction of the holding pattern through more than 180°')
+    expect(text).toMatch(/opposite the pattern/i)
+    expect(text).toMatch(/crosses back over the holding course|onto the holding side/i)
+    expect(text).not.toMatch(/same way the pattern|follows the pattern|only that direction/i)
+  })
+
+  it('entries lesson names the two-turns-against structure of the parallel entry', () => {
+    const text = lessonText('entries')
+    expect(text).toMatch(/first two turns/i)
+    expect(text).toMatch(/only the turn on reaching the fix/i)
+  })
 })

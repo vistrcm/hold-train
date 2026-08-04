@@ -118,6 +118,21 @@ describe('content-audit regressions (Task 17, verified against FAA sources)', ()
     expect(item.source).toContain('j8(d)')
   })
 
+  // See docs/parallel-entry-evidence.md: FIG 5-3-4 draws the teardrop rejoin
+  // clockwise and the parallel rejoin counter-clockwise. The verbatim AIM clause
+  // stays in the answer, so the negative regexes anchor on the gloss, not on it.
+  it('entries item answers the parallel rejoin as opposite the pattern', () => {
+    const item = byId('entries')
+    expect(item.answer).toContain(
+      'turn in the direction of the holding pattern through more than 180°',
+    )
+    expect(item.answer).toMatch(/opposite the pattern/i)
+    expect(item.answer).toMatch(/crosses back over the holding course|onto the holding side/i)
+    expect(item.answer).toMatch(/first two turns/i)
+    expect(item.answer).toMatch(/only the turn on reaching the fix/i)
+    expect(item.answer).not.toMatch(/same way the pattern|follows the pattern|only that direction/i)
+  })
+
   it('turn-direction items state the full AIM i5 conditional, not "only left"', () => {
     for (const id of ['clearance-elements', 'standard-vs-nonstandard']) {
       const item = byId(id)
