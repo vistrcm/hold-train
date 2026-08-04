@@ -152,12 +152,16 @@ no text layer and must be rendered to images and read visually.
 
 ### Task 4: Verify acceptance criteria
 
-- [ ] no user-visible string calls the nonholding side "unprotected"
-- [ ] the wind-lab debrief still names which side an inbound crossing fell on
-- [ ] every protected-airspace figure in `docs/` cites 8260.3G at sub-paragraph granularity or is
-      labelled unverified
-- [ ] full suite: `npm test`; type check: `npm run typecheck`
-- [ ] no runtime dependencies added
+- [x] no user-visible string calls the nonholding side "unprotected" (grep of `src/`: the word
+      survives only in code comments and the test's negative assertion
+      `expect(debrief).not.toMatch(/unprotected/)`)
+- [x] the wind-lab debrief still names which side an inbound crossing fell on
+      (`wind-lab.test.ts` "names the non-holding side …" and "names the holding side …" both pass)
+- [x] every protected-airspace figure in `docs/` cites 8260.3G at sub-paragraph granularity or is
+      labelled unverified (remaining "8 NM / 4 NM" strings in docs are the correction notes quoting
+      the retracted claim; other NM figures are unrelated chart-hold/DME facts)
+- [x] full suite: `npm test` (614/614); type check: `npm run typecheck` (clean)
+- [x] no runtime dependencies added (`package.json` has no `dependencies` key)
 
 ### Task 5: [Final] Update documentation
 
