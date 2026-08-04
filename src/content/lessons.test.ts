@@ -136,11 +136,19 @@ describe('required lesson content', () => {
   // ¶16-3-2 / Table 16-6-1; docs/holding-protected-airspace.md). Every
   // content bank carries this scan — the guarded siblings did not stop the
   // unguarded one from shipping the folklore model.
-  it('no paragraph teaches a one-side-protected model', () => {
+  it('no lesson teaches a one-side-protected model', () => {
+    // Every user-visible string of the lesson, not just paragraph text:
+    // title renders as the heading, source next to each paragraph,
+    // drillLabel as the practice link.
     for (const lesson of LESSONS) {
-      for (const p of lesson.paragraphs) {
-        expect(p.text, lesson.id).not.toMatch(/unprotected/i)
-        expect(p.text, lesson.id).not.toMatch(/protected side/i)
+      const strings = [
+        lesson.title,
+        lesson.drillLabel,
+        ...lesson.paragraphs.flatMap((p) => [p.text, p.source]),
+      ]
+      for (const s of strings) {
+        expect(s, lesson.id).not.toMatch(/unprotected/i)
+        expect(s, lesson.id).not.toMatch(/protected side/i)
       }
     }
   })

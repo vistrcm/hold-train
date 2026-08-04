@@ -224,7 +224,8 @@ describe('content-audit regressions (Task 17, verified against FAA sources)', ()
   // the reader absorbs while rejecting it.
   it('no question, option, or explanation teaches a one-side-protected model', () => {
     for (const q of QUESTIONS) {
-      const text = [q.question, ...q.options, q.explanation].join(' ')
+      // source included: written-test renders it with the explanation.
+      const text = [q.question, ...q.options, q.explanation, q.source].join(' ')
       expect(text, q.id).not.toMatch(/unprotected/i)
       expect(text, q.id).not.toMatch(/protected side/i)
     }

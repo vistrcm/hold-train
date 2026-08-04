@@ -189,7 +189,8 @@ describe('CORE_DECK key facts (verified against FAA sources)', () => {
 
   it('no card teaches a one-side-protected model', () => {
     for (const card of CORE_DECK) {
-      const text = `${card.front} ${card.back}`
+      // source included: anki-export appends it to the exported card back.
+      const text = `${card.front} ${card.back} ${card.source}`
       expect(text, card.front).not.toMatch(/unprotected/i)
       // "protected side" (as opposed to "protected airspace") is the framing
       // that smuggles the claim in without the word.

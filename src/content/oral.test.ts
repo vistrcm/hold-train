@@ -116,7 +116,8 @@ describe('required content presence', () => {
 
   it('no item calls a side unprotected or names "the protected side"', () => {
     for (const item of ORAL_ITEMS) {
-      const text = `${item.question} ${item.answer} ${item.caveat ?? ''}`
+      // source included: oral-prep renders it in a <cite> under the answer.
+      const text = `${item.question} ${item.answer} ${item.caveat ?? ''} ${item.source}`
       expect(text, item.id).not.toMatch(/unprotected/i)
       expect(text, item.id).not.toMatch(/protected side/i)
     }
