@@ -11,7 +11,9 @@ Two related content defects, both about holding protected airspace:
    nonholding side is not unprotected; it is the narrower of two protected areas. The word teaches
    the wrong mental model of *why* straying onto that side matters.
 
-Split out of `docs/plans/20260802-parallel-entry-rejoin-turn.md`, which needed the safety rationale
+Split out of `docs/plans/completed/20260802-parallel-entry-rejoin-turn.md` (completed 2026-08-02;
+that plan's own Task 10 moved it under `completed/`, which is why line 142 below already uses the
+new path), which needed the safety rationale
 but not this verification work, and which must not touch these files.
 
 ## ⚠️ This reverses a prior ledger decision — argue, do not overwrite

@@ -906,3 +906,166 @@ predates the 2026-08-02 rejoin-direction correction, on the same terms as the
   in `src/parallel-entry.invariants.test.ts`, written out against `hold.turnDirection`.
   Mutation confirmed: inverting the engine's parallel branch fails exactly the two `A2`
   tests (map and sim) and nothing else in that file.
+
+## Post-completion review fix — 2026-08-03 (code review iteration 5)
+
+- **Fixed: the corrected oral answer never reached already-recorded misses — the misses
+  deck kept exporting the inverted rejoin** (`src/app/anki-export.ts`). `oral-prep.ts` and
+  `written-test.ts` snapshot the item's prose into localStorage at miss time so a card
+  survives its item being deleted; that same denormalization *freezes* the fact, and
+  nothing on the read side ever revisited it. A student who self-graded "missed" on the
+  `entries` oral item before the 2026-08-02 correction had `a right-turn hold reintercepts
+  right` sitting in their store, and re-exporting today regenerated it verbatim. This is
+  the negative-training path the whole correction exists to close, surviving *inside the
+  app* rather than in a stale external deck — and it made the re-import step added in
+  iteration 3 false for exactly the deck it tells the user to refresh: the re-downloaded
+  misses file contained the same wrong text. The two tests added with that step assert it
+  is *present* and *hedged*, never that it is *true*; asserting a step exists is not
+  asserting it works, the same distinction iteration 3 drew about the update-vs-duplicate
+  claim one line up.
+  `itemId`/`questionId` were already being recorded beside the prose, so only the read
+  side was missing: `oralMissCard` and `writtenMissCard` now resolve the live item by id
+  and fall back to the snapshot only when that id no longer resolves. No store schema
+  change (`{v:1}` stays backward compatible), and the delete-resilience the snapshot was
+  built for is preserved — including for pre-`itemId` snapshots, which simply miss the
+  lookup and use their own prose. Entry cards are untouched: they are engine-derived
+  scenarios, not bank prose.
+  Written was fixed alongside oral although it is latent — `questions.ts` carried no
+  rejoin claim, so nothing is wrong in a store today. It is the identical defect one drill
+  over, and the next content correction that touches an explanation would ship the stale
+  one; a fix applied to the carrier that happened to break is how the pre-2026-08-02
+  rejoin defect survived in three modules at once.
+  Regression tests, all in `src/app/anki-export.test.ts`: `rebuilds an oral miss card from
+  live content, not the frozen snapshot` (stores the pre-fix gloss under a live id and
+  asserts the export carries the current answer and no trace of it), the written
+  counterpart, and `falls back to the snapshot when the id no longer resolves` — which is
+  the guard against over-fixing, since both live-id tests would also pass an implementation
+  that simply dropped unresolvable misses.
+- **Fixed: a comment claimed the wrong sweep size**
+  (`src/parallel-entry.invariants.test.ts`, the sim's `A2` docblock). It said the test goes
+  red at "all 24 course × pattern combinations"; `COURSES` has 10 entries and `PATTERNS` 2,
+  so it is 20 (24 was never right — the plan's earlier 18 came from 9 courses). Reworded to
+  point at the arrays rather than restate a number that drifts every time one is edited.
+
+## Post-completion review fixes — 2026-08-03 (codex review iteration, commit `bb69397`)
+
+Recorded late: `bb69397` changed a `source` field and shipped a regression test without a
+ledger entry, and CLAUDE.md's FAA-source convention closes with "record any content fix
+there with its regression test". A citation-granularity change with a test is squarely that.
+
+- **Fixed: the parallel guidance cited prose that cannot support its own field**
+  (`src/engine/entry.ts`). `turnToInbound` for a parallel is read off FIG 5-3-4, not from
+  j3's sentence — which this branch establishes cannot discriminate the two senses at all.
+  Citing `AIM 5-3-8 j3` alone offered a rendered sentence a citation that does not support
+  it: the derivation-as-citation failure the 2026-08-02 audit exists to correct, one level
+  down in the engine rather than in content. Now `AIM 5-3-8 j3(a), FIG 5-3-4`.
+  Regression test: `the parallel guidance cites the figure its rejoin direction comes from`
+  (`src/engine/entry.test.ts`), which also asserts the *other* entries do **not** carry the
+  figure, so widening every guidance to it cannot satisfy the test by accident.
+
+## Post-completion review fixes — 2026-08-03 (code review iteration, commit `d09429a`)
+
+Two guard-integrity defects, same class as iteration 4's, likewise unrecorded at the time.
+
+- **Fixed: the map's sweep check was blind to a reflection.** A chord length is unsigned and
+  `sin(θ/2) = sin(180° − θ/2)`, so 135° and 225° have an identical chord: mis-signing the
+  rollout to `c − PARALLEL_INTERCEPT_DEG·rs` swept 135°, kept the sweep flag, still rolled
+  out on the holding side, and left the invariants file green at 18/18. Regression test:
+  `the drawn arc turns the oracle's way`, which measures the chord's *bearing* — signed, and
+  needs only the two endpoints already parsed. Reach for a bearing or a point over a length
+  whenever the defect can be a reflection.
+- **Fixed: the `flyCircuit` caller guard short-circuited on `textbookDecisions()`.** A spread
+  is a *default* and the key written after it wins, so `{ ...textbookDecisions(h, w), entry:
+  <non-literal> }` passed while wind-lab genuinely flew a parallel circuit. Every `entry:` in
+  the argument list is now required to be a quoted `'direct'`, the builder answers only the
+  "no `entry:` key at all" case, and the paren scan throws on an unbalanced match rather than
+  returning a truncated slice — a fail-open scan reports as a clean call.
+
+## Post-completion review fixes — 2026-08-03 (code review iteration 6)
+
+- **Fixed: the misses deck re-exported the pre-correction ENTRY ANSWER** (`src/app/anki-export.ts`).
+  Iteration 5 rebuilt oral and written miss cards from live content and excused entry cards as
+  "engine-derived scenarios, not bank prose". That is backwards as a safety argument: `expected`
+  and `alternates` are `determineEntry` output frozen at miss time, so an engine correction — this
+  repo has shipped two — invalidates them exactly as a content correction invalidates prose, and
+  the frozen fact is the *entry sector*, the one CLAUDE.md opens by calling negative training.
+  The snapshot already recorded `heading` and `holdSpec`, so only the read side was missing;
+  `entryMissCard` now re-derives via `determineEntry` and falls back to the frozen answer for a
+  pre-`holdSpec` or malformed snapshot (validated, not cast — one bad miss must not take the whole
+  export down). The scenario *text* stays frozen deliberately: it is re-derivable only from `seed`,
+  which maps through the fixture lists, so after the fixture rename logged above the same seed
+  yields a different hold and the card would silently swap the question the user missed. Frozen
+  prose that is merely dated beats a correct answer to an unasked question. Regression tests:
+  `re-derives an entry miss answer from the engine, not the frozen snapshot` (expectation derived
+  from the AIM's sector geometry, not by calling `determineEntry` — reading the oracle would agree
+  with any engine) and `keeps the frozen entry answer when the snapshot predates holdSpec`.
+- **Fixed: iteration 5's live-rebuild tests pinned one field of six.** Both stale fixtures copied
+  the *live* values into every field except the one asserted on, so reverting `question`, `topic`,
+  `correctOption` and `acs` to the snapshot read each left the full suite green — including
+  `correctOption`, the written card's answer line and the string a correction is likeliest to
+  touch. A fixture that agrees with live cannot discriminate. Every field now differs and every
+  rebuild is asserted; all five reversions mutation-confirmed red.
+- **Fixed: `oralMissCard` dropped the item's `caveat`** (`src/app/anki-export.ts`). `OralItem`
+  keeps its caveat out of `answer` (oral-prep.ts renders it separately) and `AnkiCard` has no
+  caveat field — precisely the case CLAUDE.md's "never drop a caveat because the type has no field
+  for it" names. Four items carry one, including `entries` (the ±5° tolerance) and
+  `wind-correction` (triple-vs-double drift), two of the three CLAUDE.md names. Folded into the
+  card back. Regression test: `carries every oral item caveat onto the exported card`, driven off
+  `ORAL_ITEMS.filter(i => i.caveat !== undefined)` rather than a hardcoded id, so a caveat added
+  later cannot ship unexported. The "Caveat rendering — verified" section above enumerated the
+  render paths and never mentioned the export, so it read as complete while one path was uncovered.
+- **Fixed: a malformed bank entry deleted a card instead of degrading** (`src/app/anki-export.ts`).
+  `correctOption` was the one rebuilt field written as a ternary on `live` rather than `?.`/`??`,
+  so a resolvable id whose `options[answerIndex]` was out of range produced `null` and dropped the
+  whole card, contradicting the documented "fall back only when the id no longer resolves".
+  Now `live?.options[live.answerIndex] ?? str(s['correctOption'])`, uniform with its siblings.
+- **Fixed: the rejoin prose scan never saw the screens** (`src/parallel-entry.invariants.test.ts`).
+  The glob was `src/content/*.ts` + README while `src/modules/entry-drill.ts` renders the rule into
+  the drill feedback panel via `flyItText` — the prose a student actually reads was the unscanned
+  half, and a wrong gloss added there passed 602/602 (mutation-confirmed, and confirmed red after
+  the fix). Now every non-test module under `src/`. Widening it required fixing the scan's *unit*
+  as well: a line is a sentence in a single-line string literal and a README paragraph, but a
+  fragment in a wrapped comment, and a fragment can lose the words that make it correct — three
+  of the first failures were on correct prose. Contiguous comment lines are joined into one unit,
+  which also strengthens `WRONG` (it now scans whole blocks). Tightening `CORRECT` to per-sentence
+  was tried and **reverted**: prose that argues the rule spreads it over individually-true
+  sentences that match nothing, so every failure is answered by widening the whitelist until it
+  accepts anything. `CORRECT` also gained "against *it*" and "*onto* the holding side", both from
+  the ICAO wording this repo calls decisive. New guard `the direction-free exemption cannot swallow
+  a wrong gloss` pins the one weakening: `isRejoinAssertion` now skips sentences naming no
+  direction *value*, so that `PARALLEL_INTERCEPT_DEG`'s docblock (about the intercept **angle**) is
+  not required to restate the rotation rule.
+- **Fixed: a fixture that could be satisfied by the clause it was not testing.** Widening `CORRECT`
+  made `emphasis cannot hide a wrong gloss, or a right one` fail — correctly. Its fixture closed
+  with ", onto the holding side", giving the raw string a second, *unemphasised* CORRECT match, so
+  the demonstration that markdown hides the rule would have collapsed silently. Fixture trimmed to
+  one emphasised phrase.
+- **Fixed: `entry` validation asserted its class, not its message** (`src/engine/sim.test.ts`).
+  The comment justified the new `assertDecisions` check as producing "a RangeError **naming the
+  field**", but `toThrow(RangeError)` is satisfied by any sibling check throwing first — it would
+  pass with the new check deleted. Now matched on `/entry must be one of/`.
+- **Fixed: the figure-citation guard was narrower than its own docblock** (`src/engine/entry.test.ts`).
+  It claimed the per-entry negative stops "widening every guidance to the figure" from satisfying
+  it by accident, but asserted only `direct`; widening the *teardrop* alone walked straight through
+  (mutation-confirmed). Now both non-parallel entries.
+- **Fixed: a dead assertion** (`src/engine/entry.test.ts`). `expect(sweep).toBeGreaterThan(180)`
+  sat immediately after `expect(sweep).toBe(225)` and could not fail. Deleted, comment kept — the
+  third instance in this file, and the rule is stated in CLAUDE.md.
+- **Fixed: the anki card front asked a question its corrected back no longer answers**
+  (`src/content/anki-deck.ts`). "Parallel entry: which side of the course do you reintercept from?"
+  was written against the pre-2026-08-02 geometry, where the rejoin stayed on the nonholding side.
+  Corrected, the rollout is on the *holding* side, so the back's opening clause about the outbound
+  leg ("on the non-holding side") read as answering the front with the opposite of the truth. The
+  prose scan cannot see it — it drops interrogatives by design, since a question states a topic and
+  no rule. Reworded to ask the rotation, which is what the card teaches.
+- **Fixed: the "card fronts are stable" claim outlived its premise** (`README.md` and the export
+  screen). It was true while the front was the frozen snapshot question; once miss cards are rebuilt
+  from live content, a correction that rewords a *question* changes the front and imports as a new
+  note. Both sides scoped, and identically — `anki-export.test.ts` pins them against each other.
+- **Fixed: a stale plan path** (`docs/plans/20260802-protected-airspace-terminology.md`), which
+  pointed at the pre-`completed/` location of the rejoin plan while line 142 of the same file
+  already used the new one.
+- **Recorded, not fixed:** the map's parallel-entry return leg is still drawn as a straight chord
+  to the fix rather than at the rollout heading, so the picture kinks up to ~35–41° on long legs
+  (raising `PARALLEL_INTERCEPT_DEG` 30 → 45 widened it from ~5°). Deferral is deliberate and
+  documented at `src/ui/mapview.ts`'s rollout block; noted here so the deferral is not lost.

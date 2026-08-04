@@ -3,8 +3,34 @@
 // offers them as Blob downloads. Misses come from the progress store's
 // scenario snapshots (entry drill, written test, oral prep); malformed or
 // unknown snapshots are skipped rather than corrupting the deck.
+//
+// Bank-backed cards (written, oral) are rebuilt from the LIVE item, looked up by
+// the id the snapshot records, and fall back to the snapshot's own prose only
+// when that id no longer resolves. The snapshot denormalizes the prose so a card
+// survives its item being deleted, but that also freezes the fact: a miss
+// recorded before the 2026-08-02 parallel-rejoin correction otherwise
+// regenerates the inverted gloss on every export, and the re-import step this
+// screen renders would be false for exactly the deck it is telling the user to
+// refresh.
+//
+// Entry cards freeze the same way, and it is WORSE there, not better: `expected`
+// and `alternates` are `determineEntry` output snapshotted at miss time, so an
+// engine correction (this repo has shipped two) leaves the deck teaching the old
+// ENTRY SECTOR — the one fact CLAUDE.md opens by calling negative training. So
+// the answer is re-derived from the engine, off the `heading`/`holdSpec` the
+// snapshot already records.
+//
+// The scenario TEXT (`clearanceText`, `chartNote`) stays frozen, deliberately.
+// It is re-derivable only from `seed`, and `generateScenario` maps a seed through
+// the fixture lists — so after a fixture rename (docs/content-audit.md, the
+// PUBLISHED_HOLDS/FIXES correction) the same seed yields a DIFFERENT hold, and
+// the card would silently swap the question the user actually missed. Frozen
+// prose that is merely dated beats a correct answer to an unasked question.
 
 import { CORE_DECK, type AnkiCard } from '../content/anki-deck'
+import { ORAL_ITEMS } from '../content/oral'
+import { QUESTIONS } from '../content/questions'
+import { determineEntry, type TurnDirection } from '../engine/entry'
 import type { Screen } from './router'
 import { store as appStore, type Miss, type Store } from './store'
 import { courseText } from '../format'
@@ -50,14 +76,53 @@ function str(x: unknown): string | null {
   return typeof x === 'string' && x.trim() !== '' ? x : null
 }
 
-function entryMissCard(drill: string, s: Record<string, unknown>): AnkiCard | null {
-  const clearanceText = str(s['clearanceText'])
-  const expected = str(s['expected'])
-  const heading = s['heading']
-  if (clearanceText === null || expected === null || typeof heading !== 'number' || !Number.isFinite(heading)) {
+/**
+ * The snapshot's hold, if it still carries the two fields `determineEntry` needs.
+ *
+ * Validated rather than cast: this comes back off localStorage as `unknown`, and
+ * `determineEntry` throws RangeError on a bad course — an export must not be
+ * takeable down by one malformed miss. A snapshot that fails this simply keeps
+ * its frozen answer, which is the pre-existing behaviour.
+ */
+function snapshotHold(x: unknown): { inboundCourse: number; turnDirection: TurnDirection } | null {
+  if (!isRecord(x)) {
     return null
   }
-  const alternates = Array.isArray(s['alternates']) ? s['alternates'].filter(Boolean) : []
+  const inboundCourse = x['inboundCourse']
+  const turnDirection = x['turnDirection']
+  if (typeof inboundCourse !== 'number' || !Number.isFinite(inboundCourse)) {
+    return null
+  }
+  if (inboundCourse < 0 || inboundCourse >= 360) {
+    return null
+  }
+  if (turnDirection !== 'right' && turnDirection !== 'left') {
+    return null
+  }
+  return { inboundCourse, turnDirection }
+}
+
+function entryMissCard(drill: string, s: Record<string, unknown>): AnkiCard | null {
+  const clearanceText = str(s['clearanceText'])
+  const heading = s['heading']
+  if (clearanceText === null || typeof heading !== 'number' || !Number.isFinite(heading)) {
+    return null
+  }
+  // Re-derive the answer from the engine when the snapshot carries enough to do
+  // it, so an entry-sector correction reaches decks already recorded. Falls back
+  // to the frozen answer for a pre-`holdSpec` or malformed snapshot.
+  const hold = snapshotHold(s['holdSpec'])
+  const live = hold === null ? null : determineEntry(heading, hold)
+  const expected = live === null ? str(s['expected']) : live.primary
+  if (expected === null) {
+    return null
+  }
+  const alternates: readonly string[] =
+    live === null
+      ? Array.isArray(s['alternates'])
+        ? s['alternates'].filter((a): a is string => typeof a === 'string' && a.trim() !== '')
+        : []
+      : live.alternates
   const also = alternates.length > 0 ? ` (also acceptable: ${alternates.join(', ')})` : ''
   const chosen = str(s['chosen'])
   const missed = chosen === null ? '' : `\nYou answered: ${chosen}.`
@@ -74,14 +139,21 @@ function entryMissCard(drill: string, s: Record<string, unknown>): AnkiCard | nu
 }
 
 function writtenMissCard(drill: string, s: Record<string, unknown>): AnkiCard | null {
-  const question = str(s['question'])
-  const correctOption = str(s['correctOption'])
-  const source = str(s['source'])
+  const live = QUESTIONS.find((q) => q.id === str(s['questionId']))
+  const question = live?.question ?? str(s['question'])
+  // Spelled with `?.`/`??` like every sibling, and that uniformity is the point:
+  // as a ternary on `live`, an out-of-range `answerIndex` made this the one field
+  // that could not fall back, so a single malformed bank entry dropped the whole
+  // card out of the export instead of degrading to the snapshot. Optional
+  // chaining and `noUncheckedIndexedAccess` both yield `undefined`, which `??`
+  // absorbs — the live arm here is genuinely optional, unlike its siblings.
+  const correctOption = live?.options[live.answerIndex] ?? str(s['correctOption'])
+  const source = live?.source ?? str(s['source'])
   if (question === null || correctOption === null || source === null) {
     return null
   }
-  const explanation = str(s['explanation'])
-  const topic = str(s['topic'])
+  const explanation = live?.explanation ?? str(s['explanation'])
+  const topic = live?.topic ?? str(s['topic'])
   return {
     front: question,
     back: explanation === null ? correctOption : `${correctOption}\n${explanation}`,
@@ -91,19 +163,28 @@ function writtenMissCard(drill: string, s: Record<string, unknown>): AnkiCard | 
 }
 
 function oralMissCard(s: Record<string, unknown>): AnkiCard | null {
-  const question = str(s['question'])
-  const answer = str(s['answer'])
-  const source = str(s['source'])
+  const live = ORAL_ITEMS.find((i) => i.id === str(s['itemId']))
+  const question = live?.question ?? str(s['question'])
+  const answer = live?.answer ?? str(s['answer'])
+  const source = live?.source ?? str(s['source'])
   if (question === null || answer === null || source === null) {
     return null
   }
   // Oral items tag every ACS element they cover (acs is a string array).
-  const acs = Array.isArray(s['acs'])
+  const snapshotAcs = Array.isArray(s['acs'])
     ? s['acs'].filter((x): x is string => typeof x === 'string' && x.trim() !== '')
     : []
+  const acs = live?.acs ?? snapshotAcs
+  // `OralItem.caveat` is a separate field (oral-prep.ts renders it as `⚠ …`
+  // beside the answer), and `AnkiCard` has none — which is exactly the case
+  // CLAUDE.md's "never drop a caveat because the type has no field for it"
+  // names. Folded into the back rather than lost: the `entries` item's own
+  // caveat is the ±5° tolerance that makes a boundary heading's second entry
+  // correct, so a card drilled without it teaches a harder rule than the AIM's.
+  const caveat = live?.caveat
   return {
     front: question,
-    back: answer,
+    back: caveat === undefined ? answer : `${answer}\n⚠ ${caveat}`,
     source,
     tags: ['miss', 'oral', ...acs],
   }
@@ -197,8 +278,10 @@ export function renderAnkiExport(el: HTMLElement, options: AnkiExportOptions = {
           Corrections are logged in <code>docs/content-audit.md</code> — the
           2026-08-02 parallel-entry rejoin fix changed a core card. Import into
           the same notetype you used before and leave Anki's existing-notes
-          setting on <em>Update</em>; card fronts are stable, so matching notes
-          <em>should</em> update rather than duplicate — but this file is a bare
+          setting on <em>Update</em>; card fronts are stable unless a correction
+          rewords a question (miss cards are rebuilt from the live bank item, so
+          a reworded question changes the front — a reworded answer does not), so
+          matching notes <em>should</em> update rather than duplicate — but this file is a bare
           TSV with no <code>#notetype:</code> or <code>#deck:</code> header, so
           update-vs-duplicate is a setting on Anki's import screen, not a
           property of the download. Check the import preview before confirming.

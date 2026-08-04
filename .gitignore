@@ -3,3 +3,11 @@ dist/
 .wrangler/
 *.log
 .DS_Store
+
+# Scratch screenshots dropped at the repo root during a bug report. Ignored
+# rather than deleted — they are the reporter's, not the repo's — so that a
+# `git add -A` cannot sweep one into the tree. Evidence worth keeping goes under
+# docs/ and is referenced from the relevant dossier.
+/*.jpg
+/*.jpeg
+/*.png

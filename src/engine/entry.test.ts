@@ -317,7 +317,11 @@ describe('entryGuidance', () => {
         const rolloutHeading = normalizeDeg(c - PARALLEL_INTERCEPT_DEG * patternSign)
         const sweep = normalizeDeg((rolloutHeading - g.outboundHeading) * rejoinSign)
         expect(sweep, `${h.turnDirection} ${c}`).toBe(225)
-        expect(sweep, `${h.turnDirection} ${c}`).toBeGreaterThan(180)
+        // NOT also asserted `> 180`: the line above fixes `sweep` at exactly
+        // 225, so a `toBeGreaterThan(180)` beside it cannot fail. The AIM bound
+        // it was standing in for is implied by the equality and restated in the
+        // comment — fake coverage is worse than none (CLAUDE.md), and this file
+        // already deletes two other assertions for the same reason.
         // What an INVERTED engine would sweep is 135° — `normalizeDeg(-x)` is
         // `360 − x`, so it is 360 − 225 by construction. NOT asserted: once the
         // line above has fixed `sweep` at 225, an expect() on it can never fail,
@@ -353,7 +357,14 @@ describe('entryGuidance', () => {
         'the parallel rejoin direction is figure-derived; see docs/parallel-entry-evidence.md',
       ).toMatch(/FIG 5-3-4/)
     }
-    expect(entryGuidance('direct', hold).source).not.toMatch(/FIG 5-3-4/)
+    // Both other entries, not just `direct`: the docblock above claims the
+    // per-entry negative stops "widening every guidance to the figure" from
+    // satisfying this by accident, and with only `direct` asserted, widening the
+    // TEARDROP alone walked through. A guard narrower than the claim in its own
+    // comment reads as coverage it does not have.
+    for (const e of ENTRIES.filter((x) => x !== 'parallel')) {
+      expect(entryGuidance(e, hold).source, `${e} over-cites the figure`).not.toMatch(/FIG 5-3-4/)
+    }
   })
 })
 

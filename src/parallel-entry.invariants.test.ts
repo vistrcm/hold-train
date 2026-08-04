@@ -363,7 +363,8 @@ describe('the sim flies the rejoin the engine specifies', () => {
   // so its rejoin turns LEFT — counter-clockwise, positive under the sign
   // convention of `trackRotationRad`. Flip `entry.ts`'s parallel branch back and
   // sim.ts follows it (it reads the oracle), so the test above follows too and
-  // stays green; this one goes red at all 24 course × pattern combinations.
+  // stays green; this one goes red at every course × pattern combination it
+  // sweeps (COURSES × PATTERNS — 20 as written, but read the arrays, not this).
   //
   // Deliberately a sign check, and that is the whole job — magnitude is pinned by
   // the intercept-angle test below, and the ">180°" bound by the sweep above.
@@ -581,8 +582,21 @@ describe('the sim limitation stays inside the bound it documents', () => {
 
 // --- the prose scan -----------------------------------------------------------
 
-/** The corrected rule, in any of the wordings the content modules use. */
-const CORRECT = /opposite|against the pattern|toward the holding side|crosses (back )?over/i
+/**
+ * The corrected rule, in any of the wordings the modules use.
+ *
+ * ⚠️ A whitelist narrower than the set of CORRECT phrasings fails on correct
+ * prose, and a guard that fails on correct prose gets weakened until it guards
+ * nothing — the WRONG docblock's warning, from the other side. Widening the scan
+ * past `src/content/` found two such gaps immediately, both in the engine's
+ * evidence docblock and both quoting the sources this repo calls decisive: the
+ * pattern-relative sense written as "against IT" rather than "against the
+ * pattern", and ICAO's "turned left ONTO the holding side" rather than "toward"
+ * it. Neither can appear in a gloss of the wrong rule, and WRONG scans the whole
+ * unit regardless, so admitting them costs no strength.
+ */
+const CORRECT =
+  /opposite|against (the pattern|it)|(toward|onto) the holding side|crosses (back )?over/i
 
 /**
  * The wrong rule, anchored on the GLOSS wording only.
@@ -618,35 +632,49 @@ const WRONG =
   /same way the pattern|(?:rejoin|reintercepts?)(?: turn)? follows the pattern|only that direction|right-turn hold[^.;,]*reintercepts? right|left-turn hold[^.;,]*reintercepts? left/i
 
 /**
- * Every content module, harvested rather than hand-listed.
+ * The content modules — a filter over the single `SOURCES` harvest, not a
+ * second glob, for the reason `SOURCES` states: two globs are two copies of
+ * "what counts as a source file" and the halves drift.
  *
- * A hand-written list scans only what existed when the list was typed — the same
- * exhaustiveness hole CLAUDE.md describes for `TIERS` and `OVERLAY_ALPHA`, and
- * the reason `questions.ts` (which carries entry prose of its own) was outside
- * the original three. Sweeping the directory means a fourth module cannot ship
- * an unscanned rejoin gloss. Same eager `?raw` glob idiom as
- * src/ui/palette.test.ts.
+ * Used only by the per-carrier non-vacuity check below. The rule scan itself
+ * runs over `PROSE`, which is wider — see there.
  */
-const CONTENT: ReadonlyArray<{ file: string; source: string }> = Object.entries(
-  import.meta.glob<string>('./content/*.ts', { query: '?raw', import: 'default', eager: true }),
+const CONTENT: ReadonlyArray<{ file: string; source: string }> = APP_MODULES.filter((m) =>
+  m.file.startsWith('src/content/'),
 )
-  .filter(([path]) => !path.endsWith('.test.ts'))
-  .map(([path, source]) => ({ file: path.replace('./', 'src/'), source }))
 
 /**
- * Every prose carrier of the rejoin rule: the content modules, plus README.
+ * Every prose carrier of the rejoin rule: every shipping module, plus README.
  *
- * README states the rule at more length than any content item does ("turns
- * *against* the pattern — back across the holding course onto the holding
- * side"), and it is the first thing a reader meets. A directory glob is only
- * exhaustive over the directory it globs, so `src/content/*.ts` left the one
- * carrier outside `content/` unscanned — the hand-listed-scope hole this file's
- * header argues against, one level up. README is already an asserted artifact
- * here (dashboard.test.ts diffs its route table, anki-export.test.ts its import
- * steps), so `?raw` is the established idiom rather than a new coupling.
+ * ⚠️ This scope is deliberately WIDER than `src/content/`, and twice now it was
+ * not wide enough. A directory glob is exhaustive only over the directory it
+ * globs — the hole this file's header argues against, and one it kept falling
+ * into one level up each time:
+ *
+ *   1. `src/content/*.ts` alone missed README, which states the rule at more
+ *      length than any content item does ("turns *against* the pattern — back
+ *      across the holding course onto the holding side") and is the first thing
+ *      a reader meets.
+ *   2. content + README still missed `src/modules/`, where the prose a STUDENT
+ *      actually reads is generated: `flyItText` (src/modules/entry-drill.ts)
+ *      renders the rejoin direction into the drill feedback panel on every
+ *      parallel scenario. Mutation-confirmed: a wrong gloss added to that panel
+ *      passed the whole suite while the identical sentence in `questions.ts`
+ *      failed it. The screens are where the rule is taught; scanning only the
+ *      banks guarded the quieter half.
+ *
+ * So it is now every non-test module under `src/`. Engine and UI files carry the
+ * rule in comments rather than rendered strings, and including them costs
+ * nothing — they must state it correctly too, and CLAUDE.md is explicit that a
+ * comment asserting the wrong rule is worse than no comment, because it argues
+ * the next session into inverting the code.
+ *
+ * README is already an asserted artifact here (dashboard.test.ts diffs its route
+ * table, anki-export.test.ts its import steps), so `?raw` is the established
+ * idiom rather than a new coupling.
  */
 const PROSE: ReadonlyArray<{ file: string; source: string }> = [
-  ...CONTENT,
+  ...APP_MODULES,
   { file: 'README.md', source: README },
 ]
 
@@ -667,9 +695,9 @@ function unemphasize(s: string): string {
 }
 
 /**
- * Does this sentence ASSERT something about the rejoin, or merely name it?
+ * Does this sentence ASSERT the rejoin RULE, or merely mention the maneuver?
  *
- * Two kinds of mention carry no rule to be right or wrong about:
+ * Three kinds of mention carry no rule to be right or wrong about:
  *   - Interrogatives. An Anki card front ("which side of the course do you
  *     reintercept from?") states the topic and nothing else.
  *   - References to the dated correction rather than to the maneuver. README's
@@ -679,28 +707,85 @@ function unemphasize(s: string): string {
  *     nothing. Anchored on an ISO date next to fix/correction, because no
  *     sentence about the maneuver carries one — "rejoin fix" alone would collide
  *     with the holding fix the aircraft actually rejoins.
+ *   - Sentences about the rejoin's MAGNITUDE, not its direction. This guard
+ *     checks one fact — which way the turn rotates — and `PARALLEL_INTERCEPT_DEG`'s
+ *     own docblock ("Angle the parallel entry's rejoin turn rolls out on,
+ *     measured from the inbound holding course…") is about the intercept angle,
+ *     a separate and explicitly CONVENTIONAL quantity. Requiring it to restate
+ *     the direction is the absurd-prose failure one line up. Detected by the
+ *     absence of any DIRECTION word, which is safe because a sentence cannot
+ *     state the rule WRONGLY without naming a direction — pinned by `the
+ *     direction-free exemption cannot swallow a wrong gloss` below, which runs
+ *     every known wrong wording through this predicate.
  *
  * ⚠️ Shared by the line selector AND the claim extractor below, so the two
  * cannot disagree about what counts. When they disagreed, a line could select in
  * and then extract to nothing — which is what the deleted `not.toBe('')`
  * assertion was compensating for.
  */
+// ⚠️ A direction VALUE, not the word "direction" — and not a bare "toward",
+// which `PARALLEL_INTERCEPT_DEG`'s docblock uses to say which way an ANGLE is
+// measured ("measured from the inbound holding course toward the rejoin turn's
+// direction"). Those two leaked the exemption open on the first attempt. Every
+// wording WRONG knows names a value; that equivalence is what makes the
+// exemption safe, and it is asserted, not assumed, below.
+const DIRECTIONAL =
+  /\bleft\b|\bright\b|opposite|against|same way|follows|holding side|clockwise|crosses|racetrack|direction of the holding/i
+
 function isRejoinAssertion(s: string): boolean {
   if (!/reintercept|rejoin/i.test(s)) return false
+  if (!DIRECTIONAL.test(s)) return false
   if (/\?['"`]?,?\s*$/.test(s.trim())) return false
   if (/\d{4}-\d{2}-\d{2}[^.;]*\b(fix|correction)\b/i.test(s)) return false
   return true
 }
 
 /**
- * Source lines that make a claim about the parallel rejoin. Each content item is
- * a single-line string literal, so a line is the unit of prose here; a README
- * paragraph is one line too, which is why the unit narrows to sentences below.
+ * A source split into units of prose, with comment blocks unwrapped.
+ *
+ * ⚠️ A raw line is NOT a unit of prose in every carrier, and assuming it was is
+ * what made widening this scan past `src/content/` fail twice on correct text.
+ * Content items are single-line string literals and a README paragraph is one
+ * line, so there a line IS a sentence. Comments wrap at 80 columns mid-sentence,
+ * so there a line is a FRAGMENT — and a fragment can lose the very words that
+ * make it correct. Both false positives were of exactly that shape: `entry.ts`
+ * says "the parallel rejoin counter-clockwise (against it) — same words, two
+ * readings", and the line break lands between "parallel" and the "opposite"
+ * CORRECT needs, leaving a fragment that names the maneuver and states nothing.
+ *
+ * Contiguous comment lines are therefore joined into one unit, which is both
+ * more accurate and strictly safer: WRONG is blacklisted over the whole block
+ * (more text, per the note on `rejoinClaim`), while CORRECT still narrows to the
+ * sentence via `rejoinClaim`. Rewrapping a comment cannot change what the guard
+ * sees — the property the emphasis normaliser exists to give the other carriers.
  */
+function proseUnits(source: string): string[] {
+  const units: string[] = []
+  let block: string[] | null = null
+  for (const raw of source.split('\n')) {
+    const trimmed = raw.trim()
+    if (/^(\/\/|\/\*|\*)/.test(trimmed)) {
+      block ??= []
+      block.push(trimmed.replace(/^\/\*+|^\/\/+|^\*+\/?|\*\/$/g, '').trim())
+      continue
+    }
+    if (block !== null) {
+      units.push(block.join(' '))
+      block = null
+    }
+    units.push(raw)
+  }
+  if (block !== null) {
+    units.push(block.join(' '))
+  }
+  return units
+}
+
+/** Units of prose that make a claim about the parallel rejoin. */
 function parallelRejoinLines(source: string): string[] {
-  return source
-    .split('\n')
-    .filter((l) => /parallel/i.test(l) && sentences(l).some(isRejoinAssertion))
+  return proseUnits(source).filter(
+    (l) => /parallel/i.test(l) && sentences(l).some(isRejoinAssertion),
+  )
 }
 
 /** A line split into sentences. Content prose joins clauses with `;` as well. */
@@ -774,6 +859,18 @@ describe('no content module teaches the rejoin the wrong way', () => {
         // sentence BY CONSTRUCTION. An assertion that cannot fail is not
         // documentation, it is fake coverage (CLAUDE.md) — the comment is the
         // part worth keeping.
+        //
+        // ⚠️ CORRECT is matched against the JOINED claim, deliberately, and
+        // tightening it to per-sentence was tried and reverted. Prose that
+        // ARGUES the rule rather than stating it once — the evidence docblocks,
+        // and lessons.ts — spreads it over several sentences, of which the
+        // supporting ones ("the same figure draws the teardrop rejoin clockwise
+        // and the parallel rejoin counter-clockwise") are individually true and
+        // individually match nothing. Per-sentence therefore demands CORRECT
+        // enumerate every valid phrasing, which is unbounded, and each failure
+        // is answered by widening the whitelist until it accepts anything. The
+        // real detector here is WRONG, which scans the whole unit below; CORRECT
+        // asks the narrower question of whether the unit says the rule AT ALL.
         const claim = unemphasize(rejoinClaim(line))
         expect(claim, `${file}: does not state the corrected rule (${EVIDENCE})`).toMatch(CORRECT)
         expect(
@@ -828,7 +925,12 @@ describe('no content module teaches the rejoin the wrong way', () => {
     const emphasised = 'The parallel rejoin *follows the pattern*, turning right in a standard hold.'
     expect(emphasised, 'raw markdown hides the gloss from WRONG — this is the hole').not.toMatch(WRONG)
     expect(unemphasize(emphasised), 'WRONG must catch the same gloss once normalised').toMatch(WRONG)
-    const correct = 'The parallel reintercept turns *against* the pattern, onto the holding side.'
+    // ⚠️ One CORRECT phrase only, and emphasis must split it. The fixture used
+    // to close with ", onto the holding side", which CORRECT later grew to
+    // accept — a second, unemphasised match made the raw string pass CORRECT and
+    // the demonstration collapsed. A fixture that can be satisfied by a clause
+    // other than the one under test stops testing that clause.
+    const correct = 'The parallel reintercept turns *against* the pattern.'
     expect(correct, 'raw markdown hides the corrected rule from CORRECT too').not.toMatch(CORRECT)
     expect(unemphasize(correct), 'CORRECT must accept the corrected rule once normalised').toMatch(CORRECT)
   })
@@ -845,6 +947,36 @@ describe('no content module teaches the rejoin the wrong way', () => {
     )
     expect(rejoinClaim(preFix), 'CORRECT must reject the defective rejoin sentence').not.toMatch(CORRECT)
     expect(preFix, 'and WRONG must still catch it').toMatch(WRONG)
+  })
+
+  it('the direction-free exemption cannot swallow a wrong gloss', () => {
+    // Guards the guard, the fourth way. `isRejoinAssertion` now skips sentences
+    // that name the rejoin without naming a DIRECTION, so that
+    // PARALLEL_INTERCEPT_DEG's docblock — which is about the intercept ANGLE, an
+    // avowedly conventional quantity — is not required to restate the rotation
+    // rule. That exemption is only safe if no WRONG wording can hide inside it:
+    // a sentence cannot state this rule incorrectly without naming a direction.
+    // Assert it over every wording WRONG knows rather than trusting the argument.
+    const wrongGlosses = [
+      'The parallel rejoin turns the same way the pattern does.',
+      'On a parallel entry the reintercept turn follows the pattern.',
+      'A right-turn hold reintercepts right on the parallel entry.',
+      'A left-turn hold reintercepts left when parallel.',
+      'The parallel rejoin turns right because only that direction exceeds 180°.',
+    ]
+    for (const gloss of wrongGlosses) {
+      expect(gloss, `WRONG no longer catches: ${gloss}`).toMatch(WRONG)
+      expect(
+        isRejoinAssertion(gloss),
+        `the direction-free exemption lets this wrong gloss through unscanned: ${gloss}`,
+      ).toBe(true)
+    }
+    // And the sentence the exemption exists for is genuinely direction-free.
+    expect(
+      isRejoinAssertion(
+        "Angle the parallel entry's rejoin turn rolls out on, measured from the inbound",
+      ),
+    ).toBe(false)
   })
 })
 

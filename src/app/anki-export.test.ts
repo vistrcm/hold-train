@@ -5,6 +5,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import README from '../../README.md?raw'
 import { CORE_DECK, type AnkiCard } from '../content/anki-deck'
+import { ORAL_ITEMS } from '../content/oral'
+import { QUESTIONS } from '../content/questions'
 import { createStore, type Miss, type Store } from './store'
 import { ENTRIES } from '../engine/entry'
 import { createEntryDrill } from '../modules/entry-drill'
@@ -265,6 +267,185 @@ describe('missesToCards', () => {
     const cards = missesToCards([entryMiss, writtenMiss, oralMiss])
     expect(cards).toHaveLength(3)
     expect(cards[1]!.tags).toContain('written')
+  })
+
+  // A miss snapshot denormalizes the item's prose into localStorage so a card
+  // survives the item being deleted — but that also FREEZES the fact. A user who
+  // missed the `entries` item before 2026-08-02 has the inverted parallel rejoin
+  // ("reintercepts right" in a right-hand hold) sitting in their store, and
+  // re-exporting today regenerated it verbatim: the exact negative-training path
+  // this branch exists to close, surviving inside the app. The re-import step the
+  // screen renders is only TRUE for the misses deck once the exporter re-reads
+  // live content. `itemId` was already recorded by oral-prep.ts; only the read
+  // side was missing. Asserting the step is present (above) is not asserting it
+  // works, so this asserts the deck itself.
+  // ⚠️ EVERY field of the stale snapshot must DIFFER from the live item, not
+  // just the one the assertion names. The first version of these two tests
+  // copied `live.question`/`live.topic`/`live.options[answerIndex]`/a subset of
+  // `live.acs` into the snapshot and asserted only on the answer prose — so
+  // reverting five of the six rebuilt fields to the snapshot read left the whole
+  // suite green (mutation-confirmed). A fixture that agrees with live is a
+  // fixture that cannot discriminate; `correctOption` in particular is the
+  // written card's ANSWER LINE, the string a content correction is likeliest to
+  // touch.
+  it('rebuilds an oral miss card from live content, not the frozen snapshot', () => {
+    const live = ORAL_ITEMS.find((i) => i.id === 'entries')!
+    const stale: Miss = {
+      drill: 'oral',
+      at: 7,
+      scenario: {
+        itemId: 'entries',
+        question: 'STALE QUESTION recorded before a content correction.',
+        answer:
+          'Note the parallel reintercept turns the same way the pattern does — a ' +
+          'right-turn hold reintercepts right — because only that direction is the ' +
+          '"more than 180°" turn the AIM specifies.',
+        source: 'STALE 0-0-0',
+        acs: ['STALE.TAG'],
+      },
+    }
+    const c = missesToCards([stale])[0]!
+    expect(c.front).toBe(live.question)
+    expect(c.back).toContain(live.answer)
+    expect(c.source).toBe(live.source)
+    expect(c.tags).toEqual(['miss', 'oral', ...live.acs])
+    expect(c.tags).not.toContain('STALE.TAG')
+    // the settled direction, and no trace of the pre-fix gloss
+    expect(c.back).toMatch(/opposite the pattern/i)
+    expect(c.back).not.toMatch(/reintercepts right|same way the pattern/i)
+  })
+
+  it('rebuilds a written miss card from live content, not the frozen snapshot', () => {
+    // Same defect class one drill over. It is latent today only because
+    // questions.ts happened to carry no rejoin claim — the next content
+    // correction that touches an explanation would ship the stale one.
+    const live = QUESTIONS.find((q) => q.id === 'entry-ktcy-haire')!
+    const stale: Miss = {
+      drill: 'written',
+      at: 8,
+      scenario: {
+        questionId: 'entry-ktcy-haire',
+        topic: 'stale-topic',
+        question: 'STALE QUESTION recorded before a content correction.',
+        chosen: 'direct',
+        correctOption: 'STALE OPTION',
+        explanation: 'STALE EXPLANATION recorded before a content correction.',
+        source: 'STALE 0-0-0',
+      },
+    }
+    const c = missesToCards([stale])[0]!
+    expect(c.front).toBe(live.question)
+    expect(c.back).toContain(live.options[live.answerIndex]!)
+    expect(c.back).toContain(live.explanation)
+    expect(c.back).not.toContain('STALE')
+    expect(c.source).toBe(live.source)
+    expect(c.tags).toContain(live.topic)
+    expect(c.tags).not.toContain('stale-topic')
+  })
+
+  // CLAUDE.md: "Never drop a caveat because the type has no field for it."
+  // `AnkiCard` has no caveat field and `OralItem` keeps its caveat OUT of
+  // `answer` (oral-prep.ts renders it separately), so a card built from `answer`
+  // alone silently teaches the unqualified rule. Driven off whichever items
+  // actually carry one rather than a hardcoded id, so a caveat added later
+  // cannot ship unexported.
+  it('carries every oral item caveat onto the exported card', () => {
+    const withCaveat = ORAL_ITEMS.filter((i) => i.caveat !== undefined)
+    expect(withCaveat.length, 'no oral item carries a caveat — fixture drift?').toBeGreaterThan(0)
+    for (const item of withCaveat) {
+      const miss: Miss = {
+        drill: 'oral',
+        at: 11,
+        scenario: { itemId: item.id, question: 'Q', answer: 'A', source: 'S', acs: [] },
+      }
+      const c = missesToCards([miss])[0]!
+      expect(c.back, `${item.id} exported without its caveat`).toContain(item.caveat!)
+    }
+  })
+
+  // The delete-resilience the snapshot was built for has to survive the fix:
+  // an id that no longer resolves (item retired, or a pre-`itemId` snapshot from
+  // an older store) must still export its card rather than vanish. Both live-id
+  // tests above would pass a "drop unresolvable misses" implementation too.
+  it('falls back to the snapshot when the id no longer resolves', () => {
+    const gone: Miss = {
+      drill: 'oral',
+      at: 9,
+      scenario: { itemId: 'retired-item', question: 'Q', answer: 'A', source: 'AIM 5-3-8', acs: [] },
+    }
+    const idless: Miss = {
+      drill: 'written',
+      at: 10,
+      scenario: { question: 'Q2', correctOption: 'C', explanation: 'E', source: 'AIM 5-3-8' },
+    }
+    const cards = missesToCards([gone, idless])
+    expect(cards).toHaveLength(2)
+    expect(cards[0]!.back).toBe('A')
+    expect(cards[1]!.back).toContain('E')
+  })
+
+  // The entry answer is the most safety-critical string the app produces, and it
+  // was the one frozen hardest: `expected`/`alternates` are `determineEntry`
+  // output snapshotted at miss time, so an engine correction left the deck
+  // teaching the OLD SECTOR while the screen's re-import step told the user the
+  // deck was now current. The module docblock used to excuse this as "engine-
+  // derived scenarios, not bank prose" — backwards as a safety argument, since
+  // engine-derived is exactly what an engine correction invalidates.
+  it('re-derives an entry miss answer from the engine, not the frozen snapshot', () => {
+    // Derived from the AIM's sector geometry, NOT by calling determineEntry —
+    // an expectation read out of the oracle agrees with any engine, including a
+    // corrected one, so it could not tell a re-derivation from a frozen read.
+    // Right-turn hold, inbound course 000: the teardrop sector spans 110°–180°
+    // clockwise of the inbound course (AIM 5-3-8 j3), so heading 140 is a
+    // teardrop, 30° clear of both boundaries and therefore un-alternated.
+    const stale: Miss = {
+      drill: 'entry',
+      at: 12,
+      scenario: {
+        clearanceText: 'Hold north of ABCDE as published.',
+        heading: 140,
+        holdSpec: { inboundCourse: 0, turnDirection: 'right' },
+        chosen: 'direct',
+        expected: 'parallel',
+        alternates: ['direct'],
+      },
+    }
+    const c = missesToCards([stale])[0]!
+    expect(c.back).toContain('Correct entry: teardrop')
+    expect(c.back).not.toContain('parallel')
+    expect(c.back).not.toContain('also acceptable')
+  })
+
+  it('keeps the frozen entry answer when the snapshot predates holdSpec', () => {
+    // Delete-resilience again: a pre-`holdSpec` snapshot, or one whose hold no
+    // longer validates, must still export rather than vanish or throw. The
+    // course here is out of the engine's [0,360) domain, which `determineEntry`
+    // answers with a RangeError — one malformed miss must not take the export
+    // down.
+    const legacy: Miss = {
+      drill: 'entry',
+      at: 13,
+      scenario: {
+        clearanceText: 'Hold east of FGHIJ as published.',
+        heading: 90,
+        expected: 'parallel',
+        alternates: ['teardrop'],
+      },
+    }
+    const bad: Miss = {
+      drill: 'entry',
+      at: 14,
+      scenario: {
+        clearanceText: 'Hold west of KLMNO as published.',
+        heading: 90,
+        holdSpec: { inboundCourse: 360, turnDirection: 'right' },
+        expected: 'direct',
+      },
+    }
+    const cards = missesToCards([legacy, bad])
+    expect(cards).toHaveLength(2)
+    expect(cards[0]!.back).toContain('Correct entry: parallel (also acceptable: teardrop)')
+    expect(cards[1]!.back).toContain('Correct entry: direct')
   })
 
   it('skips unknown drills and malformed scenarios without throwing', () => {

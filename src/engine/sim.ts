@@ -31,7 +31,7 @@
 //
 // Frame: NM east/north of the holding fix (the map view's MapPoint shape).
 
-import { PARALLEL_INTERCEPT_DEG, type Entry, type TurnDirection, entryGuidance } from './entry'
+import { ENTRIES, PARALLEL_INTERCEPT_DEG, type Entry, type TurnDirection, entryGuidance } from './entry'
 import { assertCourse, normalizeDeg } from './geometry'
 import { inboundCrab, outboundHeading, outboundTimeSeconds, type Wind } from './wind'
 
@@ -108,6 +108,15 @@ export function textbookDecisions(hold: SimHold, wind: Wind, tasKt = HOLD_TAS_KT
 }
 
 function assertDecisions(d: SimDecisions): void {
+  // `entryGuidance`'s switch is exhaustive over `Entry`, so it has no fallthrough
+  // return and hands back `undefined` for anything outside the union — which the
+  // turn-sign read below dereferences immediately. Without this the caller gets
+  // `TypeError: Cannot read properties of undefined` from inside the integrator
+  // instead of a RangeError naming the field, and TS's exhaustiveness proof does
+  // not survive a cast, a widened type or a deserialized value.
+  if (!ENTRIES.includes(d.entry)) {
+    throw new RangeError(`entry must be one of ${ENTRIES.join(', ')}, got ${String(d.entry)}`)
+  }
   assertCourse(d.outboundHeading, 'outboundHeading')
   if (!Number.isFinite(d.inboundCrab) || Math.abs(d.inboundCrab) > MAX_CRAB_DEG) {
     throw new RangeError(`inboundCrab must be within ±${MAX_CRAB_DEG}°, got ${d.inboundCrab}`)

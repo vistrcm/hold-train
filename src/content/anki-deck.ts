@@ -42,7 +42,15 @@ export const CORE_DECK: readonly AnkiCard[] = [
     tags: ['rote', 'entry', 'IR.III.B.S1'],
   },
   {
-    front: 'Parallel entry: which side of the course do you reintercept from?',
+    // ⚠️ Asks which WAY the rejoin turns, not which SIDE it comes from. The
+    // old front ("which side of the course do you reintercept from?") was
+    // written against the pre-2026-08-02 geometry, where the rejoin stayed on
+    // the nonholding side. Corrected, the rollout is on the HOLDING side, so
+    // the back's opening clause ("outbound on the non-holding side" — the
+    // outbound leg) reads as answering the front with the opposite of the truth.
+    // The prose scan cannot catch this: it drops interrogatives, because a
+    // question states a topic and no rule. Rotation is what the card teaches.
+    front: 'Parallel entry: which way does the reintercept turn rotate?',
     back: 'Parallel the holding course outbound on the non-holding side for one minute, then turn IN THE DIRECTION OF THE HOLDING PATTERN through more than 180°, and return to the fix or intercept the inbound course. The reintercept turn is rotationally opposite the pattern (left in a standard right-turn hold) and crosses back over the holding course onto the holding side — "in the direction of the holding pattern" means toward the racetrack, not the way it turns. Parallel is the one entry whose first two turns both oppose the pattern; only the turn on reaching the fix again follows it.',
     source: 'AIM 5-3-8 j3 (entry procedures), FIG 5-3-4',
     tags: ['rote', 'entry', 'IR.III.B.S1'],
