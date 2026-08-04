@@ -154,7 +154,7 @@ recorded once, in the engine, so the map and the sim cannot drift from it.
    `docs/content-audit.md` (the entry "**Fixed: the wind-lab debrief hid which side a wide inbound
    crossed on**") and is pinned by `src/modules/wind-lab.test.ts:376`. Reversing a
    ledger decision without arguing against it is the same mistake this plan exists to correct. It is
-   handled in `docs/plans/20260802-protected-airspace-terminology.md`, **not here.**
+   handled in `docs/plans/completed/20260802-protected-airspace-terminology.md`, **not here.**
 
 ## Context (from discovery)
 

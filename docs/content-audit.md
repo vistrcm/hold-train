@@ -1315,3 +1315,13 @@ failure this ledger records for the rejoin prose scan.
   recorded — re-deriving the fractions from the table previously landed strictly below the
   published lower bound and read as a transcription error. The amended 2026-07-22 entry above
   also now records the test rename its citation predates.
+- **Fixed: `docs/research-claude.md` carried the one-side-protected model twice past its own
+  Task-2 correction.** Line 41 was corrected because the plan named it; §17's safety bullet
+  ("wandering onto the non-holding side … does not [keep the airplane inside protected
+  airspace]") and the SAFETY-CRITICAL Anki call-out ("stay on the holding/protected side")
+  restated the same model in prose with no NM figures, so the acceptance sweep — `src/`
+  strings plus docs *figures* citing 8260.3G — never touched them. The call-out line is
+  explicitly Anki-ready, i.e. a re-seed path for the exact defect the plan removed. Both now
+  state both-sides-protected / non-holding-narrower with the 8260.3G Table 16-6-1 citation.
+  No regression test: the content-bank scans cover `src/content/` and the wind-lab screen,
+  not `docs/` — docs prose remains guarded only by review.
