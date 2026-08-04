@@ -112,15 +112,19 @@ no text layer and must be rendered to images and read visually.
 **Files:**
 - Modify: `docs/research-claude.md`
 
-- [ ] replace the 8/4 NM claim at `:41` with the verified finding, citing 8260.3G Table 16-6-1 and
+- [x] replace the 8/4 NM claim at `:41` with the verified finding, citing 8260.3G Table 16-6-1 and
       linking `docs/holding-protected-airspace.md`
-- [ ] state plainly that **both sides are protected** and that there is no single pair of numbers —
+- [x] state plainly that **both sides are protected** and that there is no single pair of numbers —
       the area scales with template (altitude/speed)
-- [ ] keep a dated note that the previous figure was sourced to a CFII, not the FAA, so the
+- [x] keep a dated note that the previous figure was sourced to a CFII, not the FAA, so the
       correction is not silently rewritten
-- [ ] note that "non-maneuvering side" is **not** an FAA term — it originates in an Aeronautical
+- [x] note that "non-maneuvering side" is **not** an FAA term — it originates in an Aeronautical
       Charting Forum submission by an outside consultant (ACF Control # 03-01-247)
-- [ ] run `npm test` and `npm run typecheck`
+      (➕ corrected during verification: the term IS in the current AIM, but only for procedure
+      turns — AIM 5-4-9 a, checked 2026-08-03 against the faa.gov AIM; AIM holding text uses
+      "holding side"/"non-holding side". The ACF 03-01-247 origin could not be located on faa.gov
+      or the open web and is recorded as unverified, per the citation convention)
+- [x] run `npm test` and `npm run typecheck` (614/614 pass; tsc clean)
 
 ### Task 3: Fix the wind-lab debrief wording without losing the prior fix's intent
 
