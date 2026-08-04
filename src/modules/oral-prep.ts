@@ -113,6 +113,12 @@ export function createOralPrep(options: OralPrepOptions = {}): OralPrepControlle
           answer: item.answer,
           source: item.source,
           acs: item.acs,
+          // Denormalized like every sibling field: the export rebuilds this card
+          // from the live item and reads the snapshot only when the id no longer
+          // resolves, so a field missing here is one the fallback card drops —
+          // and dropping this one exports the answer without the qualification
+          // that makes it true (CLAUDE.md: never drop a caveat).
+          caveat: item.caveat,
         })
       }
       index += 1

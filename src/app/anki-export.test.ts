@@ -384,6 +384,50 @@ describe('missesToCards', () => {
     expect(cards[1]!.back).toContain('E')
   })
 
+  // The caveat had no snapshot source at all, so it survived only on the LIVE
+  // path — and the fallback path is the one delete-resilience exists for. The
+  // `entries` item's caveat is the ±5° tolerance that makes a boundary heading's
+  // second entry correct, so the retired-item card taught a stricter rule than
+  // the AIM's, silently. `recordMiss` now denormalizes it like every sibling.
+  it('carries the caveat through the fallback path too', () => {
+    const gone: Miss = {
+      drill: 'oral',
+      at: 20,
+      scenario: {
+        itemId: 'retired-item',
+        question: 'Q',
+        answer: 'A',
+        source: 'AIM 5-3-8',
+        acs: [],
+        caveat: 'within good operating limits, ±5°',
+      },
+    }
+    expect(missesToCards([gone])[0]!.back).toContain('within good operating limits, ±5°')
+  })
+
+  // ...but only there. The snapshot is a CACHE, so a live item that has had its
+  // caveat RETIRED must not have it resurrected off a stale miss — the same
+  // direction-of-authority the answer/source rebuild establishes, applied to the
+  // one field whose absence is meaningful. `??` would get this backwards
+  // (`undefined` falls through to the snapshot); the ternary on `live` is why.
+  it('does not resurrect a retired caveat from the snapshot', () => {
+    const plain = ORAL_ITEMS.find((i) => i.caveat === undefined)
+    expect(plain, 'every oral item carries a caveat — fixture drift?').toBeDefined()
+    const stale: Miss = {
+      drill: 'oral',
+      at: 21,
+      scenario: {
+        itemId: plain!.id,
+        question: 'Q',
+        answer: 'A',
+        source: 'AIM 5-3-8',
+        acs: [],
+        caveat: 'RETIRED CAVEAT',
+      },
+    }
+    expect(missesToCards([stale])[0]!.back).not.toContain('RETIRED CAVEAT')
+  })
+
   // The entry answer is the most safety-critical string the app produces, and it
   // was the one frozen hardest: `expected`/`alternates` are `determineEntry`
   // output snapshotted at miss time, so an engine correction left the deck
@@ -446,6 +490,45 @@ describe('missesToCards', () => {
     expect(cards).toHaveLength(2)
     expect(cards[0]!.back).toContain('Correct entry: parallel (also acceptable: teardrop)')
     expect(cards[1]!.back).toContain('Correct entry: direct')
+  })
+
+  // `heading` is the OTHER argument the re-derivation feeds the engine, and it
+  // reached `determineEntry` unguarded while its co-argument `inboundCourse` was
+  // range-checked by `snapshotHold` for exactly this reason. `courseText` — the
+  // only consumer before the re-derivation landed — never throws, so an
+  // out-of-domain heading was harmless until this branch and is now a
+  // `RangeError` out of `angleDiff`, uncaught all the way up through
+  // `missesToCards` into `renderAnkiExport`, which the router calls after
+  // clearing `#app`. One hand-edited localStorage entry blanks the screen.
+  it('does not throw on a heading outside the engine domain', () => {
+    const good: Miss = {
+      drill: 'entry',
+      at: 15,
+      scenario: {
+        clearanceText: 'Hold north of ABCDE as published.',
+        heading: 140,
+        holdSpec: { inboundCourse: 0, turnDirection: 'right' },
+        expected: 'teardrop',
+      },
+    }
+    // 360 is the boundary the engine rejects (courses live in [0, 360)); -1 and
+    // NaN are the other two ways a stored number leaves the domain.
+    const bad: Miss[] = [360, -1, Number.NaN].map((heading, i) => ({
+      drill: 'entry',
+      at: 16 + i,
+      scenario: {
+        clearanceText: 'Hold east of FGHIJ as published.',
+        heading,
+        holdSpec: { inboundCourse: 0, turnDirection: 'right' },
+        expected: 'parallel',
+      },
+    }))
+    // The surviving good card is the assertion that matters: a `try/catch`
+    // wrapped around the whole loop would also "not throw", and would drop
+    // every later miss with it.
+    const cards = missesToCards([...bad, good])
+    expect(cards).toHaveLength(1)
+    expect(cards[0]!.back).toContain('Correct entry: teardrop')
   })
 
   it('skips unknown drills and malformed scenarios without throwing', () => {

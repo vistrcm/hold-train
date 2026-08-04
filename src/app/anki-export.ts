@@ -105,7 +105,20 @@ function snapshotHold(x: unknown): { inboundCourse: number; turnDirection: TurnD
 function entryMissCard(drill: string, s: Record<string, unknown>): AnkiCard | null {
   const clearanceText = str(s['clearanceText'])
   const heading = s['heading']
-  if (clearanceText === null || typeof heading !== 'number' || !Number.isFinite(heading)) {
+  if (clearanceText === null || typeof heading !== 'number') {
+    return null
+  }
+  // Range-checked against the ENGINE's domain, not merely for finiteness:
+  // `heading` is the second argument the re-derivation below feeds
+  // `determineEntry`, which throws RangeError outside [0, 360) exactly as it
+  // does for `snapshotHold`'s `inboundCourse`. Guarding one of the pair and not
+  // the other left `missesToCards` — uncaught, called after the router has
+  // cleared `#app` — takeable down by a single hand-edited miss. Dropped rather
+  // than answered from the frozen snapshot because the heading IS the question
+  // on the card front ("Your heading: … — which entry?"): a card asking about
+  // 400° has no correct answer to fall back to, and this is the same disposition
+  // a non-numeric heading already got.
+  if (!Number.isFinite(heading) || heading < 0 || heading >= 360) {
     return null
   }
   // Re-derive the answer from the engine when the snapshot carries enough to do
@@ -181,10 +194,17 @@ function oralMissCard(s: Record<string, unknown>): AnkiCard | null {
   // names. Folded into the back rather than lost: the `entries` item's own
   // caveat is the ±5° tolerance that makes a boundary heading's second entry
   // correct, so a card drilled without it teaches a harder rule than the AIM's.
-  const caveat = live?.caveat
+  //
+  // Ternary on `live`, not `live?.caveat ?? str(...)`: the caveat is the one
+  // field whose ABSENCE is meaningful, so `??` would read a live item that has
+  // had its caveat retired as "no live value" and resurrect the stale one off
+  // the snapshot — the frozen-fact bug this whole rebuild exists to close,
+  // running backwards. Live wins outright; the snapshot answers only the
+  // retired-id case, which is the case delete-resilience is for.
+  const caveat = live === undefined ? str(s['caveat']) : live.caveat
   return {
     front: question,
-    back: caveat === undefined ? answer : `${answer}\n⚠ ${caveat}`,
+    back: caveat === undefined || caveat === null ? answer : `${answer}\n⚠ ${caveat}`,
     source,
     tags: ['miss', 'oral', ...acs],
   }

@@ -103,12 +103,18 @@ describe('createOralPrep', () => {
     const misses = store.loadState().misses
     expect(misses.length).toBe(1)
     expect(misses[0]!.drill).toBe('oral')
+    // `caveat` included: `anki-export.ts` rebuilds the card from the live item
+    // by `itemId` and reads the snapshot only when that id no longer resolves,
+    // so any field missing here is a field the fallback card silently drops.
+    // The caveat is the qualification that keeps the answer from teaching a
+    // stricter rule than the AIM's — CLAUDE.md's "never drop a caveat".
     expect(misses[0]!.scenario).toMatchObject({
       itemId: 'b',
       question: 'QB?',
       answer: 'AB',
       source: 'FAA-S-ACS-8C',
       acs: ['IR.III.B.S4'],
+      caveat: 'a caveat',
     })
   })
 

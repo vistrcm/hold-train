@@ -1069,3 +1069,33 @@ Two guard-integrity defects, same class as iteration 4's, likewise unrecorded at
   to the fix rather than at the rollout heading, so the picture kinks up to ~35–41° on long legs
   (raising `PARALLEL_INTERCEPT_DEG` 30 → 45 widened it from ~5°). Deferral is deliberate and
   documented at `src/ui/mapview.ts`'s rollout block; noted here so the deferral is not lost.
+
+## Post-completion review fixes — 2026-08-03 (code review iteration 7)
+
+Two independent review agents converged on the same defect, both tracing it to the same root: the
+engine re-derivation added in iteration 6 fed `determineEntry` two arguments and validated one.
+
+- **Fixed: one malformed miss could blank the Anki Export screen** (`src/app/anki-export.ts`).
+  `entryMissCard` checked `heading` for *finiteness* only, then passed it to `determineEntry`,
+  which `assertCourse`-throws `RangeError` outside `[0, 360)` — exactly what `snapshotHold` guards
+  its co-argument `inboundCourse` against, with a docblock saying "an export must not be takeable
+  down by one malformed miss". Nothing catches it between there and `renderAnkiExport`, and the
+  router clears `#app` before rendering, so a stored `heading: 360` renders an empty screen. New
+  before this branch: pre-re-derivation, `heading` only reached `courseText`, which cannot throw.
+  Dropped rather than fallen back on, because the heading *is* the card's question. Regression:
+  `does not throw on a heading outside the engine domain` — three out-of-domain misses plus one
+  good one, asserting the **good card survives**, since a `try/catch` around the loop would also
+  "not throw" while swallowing every later miss.
+- **Fixed: the oral caveat was dropped on the fallback path** (`src/modules/oral-prep.ts`,
+  `src/app/anki-export.ts`). `recordMiss` never snapshotted `caveat`, and `oralMissCard` read it
+  only from the live item — so the retired-id path, which is the one delete-resilience exists for,
+  exported the answer stripped of its qualification. For the `entries` item that qualification is
+  the ±5° tolerance making a boundary heading's second entry correct, so the card taught a stricter
+  rule than the AIM's. This is the drop the iteration-6 comment above the line claims to prevent.
+  Recorded now, and read back with a ternary on `live` rather than `live?.caveat ?? snapshot`: the
+  caveat is the one field whose *absence* is meaningful, so `??` would resurrect a deliberately
+  retired caveat off a stale miss — the frozen-fact bug running backwards. Regressions:
+  `carries the caveat through the fallback path too`, `does not resurrect a retired caveat from the
+  snapshot`, and the recorder side in `oral-prep.test.ts`. All four guards mutation-confirmed.
+- **Not re-fixed:** the mapview rollout kink, reported again this iteration. Already a deliberate,
+  documented deferral (see the previous section's closing entry).
