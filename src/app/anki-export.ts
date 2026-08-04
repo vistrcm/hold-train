@@ -41,6 +41,23 @@ export const MISSES_FILENAME = 'hold-train-misses.tsv'
 /** Entry answers are engine-generated; the miss card cites the entry rules. */
 const ENTRY_MISS_SOURCE = 'AIM 5-3-8 j3 (entry procedures)'
 
+/**
+ * …and a card that lists an ALTERNATE cites the tolerance that makes it correct.
+ *
+ * A second acceptable entry is not a fact of j3: it exists only because the
+ * heading sits within the ±5° boundary band of AIM 5-3-8 j8(d). Rendering
+ * "(also acceptable: …)" under the j3-only citation points the student at a
+ * paragraph that does not contain the rule the card just taught — the
+ * sub-paragraph-granularity convention this project holds every user-visible
+ * aviation fact to. `oral.ts` cites the same fact the same way.
+ *
+ * Derived from the base rather than written out, so the two cannot drift, and
+ * chosen by what the card RENDERS rather than by which path built it: the
+ * frozen snapshot carries alternates too, and a legacy miss states the
+ * tolerance exactly as loudly as a re-derived one.
+ */
+const ENTRY_MISS_ALTERNATES_SOURCE = `${ENTRY_MISS_SOURCE}, j8(d) (±5° heading tolerance)`
+
 // Tabs would split the field; newlines would split the card. Anki renders
 // HTML, so line breaks survive as <br>.
 //
@@ -146,7 +163,7 @@ function entryMissCard(drill: string, s: Record<string, unknown>): AnkiCard | nu
   return {
     front: `${clearanceText}${chartLine}\nYour heading: ${courseText(heading)} — which entry?`,
     back: `Correct entry: ${expected}${also}.${missed}`,
-    source: ENTRY_MISS_SOURCE,
+    source: also === '' ? ENTRY_MISS_SOURCE : ENTRY_MISS_ALTERNATES_SOURCE,
     tags: ['miss', drill],
   }
 }

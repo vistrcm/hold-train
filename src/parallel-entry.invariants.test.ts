@@ -629,7 +629,7 @@ const CORRECT =
  * checking it. Pinned by `the negatives accept the corrected rule` below.
  */
 const WRONG =
-  /same way the pattern|(?:rejoin|reintercepts?)(?: turn)? follows the pattern|only that direction|right-turn hold[^.;,]*reintercepts? right|left-turn hold[^.;,]*reintercepts? left/i
+  /same way the pattern|(?:rejoin|reintercepts?)(?: turn)? follows the pattern|only that direction|right-turn hold[^.;,]*reintercepts? right|left-turn hold[^.;,]*reintercepts? left|(?:rejoin|reintercepts?)(?: turns?)?[^.;,()]*(?:with the pattern|matches the pattern|same direction as the pattern)/i
 
 /**
  * The content modules — a filter over the single `SOURCES` harvest, not a
@@ -725,24 +725,45 @@ function unemphasize(s: string): string {
  *     measured from the inbound holding course…") is about the intercept angle,
  *     a separate and explicitly CONVENTIONAL quantity. Requiring it to restate
  *     the direction is the absurd-prose failure one line up. Detected by the
- *     absence of any DIRECTION word, which is safe because a sentence cannot
- *     state the rule WRONGLY without naming a direction — pinned by `the
- *     direction-free exemption cannot swallow a wrong gloss` below, which runs
- *     every known wrong wording through this predicate.
+ *     absence of any DIRECTION word.
+ *
+ *     ⚠️ What makes this exemption safe is NOT the argument it was first
+ *     written on. That argument — "a sentence cannot state the rule WRONGLY
+ *     without naming a direction" — is false, and the list that was supposed to
+ *     have asserted it merely restated it: all five wordings named a direction
+ *     VALUE, so the predicate agreed with itself. English states agreement with
+ *     a VERB and never names either direction ("the parallel reintercept turns
+ *     WITH the pattern", "MATCHES the pattern direction"), and four such
+ *     wordings escaped this predicate AND the blacklist together.
+ *
+ *     The exemption is safe because it is an exemption from CORRECT ONLY: WRONG
+ *     scans `parallelRejoinMentions`, which applies no exemptions at all. So the
+ *     live risk is the blacklist's VOCABULARY, not this gate — which is why the
+ *     agreement-verb alternatives were added to WRONG in the same change, and
+ *     why the fixtures in `the direction-free exemption cannot swallow a wrong
+ *     gloss` below must keep naming no direction. A fixture that names one tests
+ *     nothing here.
  *
  * ⚠️ Shared by the line selector AND the claim extractor below, so the two
  * cannot disagree about what counts. When they disagreed, a line could select in
  * and then extract to nothing — which is what the deleted `not.toBe('')`
  * assertion was compensating for.
  */
-// ⚠️ A direction VALUE, not the word "direction" — and not a bare "toward",
-// which `PARALLEL_INTERCEPT_DEG`'s docblock uses to say which way an ANGLE is
-// measured ("measured from the inbound holding course toward the rejoin turn's
-// direction"). Those two leaked the exemption open on the first attempt. Every
-// wording WRONG knows names a value; that equivalence is what makes the
-// exemption safe, and it is asserted, not assumed, below.
+// ⚠️ A direction VALUE or an AGREEMENT VERB — but not the bare word "direction",
+// and not a bare "toward", which `PARALLEL_INTERCEPT_DEG`'s docblock uses to say
+// which way an ANGLE is measured ("measured from the inbound holding course
+// toward the rejoin turn's direction"). Those two leaked the exemption open on
+// the first attempt.
+//
+// ⚠️ The agreement alternatives key on the VERB (`with`, `matches`, `same
+// direction as`), never on the noun phrase alone. `pattern direction` is not a
+// gloss: the corrected rule uses the identical noun and negates it ("opposes the
+// pattern direction"), so an alternative built on the noun would reject the
+// settled wording — and a blacklist that fails on correct prose gets weakened
+// until it guards nothing. Pinned both ways in `the negatives accept the
+// corrected rule` below.
 const DIRECTIONAL =
-  /\bleft\b|\bright\b|opposite|against|same way|follows|holding side|clockwise|crosses|racetrack|direction of the holding/i
+  /\bleft\b|\bright\b|opposite|against|same way|follows|holding side|clockwise|crosses|racetrack|direction of the holding|with the pattern|matches the pattern|same direction/i
 
 function isRejoinAssertion(s: string): boolean {
   if (!/reintercept|rejoin/i.test(s)) return false
@@ -986,6 +1007,27 @@ describe('no content module teaches the rejoin the wrong way', () => {
     // …and the same-sense pairing the last two alternatives exist for, in both senses.
     expect('a right-turn hold reintercepts right').toMatch(WRONG)
     expect('in a left-turn hold the parallel reintercepts left').toMatch(WRONG)
+    // ⚠️ The agreement-verb alternatives must key on the VERB, never on the noun
+    // phrase. `pattern direction` alone is not a gloss: the corrected rule uses
+    // the identical noun and negates it, so an alternative built on the noun
+    // rejects the settled wording — CLAUDE.md's own statement of it, below.
+    for (const correct of [
+      "the parallel rejoin turn rotates opposite the pattern's turn direction",
+      'the parallel reintercept turn opposes the pattern direction, crossing back onto the holding side',
+    ]) {
+      expect(correct, 'WRONG must not key the agreement gloss on the noun').not.toMatch(WRONG)
+    }
+    // ⚠️ And a bare "rejoin … with the pattern" is not wrong either — it is the
+    // TEARDROP's rejoin, which genuinely does turn with the pattern. The word
+    // naming the maneuver does not say WHICH maneuver, the same ambiguity the
+    // "reintercepts right" note above records. This exact sentence is live in
+    // `entry.ts`'s evidence docblock and failed the widened blacklist on the
+    // first attempt; the agreement gap excludes `()` for it, because a
+    // parenthetical gloss bounds a clause exactly as a comma does.
+    expect(
+      'FIG 5-3-4 draws the teardrop rejoin clockwise (with the pattern) and the parallel rejoin counter-clockwise',
+      'WRONG must not read the teardrop rejoin as the parallel one',
+    ).not.toMatch(WRONG)
   })
 
   it('emphasis cannot hide a wrong gloss, or a right one', () => {
@@ -1036,6 +1078,19 @@ describe('no content module teaches the rejoin the wrong way', () => {
       'A right-turn hold reintercepts right on the parallel entry.',
       'A left-turn hold reintercepts left when parallel.',
       'The parallel rejoin turns right because only that direction exceeds 180°.',
+      // ⚠️ The four below are the hole this list was asserted over and did not
+      // find, because every wording above happens to name a direction VALUE
+      // (left/right/same way/follows) and these name an agreement VERB instead.
+      // The argument the exemption rested on — "a sentence cannot state this
+      // rule incorrectly without naming a direction" — is simply false: English
+      // states agreement with `with`, `matches`, `same direction as` and never
+      // says which way either turn goes. Each of these escaped BOTH regexes
+      // (unselected by the whitelist, unmatched by the blacklist), so a
+      // correction gloss written this way shipped entirely unscanned.
+      'The parallel reintercept turns with the pattern.',
+      'On a parallel entry the rejoin is in the same direction as the pattern turns.',
+      'The parallel rejoin turn matches the pattern direction.',
+      'The parallel rejoin turn goes the same direction as the pattern.',
     ]
     for (const gloss of wrongGlosses) {
       expect(gloss, `WRONG no longer catches: ${gloss}`).toMatch(WRONG)

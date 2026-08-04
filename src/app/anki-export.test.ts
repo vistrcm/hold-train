@@ -492,6 +492,50 @@ describe('missesToCards', () => {
     expect(cards[1]!.back).toContain('Correct entry: direct')
   })
 
+  it('cites the ±5° tolerance exactly on the entry cards that render an alternate', () => {
+    // CLAUDE.md's citation convention: every user-visible aviation fact carries
+    // its FAA source at SUB-PARAGRAPH granularity. "(also acceptable: …)" is a
+    // second fact, and it is not in j3 — a second entry is correct only under
+    // the ±5° boundary tolerance of AIM 5-3-8 j8(d), which `oral.ts` already
+    // cites at that granularity for the same fact. These go into spaced
+    // repetition, so a card teaching the tolerance under an entry-procedures-
+    // only citation sends the student to a paragraph that does not contain it.
+    //
+    // Keyed on what the card RENDERS, not on which path built it: the frozen
+    // path carries alternates out of the snapshot and needs the clause just as
+    // much as the re-derived one. Both are asserted below, and the no-alternate
+    // card pins the converse — a card that never states the tolerance must not
+    // claim to cite it.
+    const alternated: Miss = {
+      drill: 'entry',
+      at: 15,
+      scenario: {
+        clearanceText: 'Hold east of FGHIJ as published.',
+        heading: 90,
+        expected: 'parallel',
+        alternates: ['teardrop'],
+      },
+    }
+    const plain: Miss = {
+      drill: 'entry',
+      at: 16,
+      scenario: {
+        clearanceText: 'Hold north of ABCDE as published.',
+        heading: 140,
+        holdSpec: { inboundCourse: 0, turnDirection: 'right' },
+        expected: 'teardrop',
+      },
+    }
+    const [withAlt, withoutAlt] = missesToCards([alternated, plain])
+    expect(withAlt!.back).toContain('also acceptable')
+    expect(withAlt!.source, 'the tolerance is stated but not cited').toContain('j8(d)')
+    expect(withoutAlt!.back).not.toContain('also acceptable')
+    expect(withoutAlt!.source, 'cites a tolerance the card never states').not.toContain('j8(d)')
+    // Both still cite the entry rules themselves.
+    expect(withAlt!.source).toContain('AIM 5-3-8 j3')
+    expect(withoutAlt!.source).toContain('AIM 5-3-8 j3')
+  })
+
   // `heading` is the OTHER argument the re-derivation feeds the engine, and it
   // reached `determineEntry` unguarded while its co-argument `inboundCourse` was
   // range-checked by `snapshotHold` for exactly this reason. `courseText` — the

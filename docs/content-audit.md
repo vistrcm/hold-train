@@ -1143,3 +1143,40 @@ deck — the one place the app cannot reach to correct anything.
   `hold.turnDirection`. Corrected per CLAUDE.md's rule that a docblock misattributing which
   assertion catches which failure mode argues the next session into deleting the one that works.
 - **Not re-fixed:** the mapview rollout kink, reported a third time. Unchanged deliberate deferral.
+- **Fixed: the entry miss card stated the ±5° tolerance under a j3-only citation**
+  (`src/app/anki-export.ts`). The rebuilt card renders `(also acceptable: …)` whenever the heading
+  sits in a boundary band, but carried `ENTRY_MISS_SOURCE = 'AIM 5-3-8 j3 (entry procedures)'`
+  unconditionally. A second entry is not a fact of j3 — it is correct only under the ±5° tolerance
+  of **j8(d)**, which `oral.ts` already cites at exactly that granularity for exactly that fact,
+  and which `determineEntry` already returns and this function discarded. Sub-paragraph granularity
+  is the project's citation convention precisely so a student can look the claim up; a spaced-
+  repetition card sending them to a paragraph that does not contain the rule it just taught is the
+  failure the convention exists to prevent. The citation is now chosen by what the card **renders**,
+  not by which path built it — the frozen snapshot carries alternates too, and a legacy miss states
+  the tolerance as loudly as a re-derived one — and is derived from the base constant so the two
+  cannot drift. Regression: `cites the ±5° tolerance exactly on the entry cards that render an
+  alternate`, which pins **both** directions; mutation-confirmed against a source pinned to either
+  constant alone.
+- **Fixed: a wrong gloss that names no direction escaped both halves of the prose guard**
+  (`src/parallel-entry.invariants.test.ts`). `isRejoinAssertion` exempts sentences naming no
+  direction *value*, so `PARALLEL_INTERCEPT_DEG`'s docblock — about the intercept **angle** — need
+  not restate the rotation rule. The docblock argued that exemption safe on the claim that "a
+  sentence cannot state the rule wrongly without naming a direction", and the test that was
+  supposed to have asserted it merely restated it: all five fixtures named a direction value, so
+  the predicate agreed with itself. English states agreement with a **verb** and names neither
+  direction — "the parallel reintercept turns *with* the pattern", "*matches* the pattern
+  direction". Four such wordings were selected out by `CORRECT` and unmatched by `WRONG`, so a
+  correction gloss written that way shipped entirely unscanned. `WRONG` gained agreement-verb
+  alternatives and `DIRECTIONAL` the matching tokens; the docblock now states the real safety
+  argument (the exemption is from `CORRECT` only, so the live risk is the blacklist's *vocabulary*)
+  instead of the false one. The alternatives key on the **verb**, never the noun: `pattern
+  direction` appears identically in the corrected rule ("*opposes* the pattern direction"), so a
+  noun-keyed alternative would reject the settled wording. Their gap also excludes `()`, because
+  "the teardrop rejoin clockwise (with the pattern)" — live in `entry.ts`'s evidence docblock and
+  **true** — matched on the first attempt: a bare "rejoin" does not say *which* maneuver's rejoin,
+  the same ambiguity the "reintercepts right" note records one alternative over. Regressions: the
+  four direction-free fixtures in `the direction-free exemption cannot swallow a wrong gloss`, and
+  two correct-prose fixtures plus the teardrop sentence in `the negatives accept the corrected
+  rule`. Mutation-confirmed six ways, including appending a direction-free wrong gloss to README —
+  which the suite passed before this change.
+- **Not re-fixed:** the mapview rollout kink, reported a fourth time. Unchanged deliberate deferral.
