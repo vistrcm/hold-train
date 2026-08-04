@@ -298,14 +298,21 @@ export function renderAnkiExport(el: HTMLElement, options: AnkiExportOptions = {
           Corrections are logged in <code>docs/content-audit.md</code> — the
           2026-08-02 parallel-entry rejoin fix changed a core card. Import into
           the same notetype you used before and leave Anki's existing-notes
-          setting on <em>Update</em>; card fronts are stable unless a correction
-          rewords a question (miss cards are rebuilt from the live bank item, so
-          a reworded question changes the front — a reworded answer does not), so
-          matching notes <em>should</em> update rather than duplicate — but this file is a bare
+          setting on <em>Update</em>; a correction that rewords an <em>answer</em>
+          keeps the front, so matching notes
+          <em>should</em> update rather than duplicate — but this file is a bare
           TSV with no <code>#notetype:</code> or <code>#deck:</code> header, so
           update-vs-duplicate is a setting on Anki's import screen, not a
           property of the download. Check the import preview before confirming.
           (Unverified against a specific Anki version.)
+          <strong>A correction that rewords the question does not update</strong>,
+          because Anki matches on the first field: it imports as a new note and
+          leaves the old one in your deck. The 2026-08-02 fix did that to a core
+          card, so if you exported before then, delete the superseded note after
+          importing — search your deck for
+          <code>which side of the course do you reintercept from</code>; its back
+          still teaches the rejoin turning the wrong way. Miss cards rebuild from
+          the live bank item, so a reworded bank question does the same.
         </li>
       </ol>
     </section>

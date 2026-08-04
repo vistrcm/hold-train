@@ -726,4 +726,39 @@ describe('anki export screen', () => {
     expect(README).toMatch(/should update rather than duplicate/i)
     expect(README).toMatch(/unverified/i)
   })
+
+  // ⚠️ Derived from the LIVE deck, not from the instruction's wording — which is
+  // the whole point. The test above asserts the hedge WORDS are present; it
+  // cannot see whether the claim is TRUE of the correction the step names, and
+  // it was not. `serializeDeck` emits a bare `front\tback\ttags` TSV with no note
+  // id, so Anki matches on the first field: a correction that rewords an ANSWER
+  // updates in place, one that rewords a QUESTION imports as a new note. The
+  // 2026-08-02 rejoin fix reworded a CORE card's front, while both carriers
+  // scoped the front-rewording caveat to MISS cards. A user who exported before
+  // then, follows these instructions, and re-imports therefore keeps the old
+  // note — whose back still reads "the reintercept turn follows the pattern" —
+  // in the review queue forever. That is this branch's negative training
+  // surviving inside the user's deck, which is the one place the app cannot
+  // reach to correct.
+  const SUPERSEDED_CORE_FRONT = 'which side of the course do you reintercept from'
+
+  it('names the superseded core-card front, and it really is superseded', () => {
+    // If this first line fails, the front was RESTORED — then the stale note
+    // matches again and the right fix is to drop the instruction, not this test.
+    expect(
+      CORE_DECK.some((c) => c.front.toLowerCase().includes(SUPERSEDED_CORE_FRONT)),
+      'the old front is back in the deck, so it is no longer superseded',
+    ).toBe(false)
+    renderAnkiExport(el, { store: storeWithMisses(0) })
+    const steps = el.textContent ?? ''
+    for (const [name, text] of [
+      ['screen', steps],
+      ['README', README],
+    ] as const) {
+      expect(text.toLowerCase(), `${name}: does not name the superseded front`).toContain(
+        SUPERSEDED_CORE_FRONT,
+      )
+      expect(text, `${name}: does not say to delete the stale note`).toMatch(/delete/i)
+    }
+  })
 })

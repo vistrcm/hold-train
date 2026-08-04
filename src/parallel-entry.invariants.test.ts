@@ -656,12 +656,24 @@ const CONTENT: ReadonlyArray<{ file: string; source: string }> = APP_MODULES.fil
  *      across the holding course onto the holding side") and is the first thing
  *      a reader meets.
  *   2. content + README still missed `src/modules/`, where the prose a STUDENT
- *      actually reads is generated: `flyItText` (src/modules/entry-drill.ts)
- *      renders the rejoin direction into the drill feedback panel on every
- *      parallel scenario. Mutation-confirmed: a wrong gloss added to that panel
- *      passed the whole suite while the identical sentence in `questions.ts`
- *      failed it. The screens are where the rule is taught; scanning only the
- *      banks guarded the quieter half.
+ *      actually reads is generated. Mutation-confirmed: a wrong gloss added to
+ *      the drill feedback panel passed the whole suite while the identical
+ *      sentence in `questions.ts` failed it. The screens are where the rule is
+ *      taught; scanning only the banks guarded the quieter half.
+ *
+ *      ⚠️ What that buys is coverage of a HAND-WRITTEN gloss added under
+ *      `src/modules/`. It is NOT coverage of `flyItText` (src/modules/entry-drill.ts),
+ *      which contributes zero units to this scan and always will: it builds its
+ *      sentence by interpolating `${g.turnToInbound}` out of the oracle, so the
+ *      direction word exists only at runtime and no source-text scan can read
+ *      it. That is the right design — an interpolated direction cannot drift
+ *      from the engine — but it means this file does not guard it. The thing
+ *      that does is `entry-drill.test.ts`'s `flyItText` block, whose A1 case
+ *      writes the rule out against `hold.turnDirection` (`turnDirection ===
+ *      'right' ? 'left' : 'right'`) rather than reading `turnToInbound` back,
+ *      per the consumer rule in CLAUDE.md. Stated precisely because a docblock
+ *      that credits the wrong assertion argues the next session into deleting
+ *      the one that works.
  *
  * So it is now every non-test module under `src/`. Engine and UI files carry the
  * rule in comments rather than rendered strings, and including them costs
@@ -788,6 +800,35 @@ function parallelRejoinLines(source: string): string[] {
   )
 }
 
+/**
+ * Every unit that so much as MENTIONS the parallel rejoin — no exemptions.
+ *
+ * ⚠️ WRONG is scanned over THIS, not over `parallelRejoinLines`, and the two
+ * must not be merged back together. `isRejoinAssertion`'s three exemptions exist
+ * to spare prose that carries no rule from the CORRECT whitelist, and they are
+ * correct for that job — but they sit in the SELECTOR, so a unit whose only
+ * rejoin sentence is exempt drops out of the scan ENTIRELY and the blacklist
+ * never sees it either. An exemption from the POSITIVE silently became an
+ * exemption from the NEGATIVE.
+ *
+ * The dated-correction exemption is the reachable one, because two shipping
+ * carriers already write such a sentence: README's re-import step and the export
+ * screen's both name "the 2026-08-02 parallel-entry rejoin fix". Extend either
+ * to say what the fix did and get it backwards — "the 2026-08-02 parallel-entry
+ * rejoin fix made the reintercept turn follow the pattern" — and the date next
+ * to "fix" exempts the sentence, the unit selects out, and the wrong gloss ships
+ * unscanned. Pinned by `a dated sentence is exempt from CORRECT, never from
+ * WRONG` below.
+ *
+ * This is the asymmetry `rejoinClaim`'s docblock already states one level down
+ * ("WRONG stays line-scoped: it is strictly safer to blacklist over more text"),
+ * applied one level up: blacklist over more UNITS as well as more text. It costs
+ * nothing — widening the negative from 8 units to 16 flagged none of them.
+ */
+function parallelRejoinMentions(source: string): string[] {
+  return proseUnits(source).filter((l) => /parallel/i.test(l) && /reintercept|rejoin/i.test(l))
+}
+
 /** A line split into sentences. Content prose joins clauses with `;` as well. */
 function sentences(line: string): string[] {
   return line.split(/(?<=[.;])\s+/)
@@ -873,12 +914,44 @@ describe('no content module teaches the rejoin the wrong way', () => {
         // asks the narrower question of whether the unit says the rule AT ALL.
         const claim = unemphasize(rejoinClaim(line))
         expect(claim, `${file}: does not state the corrected rule (${EVIDENCE})`).toMatch(CORRECT)
+      }
+    }
+  })
+
+  it('no unit that mentions the parallel rejoin glosses it the wrong way', () => {
+    // ⚠️ Scanned over `parallelRejoinMentions`, which is WIDER than the selector
+    // the positive above uses — see that function's docblock. The blacklist is
+    // the real detector here, so it must not inherit the whitelist's exemptions:
+    // a unit spared from having to STATE the rule is not thereby spared from
+    // stating it WRONGLY.
+    for (const { file, source } of PROSE) {
+      for (const unit of parallelRejoinMentions(source)) {
         expect(
-          unemphasize(line),
+          unemphasize(unit),
           `${file}: still glosses the rejoin as following the pattern (${EVIDENCE})`,
         ).not.toMatch(WRONG)
       }
     }
+  })
+
+  it('a dated sentence is exempt from CORRECT, never from WRONG', () => {
+    // Guards the guard, the fifth way — the hole the split above closes. The
+    // dated-correction exemption is legitimate on the positive side: README and
+    // the export screen both say "the 2026-08-02 parallel-entry rejoin fix
+    // changed a core card", and demanding that restate the rotation rule would
+    // be absurd prose. But the same sentence extended into a wrong gloss must
+    // still be caught, and under the old single-selector scan it was not.
+    // ⚠️ Worded with a gloss WRONG already knows ("follows the pattern"), so
+    // that what this test demonstrates is the SELECTOR hole and nothing else. A
+    // fixture that also needed a new WRONG alternative would conflate the two
+    // and could be "fixed" by widening the blacklist, leaving the hole open.
+    const dated =
+      'Corrections are logged in the ledger — the 2026-08-02 parallel-entry rejoin fix: the reintercept turn follows the pattern.'
+    // exempt from the positive: it selects out of the CORRECT scan entirely…
+    expect(parallelRejoinLines(dated), 'the exemption itself must still hold').toHaveLength(0)
+    // …and that is exactly why the negative must not use the same selector.
+    expect(parallelRejoinMentions(dated), 'the wide scan must still see it').toHaveLength(1)
+    expect(dated, 'WRONG must catch a wrong gloss wearing a date').toMatch(WRONG)
   })
 
   it('the negatives cannot match the AIM clause the modules quote verbatim', () => {

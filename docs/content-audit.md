@@ -1099,3 +1099,47 @@ engine re-derivation added in iteration 6 fed `determineEntry` two arguments and
   snapshot`, and the recorder side in `oral-prep.test.ts`. All four guards mutation-confirmed.
 - **Not re-fixed:** the mapview rollout kink, reported again this iteration. Already a deliberate,
   documented deferral (see the previous section's closing entry).
+
+## Post-completion review fixes — 2026-08-03 (code review iteration 8)
+
+Both review agents converged on the same defect again, and this time it lives in the user's Anki
+deck — the one place the app cannot reach to correct anything.
+
+- **Fixed: the import instructions promised in-place updates for a correction that cannot get
+  one** (`src/app/anki-export.ts`, `README.md`). This branch reworded a **core** card's *front*
+  (`'Parallel entry: which side of the course do you reintercept from?'` →
+  `'…which way does the reintercept turn rotate?'`), and in the same change both carriers told the
+  user "card fronts are stable unless a correction rewords a question", scoping the front-rewording
+  caveat to **miss** cards. `serializeDeck` emits a bare `front\tback\ttags` TSV with no note id, so
+  Anki matches on the first field: the superseded note cannot match, the re-import adds a second
+  card, and the old one — back still reading "The reintercept turn follows the pattern (right in a
+  standard hold) — only that direction exceeds 180°" — stays in the review queue. A user who
+  exported before 2026-08-02 and follows the app's own instructions therefore keeps drilling the
+  inverted rejoin. That is this branch's negative training surviving *inside the user's deck*.
+  Both carriers now state that a reworded question imports as a new note, name the superseded front
+  verbatim, and say to delete it. Regression: `names the superseded core-card front, and it really
+  is superseded` — which asserts the claim against the **live `CORE_DECK`**, not against the
+  instruction's wording, so restoring that front fails the suite instead of silently invalidating
+  the paragraph. The existing `hedges the update-vs-duplicate claim` test passed throughout: it
+  checks the hedge *words* are present, never that the claim is true of the correction it names.
+- **Fixed: the prose scan's positive-side exemptions also exempted the blacklist**
+  (`src/parallel-entry.invariants.test.ts`). `isRejoinAssertion`'s three exemptions are shared by
+  the line selector and the claim extractor — deliberately, so the two cannot disagree — but that
+  put them in the **selector**, so a unit whose only rejoin sentence is exempt dropped out of the
+  scan entirely and `WRONG` never saw it. The dated-correction exemption is reachable in shipping
+  prose: README and the export screen both already carry a sentence naming "the 2026-08-02
+  parallel-entry rejoin fix", and extending either into a wrong gloss ships unscanned. `WRONG` now
+  runs over `parallelRejoinMentions` — every unit naming the maneuver, no exemptions — while
+  `CORRECT` keeps the narrow selector it needs. Widening the negative from 8 units to 16 flagged
+  none of them, so it cost no correct prose. Regressions: `no unit that mentions the parallel
+  rejoin glosses it the wrong way` and `a dated sentence is exempt from CORRECT, never from WRONG`;
+  mutation-confirmed by appending a dated wrong gloss to README, which the suite missed before.
+- **Fixed (comment only): the `PROSE` docblock credited the scan with coverage it does not have.**
+  It said widening to `src/modules/` covered `flyItText`'s rendered rejoin direction. That module
+  contributes **zero** units to the scan and always will: `flyItText` interpolates
+  `${g.turnToInbound}` out of the oracle, so the direction word exists only at runtime. The
+  widening does buy coverage of a *hand-written* gloss added under `src/modules/`; what actually
+  pins `flyItText` is `entry-drill.test.ts`'s A1 case, which writes the rule out against
+  `hold.turnDirection`. Corrected per CLAUDE.md's rule that a docblock misattributing which
+  assertion catches which failure mode argues the next session into deleting the one that works.
+- **Not re-fixed:** the mapview rollout kink, reported a third time. Unchanged deliberate deferral.
