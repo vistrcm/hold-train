@@ -40,10 +40,10 @@ Add a persistent "Home" link that returns the user to `#/` (the home screen list
 **Files:**
 - Modify: `src/styles.css`
 
-- [ ] Add a `.home-link` rule (or a `nav` rule scoped to the router nav) using only existing `:root` custom properties for any colour — no literals, no new variables (avoids extending the contrast TIERS map)
-- [ ] Keep it a text link (4.5:1 text contrast is already satisfied by the existing ink/accent variables against both `--bg` and `--surface`); do not introduce a filled/bordered component, which would trigger the SC 1.4.11 boundary rules
-- [ ] Confirm `styles.test.ts` still passes (colour-literal sweep, `var()` definedness) — it asserts against the stylesheet text, so no new test file is needed; add a `var(--…)` reference only to variables that exist
-- [ ] Run `npm test` and `npm run typecheck` — must pass before Task 3
+- [x] Add a `.home-link` rule (or a `nav` rule scoped to the router nav) using only existing `:root` custom properties for any colour — no literals, no new variables (avoids extending the contrast TIERS map)
+- [x] Keep it a text link (4.5:1 text contrast is already satisfied by the existing ink/accent variables against both `--bg` and `--surface`); do not introduce a filled/bordered component, which would trigger the SC 1.4.11 boundary rules
+- [x] Confirm `styles.test.ts` still passes (colour-literal sweep, `var()` definedness) — it asserts against the stylesheet text, so no new test file is needed; add a `var(--…)` reference only to variables that exist
+- [x] Run `npm test` and `npm run typecheck` — must pass before Task 3
 
 ### Task 3: Verify acceptance criteria
 

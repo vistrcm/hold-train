@@ -74,6 +74,17 @@ a {
   color: var(--accent);
 }
 
+/* Router nav: the "← Home" link rendered above every non-home screen. Kept a
+   plain text link on purpose — a filled or bordered component would fall under
+   SC 1.4.11's 3:1 boundary rule; as text it only needs the 4.5:1 the global
+   `a` colour already clears on both backdrops. */
+.home-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--touch);
+  font-size: var(--fs-base);
+}
+
 /* `--surface` on `--bg` is only 1.13:1, so a surface-filled tap target has no
    visible edge of its own. SC 1.4.11 wants 3:1 for the boundary of a UI
    component, which the `--border` edge supplies (3.21:1 on `--bg`). Asserted by
