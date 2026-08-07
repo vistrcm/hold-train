@@ -30,10 +30,10 @@ Add a persistent "Home" link that returns the user to `#/` (the home screen list
 - Modify: `src/app/router.test.ts`
 - Modify: `src/app/router.ts`
 
-- [ ] Write failing tests in `router.test.ts`: (a) rendering a module route puts an `<a href="#/">` home link in the root; (b) rendering the home screen does NOT include the home link; (c) the screen's own content still renders alongside the nav; (d) following a hashchange back to `''` re-renders home without the link
-- [ ] Update the two existing assertions that expect `root.textContent` to equal exactly the screen title (`renderCurrent renders the screen...`, `re-renders when the hash changes`) to `toContain`, and additionally assert the home link is present — the nav text is now part of root
-- [ ] Implement in `router.ts` `renderCurrent`: clear root; if the resolved screen is not home, append a `<nav>` containing `<a class="home-link" href="#/">← Home</a>`; append a child `<div>` and call `screen.render` on that div (screens own their container's innerHTML, so the nav must be a sibling, not inside it)
-- [ ] Run `npm test` and `npm run typecheck` — must pass before Task 2
+- [x] Write failing tests in `router.test.ts`: (a) rendering a module route puts an `<a href="#/">` home link in the root; (b) rendering the home screen does NOT include the home link; (c) the screen's own content still renders alongside the nav; (d) following a hashchange back to `''` re-renders home without the link
+- [x] Update the two existing assertions that expect `root.textContent` to equal exactly the screen title (`renderCurrent renders the screen...`, `re-renders when the hash changes`) to `toContain`, and additionally assert the home link is present — the nav text is now part of root
+- [x] Implement in `router.ts` `renderCurrent`: clear root; if the resolved screen is not home, append a `<nav>` containing `<a class="home-link" href="#/">← Home</a>`; append a child `<div>` and call `screen.render` on that div (screens own their container's innerHTML, so the nav must be a sibling, not inside it)
+- [x] Run `npm test` and `npm run typecheck` — must pass before Task 2
 
 ### Task 2: Style the home link within the colour-guard rules
 

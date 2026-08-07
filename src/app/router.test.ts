@@ -55,7 +55,8 @@ describe('createRouter', () => {
     const router = createRouter([a, b], root)
     window.location.hash = '#/entry-drill'
     router.renderCurrent()
-    expect(root.textContent).toBe('Entry Drill')
+    expect(root.textContent).toContain('Entry Drill')
+    expect(root.querySelector('a.home-link')).not.toBeNull()
     expect(a.renders).toBe(1)
   })
 
@@ -64,6 +65,44 @@ describe('createRouter', () => {
     router.start()
     window.location.hash = '#/written-test'
     window.dispatchEvent(new HashChangeEvent('hashchange'))
-    expect(root.textContent).toBe('Written Test')
+    expect(root.textContent).toContain('Written Test')
+    expect(root.querySelector('a.home-link')).not.toBeNull()
+  })
+
+  it('renders a home link pointing at #/ on module screens', () => {
+    const router = createRouter([a, b], root)
+    window.location.hash = '#/entry-drill'
+    router.renderCurrent()
+    const link = root.querySelector('a.home-link')
+    expect(link).not.toBeNull()
+    expect(link!.getAttribute('href')).toBe('#/')
+  })
+
+  it('does not render the home link on the home screen', () => {
+    const router = createRouter([a, b], root)
+    window.location.hash = ''
+    router.renderCurrent()
+    expect(root.querySelector('a.home-link')).toBeNull()
+    expect(root.textContent).toContain('Hold Train')
+  })
+
+  it('renders the screen content alongside the nav, not clobbered by it', () => {
+    const router = createRouter([a, b], root)
+    window.location.hash = '#/written-test'
+    router.renderCurrent()
+    expect(root.querySelector('a.home-link')).not.toBeNull()
+    expect(root.textContent).toContain('Written Test')
+  })
+
+  it('hashchange back to home re-renders without the home link', () => {
+    const router = createRouter([a, b], root)
+    router.start()
+    window.location.hash = '#/entry-drill'
+    window.dispatchEvent(new HashChangeEvent('hashchange'))
+    expect(root.querySelector('a.home-link')).not.toBeNull()
+    window.location.hash = ''
+    window.dispatchEvent(new HashChangeEvent('hashchange'))
+    expect(root.querySelector('a.home-link')).toBeNull()
+    expect(root.textContent).toContain('Hold Train')
   })
 })
