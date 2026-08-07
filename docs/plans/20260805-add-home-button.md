@@ -47,9 +47,9 @@ Add a persistent "Home" link that returns the user to `#/` (the home screen list
 
 ### Task 3: Verify acceptance criteria
 
-- [ ] Run full test suite: `npm test`
-- [ ] Run `npm run typecheck` (`tsc --noEmit`)
-- [ ] Verify `main.test.ts` default-path test still passes (real registry, real render path — proves the nav renders without breaking any registered screen)
+- [x] Run full test suite: `npm test` — 624/624 across 27 files
+- [x] Run `npm run typecheck` (`tsc --noEmit`) — clean
+- [x] Verify `main.test.ts` default-path test still passes (real registry, real render path — proves the nav renders without breaking any registered screen) — 4/4 in isolation
 
 ### Task 4: Update documentation
 
