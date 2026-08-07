@@ -8,6 +8,9 @@ Add a persistent "Home" link that returns the user to `#/` (the home screen list
   - Modify: `src/app/router.ts` — render the nav + screen container in `renderCurrent`
   - Modify: `src/app/router.test.ts` — new assertions; update two exact-textContent assertions
   - Modify: `src/styles.css` — style for the home link using existing `:root` variables only
+  - Modify (Task 4 + review fixes): `README.md` — one-line home-link mention after the module map
+  - Modify (review fixes): `src/main.test.ts` — real-registry integration test for the home-link nav through the actual hashchange path
+  - Modify (review fixes): `CLAUDE.md` — router-owned-chrome convention; TDD bullet's throwing-screen symptom reworded
 - Related patterns:
   - Router already owns the home screen and the `''` path; `resolve` falls back to home, so `#/` is always a valid target
   - Screens set `el.innerHTML` on the element passed to `render` — the router must pass them a child container so the nav survives
@@ -47,11 +50,11 @@ Add a persistent "Home" link that returns the user to `#/` (the home screen list
 
 ### Task 3: Verify acceptance criteria
 
-- [x] Run full test suite: `npm test` — 624/624 across 27 files
+- [x] Run full test suite: `npm test` — 624/624 across 27 files at Task 3 completion (review-fix commits added tests afterwards; suite green at branch tip)
 - [x] Run `npm run typecheck` (`tsc --noEmit`) — clean
 - [x] Verify `main.test.ts` default-path test still passes (real registry, real render path — proves the nav renders without breaking any registered screen) — 4/4 in isolation
 
 ### Task 4: Update documentation
 
 - [x] Check README.md: the asserted route table's row shape is unchanged (no new routes), so no table edit; add a one-line mention of the home navigation only if README describes navigation at all — README describes navigation (route table, suggested order, hash-router note), so a one-line home-link mention was added after the module map; table rows untouched
-- [x] No CLAUDE.md change — no new internal pattern (router remains the single owner of chrome around screens)
+- [x] CLAUDE.md updated (post-review, commit 0a31971) — the original "no new pattern" call here was wrong: screens used to receive the root element directly, so the sibling-container contract is new. Added the Conventions bullet documenting router-owned chrome (screens must not add their own home/back links) and reworded the TDD bullet's throwing-screen symptom ("leaves `#app` blank" → nav over an empty container)

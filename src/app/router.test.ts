@@ -1,5 +1,12 @@
 import { describe, it, expect, beforeEach } from 'vitest'
+import README from '../../README.md?raw'
 import { createRouter, type Screen } from './router'
+
+// The label exists as two hand-written copies: router.ts renders it, README
+// states it. Both assertions below read this constant, so renaming the link in
+// router.ts alone fails the DOM pin, and updating the constant alone fails the
+// README pin until the prose says the same thing.
+const HOME_LABEL = '← Home'
 
 function screen(path: string, title: string): Screen & { renders: number } {
   const s = {
@@ -79,8 +86,14 @@ describe('createRouter', () => {
     const link = root.querySelector('a.home-link')
     expect(link).not.toBeNull()
     expect(link!.getAttribute('href')).toBe('#/')
-    // README states this label; keep them in sync
-    expect(link!.textContent).toBe('← Home')
+    expect(link!.textContent).toBe(HOME_LABEL)
+  })
+
+  it('README states the same label the router renders', () => {
+    // README is an asserted artifact here (dashboard.test.ts diffs its route
+    // table); a comment-only "keep them in sync" is the drift class this repo
+    // closes with ?raw imports.
+    expect(README).toContain(HOME_LABEL)
   })
 
   it('renderCurrent falls back to home without a home link for unknown routes', () => {
@@ -127,5 +140,30 @@ describe('createRouter', () => {
     window.dispatchEvent(new HashChangeEvent('hashchange'))
     expect(root.querySelector('a.home-link')).toBeNull()
     expect(root.textContent).toContain('Hold Train')
+  })
+})
+
+// CLAUDE.md: the router owns all chrome around screens, and screens must not
+// add their own home/back links. Nothing structural stops a module from
+// rendering a second one (two stacked home links, suite green), so pin the
+// convention the way this repo pins its others: scan the shipping sources.
+describe('home-link ownership', () => {
+  const MODULES = import.meta.glob<string>('../modules/*.ts', {
+    query: '?raw',
+    import: 'default',
+    eager: true,
+  })
+
+  it('no screen module renders its own home link', () => {
+    const shipping = Object.entries(MODULES).filter(([path]) => !path.endsWith('.test.ts'))
+    expect(shipping.length, 'glob matched no module files').toBeGreaterThan(0)
+    for (const [path, source] of shipping) {
+      // exact 'href="#/"' only — module links to sibling routes ('#/entry-drill')
+      // are legitimate and do not match
+      expect(source, `${path} renders its own home link — the router owns that chrome`)
+        .not.toContain('home-link')
+      expect(source, `${path} links to home — the router owns that chrome`)
+        .not.toContain('href="#/"')
+    }
   })
 })
