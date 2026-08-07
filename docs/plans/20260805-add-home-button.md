@@ -53,5 +53,5 @@ Add a persistent "Home" link that returns the user to `#/` (the home screen list
 
 ### Task 4: Update documentation
 
-- [ ] Check README.md: the asserted route table's row shape is unchanged (no new routes), so no table edit; add a one-line mention of the home navigation only if README describes navigation at all
-- [ ] No CLAUDE.md change — no new internal pattern (router remains the single owner of chrome around screens)
+- [x] Check README.md: the asserted route table's row shape is unchanged (no new routes), so no table edit; add a one-line mention of the home navigation only if README describes navigation at all — README describes navigation (route table, suggested order, hash-router note), so a one-line home-link mention was added after the module map; table rows untouched
+- [x] No CLAUDE.md change — no new internal pattern (router remains the single owner of chrome around screens)
