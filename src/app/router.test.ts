@@ -147,23 +147,34 @@ describe('createRouter', () => {
 // add their own home/back links. Nothing structural stops a module from
 // rendering a second one (two stacked home links, suite green), so pin the
 // convention the way this repo pins its others: scan the shipping sources.
+// All of src/, not just modules/ — the registry in main.ts pulls one screen
+// from app/ (anki-export), and a directory glob is exhaustive only over the
+// directory it globs. router.ts is the one file allowed to carry this chrome.
+// (Vite excludes this test itself from its own glob.)
 describe('home-link ownership', () => {
-  const MODULES = import.meta.glob<string>('../modules/*.ts', {
+  const SOURCES = import.meta.glob<string>('../**/*.ts', {
     query: '?raw',
     import: 'default',
     eager: true,
   })
 
-  it('no screen module renders its own home link', () => {
-    const shipping = Object.entries(MODULES).filter(([path]) => !path.endsWith('.test.ts'))
+  it('no module outside the router renders its own home link', () => {
+    const paths = Object.keys(SOURCES)
+    expect(paths.some((p) => p.endsWith('/anki-export.ts')),
+      'glob no longer reaches the app/ screen the registry registers').toBe(true)
+    expect(paths.some((p) => p.endsWith('/router.ts')),
+      'allowlisted router.ts missing — the exemption would hide a rename').toBe(true)
+    const shipping = Object.entries(SOURCES).filter(
+      ([path]) => !path.endsWith('.test.ts') && !path.endsWith('/router.ts'),
+    )
     expect(shipping.length, 'glob matched no module files').toBeGreaterThan(0)
     for (const [path, source] of shipping) {
-      // exact 'href="#/"' only — module links to sibling routes ('#/entry-drill')
-      // are legitimate and do not match
       expect(source, `${path} renders its own home link — the router owns that chrome`)
         .not.toContain('home-link')
+      // home href in any quoting; sibling-route links ('#/entry-drill') are
+      // legitimate and do not match because the closing quote must follow '#/'
       expect(source, `${path} links to home — the router owns that chrome`)
-        .not.toContain('href="#/"')
+        .not.toMatch(/href=["'`]#\/["'`]/)
     }
   })
 })
