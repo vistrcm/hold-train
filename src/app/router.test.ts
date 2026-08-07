@@ -60,6 +60,9 @@ describe('createRouter', () => {
     expect(a.renders).toBe(1)
   })
 
+  // start() registers a window hashchange listener with no teardown, so started
+  // routers outlive their test. Harmless while every test builds a fresh root
+  // and fixtures, but a test must not count renders after another dispatch.
   it('re-renders when the hash changes', async () => {
     const router = createRouter([a, b], root)
     router.start()
@@ -76,6 +79,16 @@ describe('createRouter', () => {
     const link = root.querySelector('a.home-link')
     expect(link).not.toBeNull()
     expect(link!.getAttribute('href')).toBe('#/')
+    // README states this label; keep them in sync
+    expect(link!.textContent).toBe('← Home')
+  })
+
+  it('renderCurrent falls back to home without a home link for unknown routes', () => {
+    const router = createRouter([a, b], root)
+    window.location.hash = '#/no-such-module'
+    router.renderCurrent()
+    expect(root.querySelector('a.home-link')).toBeNull()
+    expect(root.textContent).toContain('Hold Train')
   })
 
   it('does not render the home link on the home screen', () => {
@@ -87,11 +100,21 @@ describe('createRouter', () => {
   })
 
   it('renders the screen content alongside the nav, not clobbered by it', () => {
-    const router = createRouter([a, b], root)
-    window.location.hash = '#/written-test'
+    // real screens write innerHTML on the element they're given — handing them
+    // root instead of a child container would wipe the nav
+    const c: Screen = {
+      path: 'wind-lab',
+      title: 'Wind Lab',
+      render(el) {
+        el.innerHTML = '<h1>Wind Lab</h1>'
+      },
+    }
+    const router = createRouter([a, b, c], root)
+    window.location.hash = '#/wind-lab'
     router.renderCurrent()
-    expect(root.querySelector('a.home-link')).not.toBeNull()
-    expect(root.textContent).toContain('Written Test')
+    expect(root.firstElementChild!.tagName).toBe('NAV')
+    expect(root.querySelector('nav a.home-link')).not.toBeNull()
+    expect(root.querySelector('h1')!.textContent).toBe('Wind Lab')
   })
 
   it('hashchange back to home re-renders without the home link', () => {
