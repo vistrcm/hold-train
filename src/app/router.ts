@@ -38,7 +38,16 @@ export function createRouter(screens: Screen[], root: HTMLElement): Router {
 
   function renderCurrent(): void {
     root.innerHTML = ''
-    resolve(window.location.hash).render(root)
+    const screen = resolve(window.location.hash)
+    if (screen !== home) {
+      const nav = document.createElement('nav')
+      nav.innerHTML = '<a class="home-link" href="#/">← Home</a>'
+      root.appendChild(nav)
+    }
+    // screens own their container's innerHTML, so give them a sibling of the nav
+    const container = document.createElement('div')
+    root.appendChild(container)
+    screen.render(container)
   }
 
   return {

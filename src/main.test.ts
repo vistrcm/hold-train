@@ -44,10 +44,27 @@ describe('route registry (main.ts)', () => {
     expect(document.querySelector('#app')!.innerHTML).not.toBe('')
   })
 
+  // router.test.ts drives the home-link chrome only with fake screens; this is
+  // the one place a real registered screen renders inside the nav + child
+  // container structure through the real hashchange path.
+  it('renders a module route with the home-link nav via the real router', () => {
+    window.location.hash = '#/learn'
+    window.dispatchEvent(new HashChangeEvent('hashchange'))
+    const app = document.querySelector('#app')!
+    expect(app.querySelector('a.home-link')).not.toBeNull()
+    const heading = app.querySelector('h1')
+    expect(heading).toBeTruthy()
+    expect(heading!.textContent).not.toBe('Hold Train')
+    window.location.hash = ''
+    window.dispatchEvent(new HashChangeEvent('hashchange'))
+    expect(app.querySelector('a.home-link')).toBeNull()
+  })
+
   // Every other UI test injects `{ store, seed }`, so the no-argument path each
   // screen actually takes in the browser — real localStorage, real clock, seed
   // from Date.now() — is otherwise never executed. A screen that throws there
-  // leaves the router's root blank with the whole suite green.
+  // leaves the router's root showing only the home-link nav over an empty
+  // container, with the whole suite green.
   it('every registered screen renders from the real default path', () => {
     for (const screen of screens) {
       const el = document.createElement('div')
