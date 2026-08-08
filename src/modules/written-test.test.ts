@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createStore, type Store } from '../app/store'
 import { QUESTIONS, type WrittenQuestion } from '../content/questions'
+import { courseText } from '../format'
 import {
   createWrittenTest,
   EXAM_LENGTH,
@@ -290,6 +291,24 @@ describe('renderWrittenTest (jsdom)', () => {
     expect(figure.querySelector('.hsi-cdi-bar')).toBeNull()
     expect(figure.querySelectorAll('.hsi-cdi-dot')).toHaveLength(0)
     expect(figure.querySelector('.hsi-tofrom')).toBeNull()
+
+    // …and the figure is of the aircraft the question asks about. Presence
+    // checks cannot see a swapped pair: `renderHSI(figureEl, { heading:
+    // q.entry.inboundCourse, course: q.entry.heading })` draws a perfectly
+    // well-formed HSI of the wrong situation on a GRADED question, and passed
+    // 732/732 before this. Pinned on a question whose two values DIFFER —
+    // entry-direct-inbound has heading 090 on a 090 course, where a swap is
+    // invisible and the assertion could not fail.
+    const skewed = entryBank.find((q) => q.entry!.heading !== q.entry!.inboundCourse)!
+    const el3 = document.createElement('div')
+    renderWrittenTest(el3, { mode: 'practice', seed: 1, store: testStore(), bank: [skewed] })
+    const skewFig = el3.querySelector<HTMLElement>('.written-figure')!
+    expect(skewFig.querySelector('.hsi-heading-readout')!.textContent).toBe(
+      courseText(skewed.entry!.heading),
+    )
+    expect(skewFig.querySelector('.hsi-crs-value')!.textContent).toBe(
+      courseText(skewed.entry!.inboundCourse),
+    )
 
     // …and the question still grades exactly as before. Same seed and bank, so
     // this controller sees the same first question in the same option order.

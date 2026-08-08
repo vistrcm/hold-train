@@ -34,7 +34,7 @@ import {
   SPEED_REDUCTION_SOURCE,
 } from './entry-drill'
 import { courseText, distanceText } from '../format'
-import { DEVIATION_DOTS, FULL_SCALE_NM, FULL_SCALE_SOURCE } from '../ui/hsi'
+import { DEVIATION_DOTS, FULL_SCALE_NM, FULL_SCALE_SOURCE, LAYOUT } from '../ui/hsi'
 
 /** First seed whose generated clearance is a charted "as published" hold. */
 const CHARTED_SEED = 4
@@ -697,6 +697,40 @@ describe('renderEntryDrill screen', () => {
     expect(el.querySelector('.hsi-hdg-value')!.textContent).toBe(courseText(s.heading))
   })
 
+  // `fix`, `distanceNm` and `headingBug` above are what the panel draws AROUND
+  // the picture. `heading` and `course` ARE the picture: they set the card
+  // rotation, the pointer, the CRS box, which way the bar deflects and the
+  // TO/FROM word. A drawHSI that hands over the reciprocal course, or swaps the
+  // two, still draws a well-formed panel — of a different aircraft — and every
+  // assertion above it stays green. All three mutations passed 732/732 before
+  // this test existed.
+  //
+  // The goldens are STATED, not re-read out of `s`: an expectation built from
+  // `s.holdSpec.inboundCourse` agrees by construction with a drawHSI reading
+  // that same field wrongly, which is the consumer-vs-oracle tautology the
+  // parallel-entry rule in CLAUDE.md warns about one screen over.
+  it('draws the card on the scenario heading and the pointer on the inbound course', () => {
+    // Seed 42: heading 173, hold 250° left turns, 9.9 NM out. `keeps every
+    // existing seed on its original heading and answer` is what holds these.
+    const s = generateScenario(42)
+    expect([s.heading, s.holdSpec.inboundCourse], 'seed 42 goldens moved').toEqual([173, 250])
+
+    const { el } = setup('cockpit')
+    expect(el.querySelector('.hsi-heading-readout')!.textContent).toBe('173°')
+    expect(el.querySelector('.hsi-crs-value')!.textContent).toBe('250°')
+
+    // TO/FROM hand-derived from the drawn picture rather than from
+    // `courseDeviation`, which would flip along with the renderer: tracking
+    // direct, the aircraft sits 9.9 NM out on the 353 bearing from Delta, and
+    // 173 lies 77° off the 250 course — inside the 90° abeam boundary — so
+    // flying 250 from here closes on the fix. TO. Cross-track is
+    // −9.9·sin(−77°) = +9.6 NM, i.e. right of course, so the bar (which shows
+    // where the course is, not where you are) pegs LEFT of the centreline.
+    expect(el.querySelector('.hsi-nav-sense')!.textContent).toBe('TO')
+    expect(el.querySelector('.hsi-tofrom')!.getAttribute('data-sense')).toBe('to')
+    expect(Number(el.querySelector('.hsi-cdi-bar')!.getAttribute('x1'))).toBeLessThan(LAYOUT.cx)
+  })
+
   it('shows the deviation indication the written-test figure suppresses', () => {
     // The bar, the dots and the flag are exactly what `hsi.ts` drops when there
     // is no position, so their presence here is the assertion that the position
@@ -797,11 +831,23 @@ describe('renderEntryDrill screen', () => {
   // The quotation carries a number, so it can fall out of step with the constant
   // it is cited for — the same drift `quotes timings that still say what the
   // generator’s constants claim` guards on the lead-time side.
+  //
+  // Which side of that drift each line catches matters here. `CDI_SCALE_AIM` is
+  // a fixed literal, so re-reading `FULL_SCALE_NM` against it binds. But
+  // `CDI_SCALE_NOTE` is BUILT from these constants, so the three lines that once
+  // re-read `FULL_SCALE_NM`, `FULL_SCALE_NM / DEVIATION_DOTS` and the window
+  // against it restated the template and could not fail — the ledger credited
+  // them with catching a `DEVIATION_DOTS` re-tune, which no expression built
+  // from `DEVIATION_DOTS` can do. Hand-written literals instead, so re-tuning
+  // any of the four constants reds this test and forces the prose to be
+  // re-derived deliberately (it also catches a re-tune that renders a raw float:
+  // at 110 kt the window interpolates as "5.5–9.166666666666666 NM").
   it('quotes a scale the instrument still draws on', () => {
     expect(CDI_SCALE_AIM).toContain(`±${FULL_SCALE_NM} NM`)
-    expect(CDI_SCALE_NOTE).toContain(`±${FULL_SCALE_NM} NM`)
-    expect(CDI_SCALE_NOTE).toContain(`${FULL_SCALE_NM / DEVIATION_DOTS} NM`)
-    expect(CDI_SCALE_NOTE).toContain(`${MIN_DISTANCE_NM}–${MAX_DISTANCE_NM} NM`)
+    expect(CDI_SCALE_NOTE).toContain('±1 NM')
+    expect(CDI_SCALE_NOTE).toContain('2 dots a side')
+    expect(CDI_SCALE_NOTE).toContain('0.5 NM')
+    expect(CDI_SCALE_NOTE).toContain('6–10 NM')
   })
 
   it('keeps the learn/cockpit aid gating unchanged now the panel carries nav data', () => {

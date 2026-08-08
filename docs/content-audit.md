@@ -1535,6 +1535,14 @@ Amends the `FULL_SCALE_NM` bullet above, which recorded the scale as "a user-vis
   `DEVIATION_DOTS` is re-tuned and leaves the AIM sentence quoted beside a scale it no longer
   governs — the drift guard the lead-time timings already had). README's source list gains
   AIM 1-1-17.
+  **Amended 2026-08-07:** the `DEVIATION_DOTS` half of that claim was false as written, and the
+  `FULL_SCALE_NM` half was true of only one of the four assertions. `CDI_SCALE_AIM` is a fixed
+  literal, so re-reading `FULL_SCALE_NM` against it binds; `CDI_SCALE_NOTE` is *built* from these
+  constants, so the three lines that re-read `FULL_SCALE_NM`, `FULL_SCALE_NM / DEVIATION_DOTS` and
+  the distance window against it restated the template and could not fail — `DEVIATION_DOTS`
+  appeared only inside those tautologies. Fake coverage under the CLAUDE.md rule, and a ledger entry
+  crediting it with a failure mode it never had. The three are now hand-written literals
+  (`±1 NM`, `2 dots a side`, `0.5 NM`, `6–10 NM`), which is what actually reds on a re-tune.
 - **Also fixed, same pass:** the deviation goldens all sat at exactly `FULL_SCALE_NM` or 90° off
   course, so *clamping the distance to full scale before* `courseDeviation` passed 727/727 while
   turning a correctly pegged needle at 6–10 NM into a near-centred one. Closed by
@@ -1545,3 +1553,34 @@ Amends the `FULL_SCALE_NM` bullet above, which recorded the scale as "a user-vis
   `tickR`) and its **paint order** (SVG has no z-index, so "over a wedge" is document order alone) —
   now asserted in `a sector wedge sweeps clockwise between its two boundary radii` and
   `paints the sector wedges under the card marks, not over them`.
+
+## Post-completion review fixes — 2026-08-07 (code review iteration 2)
+
+- **The two `renderHSI` consumers never pinned the `heading` and `course` they pass.** This branch
+  promoted both from decorative pointer inputs to the values that drive the deviation bar's
+  deflection, the TO/FROM glyph and status word, the CRS readout and the `aria-label`. The new
+  consumer-side tests pinned `fix`, `distanceNm`, `headingBug` and the *presence* of the deviation
+  elements — nothing asserted the two props that determine the whole picture. Three mutations, each
+  run against the real suite, passed **732/732**:
+  - `course: (holdSpec.inboundCourse + 180) % 360` in `drawHSI` — the drill draws the **outbound**
+    course: wrong CRS box, wrong pointer, needle deflected the wrong way, TO/FROM inverted for most
+    headings, wrong accessible description.
+  - `heading: (heading + 37) % 360` — compass card rotated 37° off the scenario while the HDG box
+    and the graded answer keep the true heading. A panel that contradicts itself.
+  - `renderHSI(figureEl, { heading: q.entry.inboundCourse, course: q.entry.heading })` in
+    `written-test.ts` — the two swapped on a **graded** question: a well-formed HSI of a different
+    aircraft than the one asked about.
+  `hsi.ts` cannot see its own consumers and its no-nav contract is silent by design, so the whole
+  HSI suite stays green through all three — the same consumer-vs-oracle hole CLAUDE.md records for
+  `mapview.ts`/`sim.ts` and the parallel rejoin, one screen over.
+- Regression tests: `draws the card on the scenario heading and the pointer on the inbound course`
+  (`src/modules/entry-drill.test.ts`) pins `.hsi-heading-readout`, `.hsi-crs-value`,
+  `.hsi-nav-sense`, the `.hsi-tofrom` sense and the bar's side for seed 42, and the added block in
+  `shows the entry figure with no deviation indication, and still grades`
+  (`src/modules/written-test.test.ts`) pins the figure's readout and CRS box. Both derive their
+  goldens from the **scenario**, stated as literals (seed 42: heading 173, course 250, 9.9 NM out,
+  TO, bar pegged left) rather than re-read out of `holdSpec.inboundCourse` or recomputed from
+  `courseDeviation` — an expectation built from the field the consumer reads agrees by construction
+  when the consumer reads it wrongly. The written-test half selects a question whose heading and
+  inbound course **differ**: `entry-direct-inbound` is heading 090 on a 090 course, where a swap is
+  invisible and the assertion could not fail.
