@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { blend, contrastRatio } from './contrast'
+import { blend, contrastRatio, hueOf } from './contrast'
 
 // Reference pairs are hand-checkable against the WCAG definition, because every
 // palette assertion in styles.test.ts and ui/palette.test.ts is only as
@@ -107,5 +107,55 @@ describe('blend', () => {
   it('rejects a malformed colour the same way contrastRatio does', () => {
     expect(() => blend('white', '#ffffff', 0.5)).toThrow()
     expect(() => blend('#ffffff', 'white', 0.5)).toThrow()
+  })
+})
+
+// The one fact the two instrument palettes have to share: an entry type keeps
+// its hue across the light plan-view plate and the dark PFD, so "green means
+// direct" cannot come to mean two different colours on one screen. Every
+// expected value here is hand-computable from the HSL definition, because
+// `ui/palette.test.ts` trusts this to decide whether two colours agree.
+describe('hueOf', () => {
+  it.each([
+    ['#ff0000', 0],
+    ['#ffff00', 60],
+    ['#00ff00', 120],
+    ['#00ffff', 180],
+    ['#0000ff', 240],
+    ['#ff00ff', 300],
+  ])('places %s at %i° on the wheel', (hex, expected) => {
+    expect(hueOf(hex)).toBeCloseTo(expected, 10)
+  })
+
+  // The primaries above hold for any formula that gets the six corners right,
+  // so pin one interior value too: max = R = 138, min = B = 0, delta = 138, and
+  // the red sector's hue is 60·(G − B)/delta = 60·82/138 = 35.652°.
+  it('interpolates inside a sector', () => {
+    expect(hueOf('#8a5200')).toBeCloseTo(35.652, 3)
+  })
+
+  // Hue is an angle, so the red sector runs negative below 0 and has to wrap
+  // rather than return −30: 60·(0 − 128)/255 = −30.1 → 329.9.
+  it('wraps into [0, 360) below red', () => {
+    expect(hueOf('#ff0080')).toBeCloseTo(329.88, 2)
+  })
+
+  // The PFD copies are deliberately brighter than the plate ones, so a helper
+  // that moved with lightness would report every pair as disagreeing.
+  it('is a hue, not a brightness — a colour and its half-strength form agree', () => {
+    // Each channel halved to the nearest 8-bit step: 0xff8800 → 0x804400.
+    expect(hueOf('#804400')).toBeCloseTo(hueOf('#ff8800'), 0)
+  })
+
+  // Documented, not meaningful: a grey has no hue and this returns 0 for one,
+  // which a caller must not read as "red". Asserted so the behaviour is pinned
+  // rather than discovered.
+  it.each(['#808080', '#000000', '#ffffff'])('returns 0 for the greyscale %s', (grey) => {
+    expect(hueOf(grey)).toBe(0)
+  })
+
+  it('rejects a malformed colour the same way contrastRatio does', () => {
+    expect(() => hueOf('white')).toThrow()
+    expect(() => hueOf('#12345')).toThrow()
   })
 })

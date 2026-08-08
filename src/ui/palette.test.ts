@@ -1,10 +1,17 @@
 import { describe, expect, it } from 'vitest'
-import { COLOUR_LITERAL, HEX_COLOUR_SOURCE, blend, contrastRatio } from '../contrast'
-// The stylesheet is read for `--bg` alone: the airframe-fixed parts of the HSI
-// (lubber triangle, heading-readout box) hang outside the rose and render on the
-// page background, not on the instrument face, and `PALETTE.face` claims in a
-// comment to match `--surface`. Two artifacts asserted by two suites that never
-// compared could drift without either failing.
+import {
+  COLOUR_LITERAL,
+  HEX_COLOUR,
+  HEX_COLOUR_SOURCE,
+  blend,
+  contrastRatio,
+  hueOf,
+} from '../contrast'
+// The stylesheet is read for `--bg`: the plan-view plate sits straight on the
+// page, so its marks are measured against both, and the dark PFD panel has to
+// separate itself from that page as a component boundary. `PALETTE.plate.face`
+// also claims in a comment to match `--surface`. Two artifacts asserted by two
+// suites that never compared could drift without either failing.
 import STYLES from '../styles.css?raw'
 // The instrument modules are read as source text, not imported for their
 // behaviour: the contrast assertions below can only judge colours they can
@@ -26,41 +33,66 @@ import { OVERLAY_ALPHA, PALETTE } from './palette'
  *
  * Every leaf of PALETTE must appear here — a hand-listed subset measured only
  * the keys that existed when the list was typed, so a new one shipped
- * unmeasured. `backdrop` is what everything else is measured against. */
+ * unmeasured. `backdrop` is what everything else in its group is measured
+ * against. */
 const TIERS: Readonly<Record<string, 'text' | 'graphic' | 'backdrop'>> = {
-  face: 'backdrop',
-  // card labels, the fix name, the aircraft and lubber symbols
-  ink: 'text',
-  // the heading readout digits
-  readout: 'text',
-  // minor ticks, ghost track, north arrow — lines, never letters
-  inkDim: 'graphic',
-  bezel: 'graphic',
-  cdi: 'graphic',
-  'entry.direct': 'graphic',
-  'entry.teardrop': 'graphic',
-  'entry.parallel': 'graphic',
+  'plate.face': 'backdrop',
+  // the fix name, the north letter, the racetrack and ownship symbols
+  'plate.ink': 'text',
+  // the flown track
+  'plate.readout': 'text',
+  // ghost track, north arrow — lines, never letters
+  'plate.inkDim': 'graphic',
+  'plate.bezel': 'graphic',
+  'plate.entry.direct': 'graphic',
+  'plate.entry.teardrop': 'graphic',
+  'plate.entry.parallel': 'graphic',
+
+  'pfd.face': 'backdrop',
+  // card labels and the heading readout digits, plus the lubber and aircraft
+  'pfd.card': 'text',
+  // the HDG box digits as well as the bug itself
+  'pfd.bug': 'text',
+  // the CRS box digits as well as the pointer and deviation bar
+  'pfd.course': 'text',
+  // minor ticks and secondary marks — lines, never letters
+  'pfd.cardDim': 'graphic',
+  'pfd.chrome': 'graphic',
+  'pfd.entry.direct': 'graphic',
+  'pfd.entry.teardrop': 'graphic',
+  'pfd.entry.parallel': 'graphic',
 }
 
 const MINIMUM = { text: 4.5, graphic: 3 } as const
 
-/** Every `name → colour` leaf of the palette, nested keys dotted. */
+/** Every `name → colour` leaf of the palette, nested keys dotted.
+ *
+ * Recursive, not two levels: the pre-split walk stopped at depth 2, and under
+ * the grouped shape that silently skips every `*.entry.*` colour while still
+ * returning a full-looking list. Pinned by `walks the whole tree`. */
 function leaves(): Array<readonly [string, string]> {
   const out: Array<readonly [string, string]> = []
-  for (const [key, value] of Object.entries(PALETTE)) {
-    if (typeof value === 'string') {
-      out.push([key, value])
-      continue
-    }
-    for (const [sub, colour] of Object.entries(value)) {
-      out.push([`${key}.${sub}`, colour])
+  const walk = (node: Record<string, unknown>, prefix: string): void => {
+    for (const [key, value] of Object.entries(node)) {
+      const name = prefix === '' ? key : `${prefix}.${key}`
+      if (typeof value === 'string') {
+        out.push([name, value])
+        continue
+      }
+      walk(value as Record<string, unknown>, name)
     }
   }
+  walk(PALETTE, '')
   return out
 }
 
-/** `--bg` as declared in the stylesheet — the surface the airframe-fixed parts
- * of the instrument sit on. */
+/** The top-level group a dotted leaf name belongs to. */
+function groupOf(name: string): string {
+  return name.split('.')[0]!
+}
+
+/** `--bg` / `--surface` as declared in the stylesheet — the page the
+ * instruments are mounted on. */
 function styleColour(name: string): string {
   // `HEX_COLOUR_SOURCE` rather than a local pattern: this value is handed
   // straight to `contrastRatio`, so the two must agree on what a hex is. The
@@ -71,17 +103,66 @@ function styleColour(name: string): string {
   return match[1]
 }
 
+/** What each group's colours actually render on.
+ *
+ * Per group, because the two instruments have opposite backdrops and measuring
+ * either against the other's would be measuring a picture that never appears.
+ * Hand-written, so it has exactly the failure mode `TIERS` has — it measures
+ * only the groups that existed when it was typed — and therefore gets the same
+ * exhaustiveness guard (`measures every group it declares against a backdrop`).
+ *
+ *  - `plate.*` renders on the white plate, but the plate is not a card
+ *    (`.mapview` carries no background rule), so it sits straight on the `--bg`
+ *    page at 1.13:1 and its frame overhangs onto that page. Both backdrops.
+ *  - `pfd.*` renders on the dark panel and on nothing else: the panel fills the
+ *    whole viewBox, so no PFD mark ever touches the page. `pfd.face` answers to
+ *    `--bg` on its own, in `separates the PFD panel from the page` below. */
+const BACKDROPS: Readonly<Record<string, ReadonlyArray<readonly [string, string]>>> = {
+  plate: [
+    ['plate.face', PALETTE.plate.face],
+    ['--bg', styleColour('--bg')],
+  ],
+  pfd: [['pfd.face', PALETTE.pfd.face]],
+}
+
 describe('instrument palette', () => {
-  it('names exactly the three AIM entry types', () => {
-    expect(Object.keys(PALETTE.entry).sort()).toEqual(['direct', 'parallel', 'teardrop'])
+  it('names exactly the three AIM entry types, in both groups', () => {
+    expect(Object.keys(PALETTE.plate.entry).sort()).toEqual(['direct', 'parallel', 'teardrop'])
+    expect(Object.keys(PALETTE.pfd.entry).sort()).toEqual(['direct', 'parallel', 'teardrop'])
   })
 
   // Frozen so a screen cannot "just tweak" one instrument's colour at runtime
-  // and drift the entry colours apart between the HSI and the map.
-  it('is frozen', () => {
-    expect(Object.isFrozen(PALETTE)).toBe(true)
-    expect(Object.isFrozen(PALETTE.entry)).toBe(true)
+  // and drift the entry colours apart between the HSI and the map. Walked
+  // rather than hand-listed: `Object.freeze` is shallow, so a new nested group
+  // is unfrozen by default and a hand-listed check would not look at it.
+  it('is frozen all the way down', () => {
+    const unfrozen: string[] = []
+    const walk = (node: Record<string, unknown>, path: string): void => {
+      if (!Object.isFrozen(node)) unfrozen.push(path)
+      for (const [key, value] of Object.entries(node)) {
+        if (typeof value === 'object' && value !== null) {
+          walk(value as Record<string, unknown>, `${path}.${key}`)
+        }
+      }
+    }
+    walk(PALETTE, 'PALETTE')
+    expect(unfrozen).toEqual([])
     expect(Object.isFrozen(OVERLAY_ALPHA)).toBe(true)
+  })
+
+  // Non-vacuous guard on the walk itself: a two-level `leaves()` returns the
+  // group object as if it were a colour and never reaches the three entry
+  // colours below it — a full-looking list with the newest colours missing,
+  // which every assertion downstream would then silently skip.
+  it('walks the whole tree, not just two levels', () => {
+    const found = leaves()
+    const names = found.map(([name]) => name)
+    expect(names).toContain('pfd.entry.direct')
+    expect(names).toContain('plate.entry.parallel')
+    expect(names).not.toContain('pfd.entry')
+    for (const [name, value] of found) {
+      expect(value, `${name} is not a colour`).toMatch(HEX_COLOUR)
+    }
   })
 
   it('classifies every colour it declares', () => {
@@ -91,19 +172,25 @@ describe('instrument palette', () => {
     expect(unclassified, 'add these to TIERS as text/graphic/backdrop').toEqual([])
   })
 
-  // The instrument face is white and the page it sits on is `--bg`; a mark that
-  // only clears its tier on one of the two is unreadable wherever it crosses to
-  // the other, which the lubber triangle and the readout box frame both do.
-  it('clears WCAG contrast on the instrument face and on the page', () => {
-    const backdrops = [
-      ['face', PALETTE.face],
-      ['--bg', styleColour('--bg')],
-    ] as const
+  it('measures every group it declares against a backdrop', () => {
+    const unmapped = Object.keys(PALETTE).filter((group) => !(group in BACKDROPS))
+    expect(unmapped, 'add these groups to BACKDROPS').toEqual([])
+  })
 
+  // A mark that only clears its tier on one of its group's backdrops is
+  // unreadable wherever it crosses to the other, which the plate's frame does.
+  it('clears WCAG contrast on every backdrop its group renders on', () => {
     const failures: string[] = []
     for (const [name, value] of leaves()) {
       const tier = TIERS[name]
       if (tier === undefined || tier === 'backdrop') continue
+      const backdrops = BACKDROPS[groupOf(name)]
+      // Not a skip: an unmapped group would otherwise pass this test by being
+      // measured against nothing at all.
+      if (backdrops === undefined) {
+        failures.push(`${name}: group ${groupOf(name)} has no backdrop`)
+        continue
+      }
       for (const [backdrop, against] of backdrops) {
         const ratio = contrastRatio(value, against)
         if (ratio < MINIMUM[tier]) {
@@ -114,20 +201,52 @@ describe('instrument palette', () => {
     expect(failures).toEqual([])
   })
 
-  // `PALETTE.face` says in a comment that it matches `--surface`, and a comment
-  // is not an assertion: a drift here silently changes what every ratio above
-  // was measured against. (The face is not a card — `.hsi`/`.mapview` carry no
-  // background rule, so the white rose sits straight on the `--bg` page at
-  // 1.13:1 and the bezel stroke is what supplies its edge, measured on `--bg`
-  // at the graphic tier above.)
-  it('keeps the instrument face equal to the stylesheet surface', () => {
-    expect(PALETTE.face).toBe(styleColour('--surface'))
+  // The dark panel is its own component boundary against the light page, so it
+  // needs no bezel stroke to be perceivable — but only if it clears the 3:1
+  // SC 1.4.11 asks of a boundary. Nothing else measures `pfd.face`: it is the
+  // backdrop everything in its own group is measured against, so without this
+  // it would be the one colour in the palette answering to nobody.
+  it('separates the PFD panel from the page', () => {
+    const ratio = contrastRatio(PALETTE.pfd.face, styleColour('--bg'))
+    expect(ratio, `pfd.face on --bg: ${ratio.toFixed(2)}`).toBeGreaterThanOrEqual(MINIMUM.graphic)
+  })
+
+  // An entry type keeps its hue across the two instruments. Lightness is free —
+  // a green readable on white is not readable on near-black — but the hue is
+  // the code the student learns, and the HSI and the map appear together in the
+  // drill's feedback view, so a hue drift teaches two colour codes on one
+  // screen. That is the drift this file was centralised to prevent.
+  //
+  // ⚠️ The tolerance was chosen after the colours were, so the number itself
+  // proves nothing; what makes this guard real is that swapping a `pfd.entry`
+  // colour for a different hue fails it (mutation-checked). The three pairs
+  // currently sit 1.58°, 0.16° and 0.00° apart.
+  const HUE_TOLERANCE_DEG = 5
+
+  it('keeps each entry colour the same hue on both instruments', () => {
+    const drifted: string[] = []
+    for (const entry of ['direct', 'teardrop', 'parallel'] as const) {
+      const gap = Math.abs(hueOf(PALETTE.plate.entry[entry]) - hueOf(PALETTE.pfd.entry[entry]))
+      // Hue is an angle: 359° and 1° are 2° apart, not 358°.
+      const apart = Math.min(gap, 360 - gap)
+      if (apart > HUE_TOLERANCE_DEG) {
+        drifted.push(`${entry}: ${apart.toFixed(2)}° apart, tolerance ${HUE_TOLERANCE_DEG}°`)
+      }
+    }
+    expect(drifted).toEqual([])
+  })
+
+  // `PALETTE.plate.face` says in a comment that it matches `--surface`, and a
+  // comment is not an assertion: a drift here silently changes what every plate
+  // ratio above was measured against.
+  it('keeps the plate face equal to the stylesheet surface', () => {
+    expect(PALETTE.plate.face).toBe(styleColour('--surface'))
   })
 
   // Non-vacuous guard: comparing the palette against itself would pass for any
   // set of values, so pin the one pair whose ratio is hand-checkable.
   it('computes real ratios (black on white is 21)', () => {
-    expect(contrastRatio('#000000', PALETTE.face)).toBeCloseTo(21, 6)
+    expect(contrastRatio('#000000', PALETTE.plate.face)).toBeCloseTo(21, 6)
   })
 })
 
@@ -136,10 +255,22 @@ describe('instrument palette', () => {
 // 1.24–2.06:1 over the white face, so every alpha the instruments paint at has
 // to be composited here before it is judged.
 describe('instrument overlays, as composited', () => {
-  const face = PALETTE.face
-  const tints = Object.entries(PALETTE.entry).map(
-    ([name, colour]) => [name, blend(colour, face, OVERLAY_ALPHA.sectorFill)] as const,
-  )
+  // Both overlays are HSI-only, so they composite over the PFD panel. Note the
+  // asymmetry against the old white face: a tint over a dark backdrop
+  // *lightens* it, so the binding assertion is no longer that the tint stays
+  // faint but that the white card marks crossing it stay legible on top.
+  const face = PALETTE.pfd.face
+
+  // A function, not a describe-scope const: `blend` throws on an alpha that is
+  // not a number, and at describe scope that throw lands during collection, so
+  // the whole file reports "no tests" and the guard that names the actual
+  // mistake never runs. Nesting `OVERLAY_ALPHA` — the exact mutation
+  // `composites every alpha it declares` exists to catch — does precisely that.
+  function tints(): Array<readonly [string, string]> {
+    return Object.entries(PALETTE.pfd.entry).map(
+      ([name, colour]) => [name, blend(colour, face, OVERLAY_ALPHA.sectorFill)] as const,
+    )
+  }
 
   // The wedge boundary is what makes the sector legible as a sector, so it is
   // stroked opaque (checked above at the graphic tier). The fill underneath is
@@ -155,14 +286,14 @@ describe('instrument overlays, as composited', () => {
   // fell to 2.85:1 here while the suite reported 3.61:1.
   it('keeps ticks and labels legible over a tinted sector', () => {
     const failures: string[] = []
-    for (const [name, tint] of tints) {
-      const tick = contrastRatio(PALETTE.inkDim, tint)
+    for (const [name, tint] of tints()) {
+      const tick = contrastRatio(PALETTE.pfd.cardDim, tint)
       if (tick < MINIMUM.graphic) {
-        failures.push(`inkDim on ${name} tint ${tint}: ${tick.toFixed(2)} < ${MINIMUM.graphic}`)
+        failures.push(`cardDim on ${name} tint ${tint}: ${tick.toFixed(2)} < ${MINIMUM.graphic}`)
       }
-      const label = contrastRatio(PALETTE.ink, tint)
+      const label = contrastRatio(PALETTE.pfd.card, tint)
       if (label < MINIMUM.text) {
-        failures.push(`ink on ${name} tint ${tint}: ${label.toFixed(2)} < ${MINIMUM.text}`)
+        failures.push(`card on ${name} tint ${tint}: ${label.toFixed(2)} < ${MINIMUM.text}`)
       }
     }
     expect(failures).toEqual([])
@@ -171,7 +302,7 @@ describe('instrument overlays, as composited', () => {
   // The thumb band is a solid marker rather than a tint, so it answers for
   // itself at the graphic tier once composited.
   it('keeps the thumb band above the graphic tier', () => {
-    const band = blend(PALETTE.entry.teardrop, face, OVERLAY_ALPHA.thumbBand)
+    const band = blend(PALETTE.pfd.entry.teardrop, face, OVERLAY_ALPHA.thumbBand)
     expect(contrastRatio(band, face)).toBeGreaterThanOrEqual(MINIMUM.graphic)
   })
 

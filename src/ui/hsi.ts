@@ -5,6 +5,11 @@
 //     3 o'clock index (9 o'clock side for nonstandard holds) — airframe-fixed
 //   - sector wedges: AIM 5-3-8 j3 entry sectors, magnetic (rotate with card)
 // Pure rendering: state in, SVG out. No internal state, no listeners.
+//
+// Draws from the `pfd` group of the instrument palette (src/ui/palette.ts) —
+// the dark half, matching the panel this instrument replicates. The plan view
+// draws from `plate`; the two groups' entry colours are held to the same hue by
+// palette.test.ts, so an entry keeps one colour code across both.
 
 import type { Entry, SectorArc, TurnDirection } from '../engine/entry'
 import { normalizeDeg } from '../engine/geometry'
@@ -68,7 +73,7 @@ function ticks(): string {
     const major = deg % 10 === 0
     const outer = polar(deg, TICK_R)
     const inner = polar(deg, TICK_R - (major ? 9 : 5))
-    const color = major ? PALETTE.ink : PALETTE.inkDim
+    const color = major ? PALETTE.pfd.card : PALETTE.pfd.cardDim
     parts.push(
       `<line class="hsi-tick" x1="${outer.x}" y1="${outer.y}" x2="${inner.x}" y2="${inner.y}" ` +
         `stroke="${color}" stroke-width="${major ? 1.6 : 1}"/>`,
@@ -83,7 +88,7 @@ function labels(): string {
     const cardinal = label.length === 1
     return (
       `<text class="hsi-label" x="${C}" y="${C - LABEL_R}" transform="rotate(${deg} ${C} ${C})" ` +
-      `text-anchor="middle" fill="${PALETTE.ink}" font-size="${cardinal ? 13 : 11}" ` +
+      `text-anchor="middle" fill="${PALETTE.pfd.card}" font-size="${cardinal ? 13 : 11}" ` +
       `font-weight="${cardinal ? 700 : 400}" font-family="system-ui, sans-serif">${label}</text>`
     )
   }).join('')
@@ -94,10 +99,10 @@ function sectorOverlay(sectors: Record<Entry, SectorArc>): string {
   return entries
     .map((entry) => {
       const { from, to } = sectors[entry]
-      const color = PALETTE.entry[entry]
+      const color = PALETTE.pfd.entry[entry]
       // The boundary carries the sector at full strength (a stroke-opacity here
-      // composited to ~1.9:1 against the white face, below the 3:1 SC 1.4.11
-      // asks of a graphical object); the fill only tints the wedge.
+      // composited to ~1.9:1 against the old white face, below the 3:1 SC
+      // 1.4.11 asks of a graphical object); the fill only tints the wedge.
       return (
         `<path class="hsi-sector hsi-sector-${entry}" data-from="${from}" data-to="${to}" ` +
         `d="${pieWedge(from, to, TICK_R)}" fill="${color}" fill-opacity="${OVERLAY_ALPHA.sectorFill}" ` +
@@ -109,7 +114,7 @@ function sectorOverlay(sectors: Record<Entry, SectorArc>): string {
 
 function coursePointer(course: number): string {
   // Drawn pointing up, rotated into place; magenta per G1000 GPS guidance.
-  const m = PALETTE.cdi
+  const m = PALETTE.pfd.course
   return (
     `<g class="hsi-course" transform="rotate(${course} ${C} ${C})">` +
     `<polygon points="100,32 94,46 106,46" fill="${m}"/>` +
@@ -128,7 +133,7 @@ function thumbBand(turnDirection: TurnDirection): string {
   const [from, to] = turnDirection === 'right' ? [70, 90] : [270, 290]
   return (
     `<path class="hsi-thumb" data-from="${from}" data-to="${to}" ` +
-    `d="${bandWedge(from, to, ROSE_R, ROSE_R - 8)}" fill="${PALETTE.entry.teardrop}" ` +
+    `d="${bandWedge(from, to, ROSE_R, ROSE_R - 8)}" fill="${PALETTE.pfd.entry.teardrop}" ` +
     `fill-opacity="${OVERLAY_ALPHA.thumbBand}"/>`
   )
 }
@@ -144,8 +149,8 @@ export function renderHSI(el: Element, props: HSIProps): void {
     `<svg class="hsi" viewBox="0 0 200 200" role="img" aria-label="${aria}">` +
     // rotating card: bezel, sector wedges, ticks, labels, course pointer
     `<g class="hsi-rose" transform="rotate(${r2(-heading)} ${C} ${C})">` +
-    `<circle cx="${C}" cy="${C}" r="${ROSE_R}" fill="${PALETTE.face}" stroke="${PALETTE.bezel}" ` +
-    `stroke-width="2"/>` +
+    `<circle cx="${C}" cy="${C}" r="${ROSE_R}" fill="${PALETTE.pfd.face}" ` +
+    `stroke="${PALETTE.pfd.chrome}" stroke-width="2"/>` +
     (props.sectorOverlay ? sectorOverlay(props.sectorOverlay) : '') +
     ticks() +
     labels() +
@@ -153,13 +158,13 @@ export function renderHSI(el: Element, props: HSIProps): void {
     `</g>` +
     // airframe-fixed: thumb band, lubber line, aircraft symbol, readout
     (props.thumbOverlay ? thumbBand(props.thumbOverlay) : '') +
-    `<polygon class="hsi-lubber" points="100,26 95,15 105,15" fill="${PALETTE.ink}"/>` +
+    `<polygon class="hsi-lubber" points="100,26 95,15 105,15" fill="${PALETTE.pfd.card}"/>` +
     `<path class="hsi-aircraft" d="M100 90 L100 112 M90 99 L110 99 M95 109 L105 109" ` +
-    `stroke="${PALETTE.ink}" stroke-width="2" fill="none" stroke-linecap="round"/>` +
-    `<rect x="79" y="0" width="42" height="15" rx="2" fill="${PALETTE.face}" ` +
-    `stroke="${PALETTE.bezel}"/>` +
+    `stroke="${PALETTE.pfd.card}" stroke-width="2" fill="none" stroke-linecap="round"/>` +
+    `<rect x="79" y="0" width="42" height="15" rx="2" fill="${PALETTE.pfd.face}" ` +
+    `stroke="${PALETTE.pfd.chrome}"/>` +
     `<text class="hsi-heading-readout" x="${C}" y="11.5" text-anchor="middle" ` +
-    `fill="${PALETTE.readout}" ` +
+    `fill="${PALETTE.pfd.card}" ` +
     `font-size="11" font-weight="700" font-family="system-ui, sans-serif">${courseText(heading)}</text>` +
     `</svg>`
 }

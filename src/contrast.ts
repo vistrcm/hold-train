@@ -94,6 +94,35 @@ export function blend(fg: string, bg: string, alpha: number): string {
 }
 
 /**
+ * Hue angle of a colour, in degrees on [0, 360): the HSL wheel, where 0 is red,
+ * 120 green and 240 blue.
+ *
+ * Exported for one job. The palette now carries each AIM entry type twice —
+ * once for the light plan-view plate, once for the dark PFD — and the two
+ * copies must stay the same *hue* while differing freely in lightness, so that
+ * "green means direct" cannot come to mean two different colours on the one
+ * screen where both instruments appear. Lightness and saturation are
+ * deliberately not returned: the PFD copy is brighter on purpose, and the hue
+ * is the only shared fact.
+ *
+ * A grey has no hue. This returns 0 for one, which a caller must not read as
+ * "red" — `palette.test.ts` only ever compares the entry colours, none of which
+ * are grey.
+ */
+export function hueOf(hex: string): number {
+  const [r, g, b] = channels(hex)
+  const max = Math.max(r, g, b)
+  const min = Math.min(r, g, b)
+  const delta = max - min
+  if (delta === 0) return 0
+  // Which sector of the wheel the colour is in is decided by its largest
+  // channel; the other two interpolate within it.
+  const sextant =
+    max === r ? ((g - b) / delta) % 6 : max === g ? (b - r) / delta + 2 : (r - g) / delta + 4
+  return ((sextant * 60) % 360 + 360) % 360
+}
+
+/**
  * A colour literal in source text, in every notation CSS and SVG accept:
  * `#rgb`/`#rgba`/`#rrggbb`/`#rrggbbaa`, plus the functional forms. Exported so
  * the stylesheet guard and the instrument guard share one definition — two
