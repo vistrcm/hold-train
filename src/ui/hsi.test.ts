@@ -349,8 +349,9 @@ describe('deviation bar', () => {
     // ⚠️ 1.0 NM is deliberately shorter than any distance the drill generates.
     // An unpegged needle *requires* a distance inside FULL_SCALE_NM, and the
     // shipping app never produces one (see "Two accepted consequences" in
-    // docs/plans/20260807-g1000-hsi.md). Do not "fix" this to a realistic
-    // distance — the golden would peg and stop measuring the arithmetic.
+    // docs/plans/completed/20260807-g1000-hsi.md). Do not "fix" this to a
+    // realistic distance — the golden would peg and stop measuring the
+    // arithmetic.
     expect(barX({ heading: 120, course: 90, nav: { fix: FIX, distanceNm: 1 } })).toBeCloseTo(
       LAYOUT.cx + 15,
       6,

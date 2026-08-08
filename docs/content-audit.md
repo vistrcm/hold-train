@@ -1501,4 +1501,4 @@ recorded here on the same terms as a wrong sentence.
   `src/modules/entry-drill.test.ts`.
 
 Full plan, with the per-task mutation tables that establish each guard actually binds:
-`docs/plans/20260807-g1000-hsi.md`.
+`docs/plans/completed/20260807-g1000-hsi.md`.
