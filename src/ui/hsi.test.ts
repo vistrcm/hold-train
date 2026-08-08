@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { determineEntry } from '../engine/entry'
-import { courseText } from '../format'
+import { courseText, distanceText } from '../format'
+import { PALETTE } from './palette'
 import {
   DEVIATION_DOTS,
   FULL_SCALE_NM,
@@ -9,6 +10,11 @@ import {
   renderHSI,
   type HSIProps,
 } from './hsi'
+
+/** The nav state needs an ident. `ZORVU` is already a `PUBLISHED_HOLDS`
+ * fixture, i.e. already checked to be a fictitious waypoint — inventing a
+ * second name here would mean repeating that check for no gain. */
+const FIX = 'ZORVU'
 
 function render(props: HSIProps): HTMLElement {
   const el = document.createElement('div')
@@ -313,7 +319,8 @@ describe('the no-nav contract', () => {
   // drawing decision — silently rendering nothing would hide it.
   it('rejects nav data with no course to deviate from', () => {
     const el = document.createElement('div')
-    expect(() => renderHSI(el, { heading: 90, nav: { distanceNm: 8 } })).toThrow(TypeError)
+    const nav = { fix: FIX, distanceNm: 8 }
+    expect(() => renderHSI(el, { heading: 90, nav })).toThrow(TypeError)
   })
 
   // Over the fix the cross-track is 0 for every heading and the sense has no
@@ -321,12 +328,11 @@ describe('the no-nav contract', () => {
   // caller depict it. The instrument must not swallow that.
   it('propagates the engine’s rejection of a non-positive distance', () => {
     const el = document.createElement('div')
-    expect(() => renderHSI(el, { heading: 90, course: 90, nav: { distanceNm: 0 } })).toThrow(
-      RangeError,
-    )
-    expect(() => renderHSI(el, { heading: 90, course: 90, nav: { distanceNm: -4 } })).toThrow(
-      RangeError,
-    )
+    for (const distanceNm of [0, -4]) {
+      expect(() =>
+        renderHSI(el, { heading: 90, course: 90, nav: { fix: FIX, distanceNm } }),
+      ).toThrow(RangeError)
+    }
   })
 })
 
@@ -345,7 +351,7 @@ describe('deviation bar', () => {
     // shipping app never produces one (see "Two accepted consequences" in
     // docs/plans/20260807-g1000-hsi.md). Do not "fix" this to a realistic
     // distance — the golden would peg and stop measuring the arithmetic.
-    expect(barX({ heading: 120, course: 90, nav: { distanceNm: 1 } })).toBeCloseTo(
+    expect(barX({ heading: 120, course: 90, nav: { fix: FIX, distanceNm: 1 } })).toBeCloseTo(
       LAYOUT.cx + 15,
       6,
     )
@@ -357,7 +363,10 @@ describe('deviation bar', () => {
     // SOUTH. South of an eastbound course is its RIGHT, cross-track +0.50 NM.
     // Fly toward the needle: the course is off the left wing, so the bar sits
     // left of centre, on the inner dot at cx − 15.
-    expect(barX({ heading: 60, course: 90, nav: { distanceNm: 1 } })).toBeCloseTo(LAYOUT.cx - 15, 6)
+    expect(barX({ heading: 60, course: 90, nav: { fix: FIX, distanceNm: 1 } })).toBeCloseTo(
+      LAYOUT.cx - 15,
+      6,
+    )
   })
 
   it('pegs on the outer dot instead of sliding off the card', () => {
@@ -366,13 +375,13 @@ describe('deviation bar', () => {
     // course, eight times full scale. The bar deflects right and stops on the
     // outer dot.
     const full = FULL_SCALE_NM * PX_PER_NM
-    expect(barX({ heading: 180, course: 90, nav: { distanceNm: 8 } })).toBeCloseTo(
+    expect(barX({ heading: 180, course: 90, nav: { fix: FIX, distanceNm: 8 } })).toBeCloseTo(
       LAYOUT.cx + full,
       6,
     )
     // Mirrored: heading 000 at 8 NM sits 8 NM due south of the fix, 8 NM RIGHT
     // of the same course, so the bar pegs on the opposite outer dot.
-    expect(barX({ heading: 0, course: 90, nav: { distanceNm: 8 } })).toBeCloseTo(
+    expect(barX({ heading: 0, course: 90, nav: { fix: FIX, distanceNm: 8 } })).toBeCloseTo(
       LAYOUT.cx - full,
       6,
     )
@@ -380,7 +389,10 @@ describe('deviation bar', () => {
 
   it('centres exactly on course', () => {
     // Heading = course: the aircraft is on the course line, dead ahead of it.
-    expect(barX({ heading: 90, course: 90, nav: { distanceNm: 8 } })).toBeCloseTo(LAYOUT.cx, 6)
+    expect(barX({ heading: 90, course: 90, nav: { fix: FIX, distanceNm: 8 } })).toBeCloseTo(
+      LAYOUT.cx,
+      6,
+    )
   })
 
   // Bar and dots are two readings of one scale, so this is drawn-against-drawn
@@ -389,7 +401,7 @@ describe('deviation bar', () => {
   // a literal of the *same* value is undetectable by construction — nothing can
   // see the difference; this is what catches the two drifting apart afterwards.)
   it('puts a half-scale deflection exactly on the drawn inner dot', () => {
-    const el = render({ heading: 120, course: 90, nav: { distanceNm: 1 } })
+    const el = render({ heading: 120, course: 90, nav: { fix: FIX, distanceNm: 1 } })
     const bar = el.querySelector('.hsi-cdi-bar')!
     const dots = [...el.querySelectorAll('.hsi-cdi-dot')].map((d) => num(d, 'cx'))
     expect(dots).toContain(num(bar, 'x1'))
@@ -398,7 +410,7 @@ describe('deviation bar', () => {
 
 describe('deviation dots', () => {
   it('draws DEVIATION_DOTS a side, evenly spaced out to full scale', () => {
-    const el = render({ heading: 90, course: 90, nav: { distanceNm: 8 } })
+    const el = render({ heading: 90, course: 90, nav: { fix: FIX, distanceNm: 8 } })
     const dots = [...el.querySelectorAll('.hsi-cdi-dot')]
     expect(dots).toHaveLength(2 * DEVIATION_DOTS)
     const full = FULL_SCALE_NM * PX_PER_NM
@@ -441,7 +453,7 @@ describe('TO/FROM flag', () => {
     // Course 090, heading 090, 5 NM out: tracking direct, the aircraft is 5 NM
     // west of the fix flying east at it, so following 090 from here reaches the
     // fix — TO. The flag points toward the arrowhead, up the local course line.
-    const f = flag({ heading: 90, course: 90, nav: { distanceNm: 5 } })
+    const f = flag({ heading: 90, course: 90, nav: { fix: FIX, distanceNm: 5 } })
     expect(f.getAttribute('data-sense')).toBe('to')
     const { apexY, baseY } = pointing(f)
     expect(apexY).toBeLessThan(baseY) // apex above its base: pointing up
@@ -452,7 +464,7 @@ describe('TO/FROM flag', () => {
     // Course 090, heading 270, 5 NM out: tracking direct on 270 means the fix
     // is west of the aircraft, so the aircraft is 5 NM EAST of it. Following
     // 090 from there flies away from the fix — FROM.
-    const f = flag({ heading: 270, course: 90, nav: { distanceNm: 5 } })
+    const f = flag({ heading: 270, course: 90, nav: { fix: FIX, distanceNm: 5 } })
     expect(f.getAttribute('data-sense')).toBe('from')
     const { apexY, baseY } = pointing(f)
     expect(apexY).toBeGreaterThan(baseY) // apex below its base: pointing down
@@ -464,12 +476,230 @@ describe('the course assembly rides the compass card', () => {
   it('composes to course − heading on screen, not to the local rotate()', () => {
     // heading 041, course 300 — both non-zero, so the composed angle is
     // distinguishable from either term: −41 + 300 = 259° on screen.
-    const el = render({ heading: 41, course: 300, nav: { distanceNm: 8 } })
+    const el = render({ heading: 41, course: 300, nav: { fix: FIX, distanceNm: 8 } })
     for (const selector of ['.hsi-course', '.hsi-cdi-bar', '.hsi-cdi-dot', '.hsi-tofrom']) {
       const node = el.querySelector(selector)
       expect(node, selector).not.toBeNull()
       expect(composedRotation(node!), selector).toBeCloseTo(259, 6)
     }
+  })
+})
+
+describe('the selected-value boxes', () => {
+  it('shows the selected heading in the HDG box, in the bug’s own colour', () => {
+    const el = render({ heading: 41, headingBug: 120 })
+    const value = el.querySelector('.hsi-hdg-value')!
+    expect(el.querySelector('.hsi-hdg-label')!.textContent).toBe('HDG')
+    // the *selected* heading, not the current one — those differ here on purpose
+    expect(value.textContent).toBe(courseText(120))
+    expect(value.getAttribute('fill')).toBe(PALETTE.pfd.bug)
+    expect(value.getAttribute('font-family')).toMatch(/monospace/)
+  })
+
+  it('shows the selected course in the CRS box, in the pointer’s own colour', () => {
+    const el = render({ heading: 41, course: 300 })
+    const value = el.querySelector('.hsi-crs-value')!
+    expect(el.querySelector('.hsi-crs-label')!.textContent).toBe('CRS')
+    expect(value.textContent).toBe(courseText(300))
+    expect(value.getAttribute('fill')).toBe(PALETTE.pfd.course)
+    expect(value.getAttribute('font-family')).toMatch(/monospace/)
+  })
+
+  it('renders both values through courseText — three digits, 0 shown as 360', () => {
+    const el = render({ heading: 41, headingBug: 0, course: 5 })
+    expect(el.querySelector('.hsi-hdg-value')!.textContent).toBe('360°')
+    expect(el.querySelector('.hsi-crs-value')!.textContent).toBe('005°')
+  })
+
+  // A box with nothing selected in it is a readout of nothing. The written
+  // test's entry figure selects a course but no heading, so it gets one box.
+  it('omits each box when its value is not selected', () => {
+    const noBug = render({ heading: 41, course: 300 })
+    expect(noBug.querySelector('.hsi-hdg-box')).toBeNull()
+    expect(noBug.querySelector('.hsi-crs-box')).not.toBeNull()
+    const noCourse = render({ heading: 41 })
+    expect(noCourse.querySelector('.hsi-crs-box')).toBeNull()
+    expect(noCourse.querySelector('.hsi-hdg-box')).toBeNull()
+  })
+
+  it('flanks the heading readout without overlapping it or the panel edge', () => {
+    const el = render({ heading: 41, headingBug: 41, course: 300 })
+    const span = (selector: string): readonly [number, number] => {
+      const box = el.querySelector(selector)!
+      return [num(box, 'x'), num(box, 'x') + num(box, 'width')] as const
+    }
+    const [hdgL, hdgR] = span('.hsi-hdg-box')
+    const [crsL, crsR] = span('.hsi-crs-box')
+    const [readL, readR] = span('.hsi-heading-box')
+    expect(hdgL).toBeGreaterThanOrEqual(0)
+    expect(crsR).toBeLessThanOrEqual(LAYOUT.width)
+    expect(hdgR).toBeLessThan(readL) // HDG left of the current heading
+    expect(crsL).toBeGreaterThan(readR) // CRS right of it
+    // one row across the top of the panel, so all three read together
+    for (const selector of ['.hsi-hdg-box', '.hsi-crs-box']) {
+      const box = el.querySelector(selector)!
+      expect(num(box, 'y'), selector).toBe(LAYOUT.boxY)
+      expect(num(box, 'height'), selector).toBe(LAYOUT.boxH)
+      expect(box.closest('.hsi-rose'), selector).toBeNull()
+    }
+  })
+})
+
+describe('the heading bug', () => {
+  it('rides the card at the selected heading, not under the nose', () => {
+    // heading 041, bug 120 — different and both non-zero, so the composed
+    // screen angle (120 − 41 = 79°) is distinguishable from either term and
+    // from its own negation. The drill parks the bug on the current heading,
+    // where the composed angle is a constant 0 that an inverted rotation
+    // satisfies exactly as well as the right one.
+    const bug = render({ heading: 41, headingBug: 120 }).querySelector('.hsi-bug')!
+    expect(bug.closest('.hsi-rose'), 'the bug marks a magnetic heading').not.toBeNull()
+    expect(composedRotation(bug)).toBeCloseTo(79, 6)
+  })
+
+  it('sits on the outer edge of the card, where the lubber reads', () => {
+    const bug = render({ heading: 0, headingBug: 120 }).querySelector('.hsi-bug')!
+    const radii = pointsOf(bug).map((p) => radiusFromCentre(p.x, p.y))
+    expect(radii.length).toBeGreaterThan(2)
+    // its inner edge touches the card…
+    expect(Math.min(...radii)).toBeGreaterThanOrEqual(LAYOUT.roseR)
+    expect(Math.min(...radii)).toBeLessThan(LAYOUT.roseR + 1)
+    // …and it does not reach out across the value boxes
+    expect(Math.max(...radii)).toBeLessThan(LAYOUT.roseR + 12)
+  })
+
+  it('is absent when no heading is selected', () => {
+    expect(render({ heading: 41 }).querySelector('.hsi-bug')).toBeNull()
+  })
+})
+
+describe('the nav status line', () => {
+  function status(props: HSIProps): Element {
+    const line = render(props).querySelector('.hsi-status')
+    expect(line, 'no nav status line drawn').not.toBeNull()
+    return line!
+  }
+
+  function field(line: Element, selector: string): string {
+    const node = line.querySelector(selector)
+    expect(node, `no ${selector} in the status line`).not.toBeNull()
+    return node!.textContent ?? ''
+  }
+
+  it('names the source, the fix and the distance', () => {
+    const line = status({ heading: 90, course: 90, nav: { fix: FIX, distanceNm: 12.4 } })
+    expect(field(line, '.hsi-nav-source')).toBe('GPS')
+    expect(field(line, '.hsi-nav-fix')).toBe(FIX)
+    expect(field(line, '.hsi-nav-distance')).toBe('12.4 NM')
+  })
+
+  // Same rule as the heading readout's `courseText`: the drill screen shows
+  // this distance in prose beside the panel, so a second rounding here would
+  // put two different numbers for one aircraft on one screen.
+  it('renders the distance through distanceText, not a second rounding rule', () => {
+    for (const distanceNm of [3, 12.44, 12.46]) {
+      const line = status({ heading: 90, course: 90, nav: { fix: FIX, distanceNm } })
+      expect(field(line, '.hsi-nav-distance'), `${distanceNm} NM`).toBe(distanceText(distanceNm))
+    }
+  })
+
+  // Not decoration: with GPS as the nav source and an active leg a real G1000
+  // has an inoperative CRS knob and auto-slews the CDI, so the picture this
+  // instrument draws — a manually selected course with a live deflection —
+  // occurs in OBS/SUSP mode and nowhere else.
+  it('annunciates OBS, the only mode this picture occurs in', () => {
+    const line = status({ heading: 90, course: 90, nav: { fix: FIX, distanceNm: 5 } })
+    expect(field(line, '.hsi-obs')).toBe('OBS')
+  })
+
+  it('reads TO when the course closes on the fix and FROM when it opens away', () => {
+    // Course 090, heading 090 at 5 NM: tracking direct, the aircraft is 5 NM
+    // west of the fix flying east at it, so following 090 reaches it — TO.
+    expect(
+      field(
+        status({ heading: 90, course: 90, nav: { fix: FIX, distanceNm: 5 } }),
+        '.hsi-nav-sense',
+      ),
+    ).toBe('TO')
+    // Course 090, heading 270 at 5 NM: the fix is west of the aircraft, so the
+    // aircraft is 5 NM east of it and following 090 flies away — FROM.
+    expect(
+      field(
+        status({ heading: 270, course: 90, nav: { fix: FIX, distanceNm: 5 } }),
+        '.hsi-nav-sense',
+      ),
+    ).toBe('FROM')
+  })
+
+  // The word and the glyph are two renderings of one flag, drawn in different
+  // groups — the glyph rides the rotating course assembly, the word is fixed to
+  // the airframe at the panel's foot — so nothing structural stops a future
+  // change computing them separately and letting them disagree. On a panel,
+  // two flags that contradict each other are worse than either alone.
+  it('agrees with the TO/FROM glyph on the card', () => {
+    for (const heading of [90, 270, 41, 200]) {
+      const el = render({ heading, course: 90, nav: { fix: FIX, distanceNm: 5 } })
+      const word = el.querySelector('.hsi-nav-sense')!.textContent ?? ''
+      const glyph = el.querySelector('.hsi-tofrom')!.getAttribute('data-sense')
+      expect(word.toLowerCase(), `heading ${heading}`).toBe(glyph)
+    }
+  })
+
+  // The written test's entry figure again: heading and course, no position at
+  // all. A status line there would invent a fix and a distance.
+  it('is absent when the instrument has no nav data', () => {
+    const el = render({ heading: 90, course: 340 })
+    expect(el.querySelector('.hsi-status')).toBeNull()
+    expect(el.querySelector('.hsi-nav-distance')).toBeNull()
+    expect(el.querySelector('.hsi-nav-sense')).toBeNull()
+    expect(el.querySelector('.hsi-obs')).toBeNull()
+  })
+
+  it('sits below the card, inside the panel, fixed to the airframe', () => {
+    const line = status({ heading: 90, course: 90, nav: { fix: FIX, distanceNm: 5 } })
+    const fields = [...line.querySelectorAll('text')]
+    expect(fields).toHaveLength(5)
+    for (const node of fields) {
+      const where = node.getAttribute('class') ?? ''
+      expect(num(node, 'y'), where).toBeGreaterThan(LAYOUT.cy + LAYOUT.roseR)
+      expect(num(node, 'y'), where).toBeLessThanOrEqual(LAYOUT.height)
+      expect(num(node, 'x'), where).toBeGreaterThanOrEqual(0)
+      expect(num(node, 'x'), where).toBeLessThanOrEqual(LAYOUT.width)
+    }
+    expect(line.closest('.hsi-rose')).toBeNull()
+  })
+})
+
+describe('the accessible description', () => {
+  function label(props: HSIProps): string {
+    return render(props).querySelector('svg')!.getAttribute('aria-label') ?? ''
+  }
+
+  it('names heading and course when there is no nav data', () => {
+    const text = label({ heading: 41, course: 300 })
+    expect(text).toContain(courseText(41))
+    expect(text).toContain(courseText(300))
+    expect(text).not.toContain('NM')
+  })
+
+  // role="img" hides the SVG's internals, so a screen reader gets this string
+  // or none of the picture: every field on the panel has to be in it.
+  it('names heading, course, fix, distance and sense when it has nav data', () => {
+    // heading 041 with course 300: tracking direct puts the aircraft southwest
+    // of the fix, which bears 041 from it. Following 300 from there differs
+    // from 041 by 101°, more than a right angle, so the course opens away —
+    // FROM, hand-derived rather than read back off the flag.
+    const text = label({
+      heading: 41,
+      course: 300,
+      headingBug: 41,
+      nav: { fix: FIX, distanceNm: 12.4 },
+    })
+    expect(text).toContain(courseText(41))
+    expect(text).toContain(courseText(300))
+    expect(text).toContain(FIX)
+    expect(text).toContain(distanceText(12.4))
+    expect(text).toContain('FROM')
   })
 })
 

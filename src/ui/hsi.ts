@@ -1,8 +1,9 @@
 // HSI (horizontal situation indicator) drawn as a self-contained G1000-style
 // PFD panel: a dark rounded plate filling the whole viewBox, carrying a
 // heading-up rotating compass card, an airframe-fixed lubber mark, the aircraft
-// symbol and the heading readout. Two optional teaching overlays a real G1000
-// does not have:
+// symbol, the heading readout, the selected-value boxes either side of it and,
+// when there is nav data, the status line along the panel's foot. Two optional
+// teaching overlays a real G1000 does not have:
 //   - thumb band: the 20° entry-shortcut aid from the 70° line down to the
 //     3 o'clock index (9 o'clock side for nonstandard holds) — airframe-fixed
 //   - sector wedges: AIM 5-3-8 j3 entry sectors, magnetic (rotate with card)
@@ -27,12 +28,14 @@
 
 import type { Entry, SectorArc, TurnDirection } from '../engine/entry'
 import { normalizeDeg } from '../engine/geometry'
-import { courseDeviation } from '../engine/nav'
-import { courseText } from '../format'
+import { courseDeviation, type CourseDeviation } from '../engine/nav'
+import { courseText, distanceText } from '../format'
 import { OVERLAY_ALPHA, PALETTE } from './palette'
 
 /** Where the aircraft is, which is what the deviation indication needs. */
 export interface NavState {
+  /** Ident of the fix being navigated to, as the status line shows it. */
+  fix: string
   /** Distance to the fix, NM. Positive — `courseDeviation` rejects the rest. */
   distanceNm: number
 }
@@ -42,6 +45,19 @@ export interface HSIProps {
   heading: number
   /** Selected course (e.g. inbound holding course); omit to hide the pointer. */
   course?: number
+  /**
+   * Selected-heading bug, degrees. Omit to hide both the bug and the HDG box:
+   * a value box with nothing selected in it would be a readout of nothing.
+   *
+   * The entry drill parks the bug on the current heading, so on that screen the
+   * HDG box, the bug and the heading readout all show the same number. That is
+   * realistic — a pilot rolls the bug onto the nose when nothing else is
+   * selected — and intentional. It is also why `hsi.test.ts` pins the bug's
+   * drawn angle with `headingBug ≠ heading`: at the drill's own values the
+   * composed screen angle is a constant 0, which an inverted rotation satisfies
+   * just as well as the right one.
+   */
+  headingBug?: number
   /**
    * Aircraft position relative to the fix. Omit for the **no-nav contract**:
    * the course pointer is still drawn, and the deviation bar, its dots and the
@@ -150,6 +166,21 @@ const FLAG_APEX = 45
 const FLAG_HALF_W = 6
 const DOT_R = 2.4
 
+// Selected-heading bug: a notch riding the outer edge of the card, wide enough
+// that it still shows either side of the lubber mark when it is parked on the
+// nose — which is where the entry drill leaves it.
+const BUG_W = 16
+const BUG_H = 7
+
+// The two selected-value boxes flanking the heading readout, and the inset the
+// nav status line's outer ends share with them.
+const SIDE_BOX_W = 62
+const PANEL_MARGIN = 5
+
+// Nav status line along the panel's foot: baseline below the card, clear of it.
+const STATUS_Y = 221
+const STATUS_SIZE = 11
+
 // Avionics readouts are monospaced: a proportional stack shuffles the digits
 // sideways as the value changes, which reads as jitter on a live heading. A
 // system stack, so this costs no webfont (and no new dependency).
@@ -254,10 +285,10 @@ function sectorOverlay(sectors: Record<Entry, SectorArc>): string {
  * against hand-drawn goldens rather than against `courseDeviation`, which would
  * flip along with it.
  */
-function deviation(heading: number, course: number, nav: NavState): string {
+function deviation(dev: CourseDeviation): string {
   const m = PALETTE.pfd.course
   const { cx, cy } = LAYOUT
-  const { crossTrackNm, sense } = courseDeviation(heading, course, nav.distanceNm)
+  const { crossTrackNm, sense } = dev
   const pegged = Math.max(-FULL_SCALE_NM, Math.min(FULL_SCALE_NM, crossTrackNm))
   const barX = r2(cx - pegged * PX_PER_NM)
 
@@ -287,7 +318,7 @@ function deviation(heading: number, course: number, nav: NavState): string {
   )
 }
 
-function coursePointer(heading: number, course: number, nav: NavState | undefined): string {
+function coursePointer(course: number, dev: CourseDeviation | undefined): string {
   // Drawn pointing up, rotated into place; magenta per G1000 GPS guidance. The
   // deviation rides inside this group, so it turns with the selected course and
   // — through `.hsi-rose` above it — with the compass card as well.
@@ -307,7 +338,7 @@ function coursePointer(heading: number, course: number, nav: NavState | undefine
     `stroke-width="2.6"/>` +
     `<line x1="${cx - POINTER_HALF_W}" y1="${tail}" x2="${cx + POINTER_HALF_W}" y2="${tail}" ` +
     `stroke="${m}" stroke-width="2.6"/>` +
-    (nav === undefined ? '' : deviation(heading, course, nav)) +
+    (dev === undefined ? '' : deviation(dev)) +
     `</g>`
   )
 }
@@ -363,16 +394,117 @@ function headingReadout(heading: number): string {
   )
 }
 
+/**
+ * One of the two selected-value boxes flanking the heading readout.
+ *
+ * The label and the digits are drawn in the colour that value is drawn in
+ * everywhere else on the panel — cyan for the bug, magenta for the course — so
+ * the box says which mark on the card it belongs to without a leader line. That
+ * is why `pfd.bug` and `pfd.course` are classified `text` in palette.test.ts
+ * rather than `graphic`: they render letters here, not only lines.
+ */
+function valueBox(kind: 'hdg' | 'crs', x: number, deg: number, colour: string): string {
+  const { boxY, boxH } = LAYOUT
+  const baseline = boxY + boxH - 4.5
+  const label = kind === 'hdg' ? 'HDG' : 'CRS'
+  return (
+    `<rect class="hsi-${kind}-box" x="${x}" y="${boxY}" width="${SIDE_BOX_W}" height="${boxH}" ` +
+    `rx="2" fill="${PALETTE.pfd.face}" stroke="${PALETTE.pfd.chrome}"/>` +
+    `<text class="hsi-${kind}-label" x="${x + 5}" y="${baseline}" fill="${colour}" ` +
+    `font-size="9" font-family="${LABEL_FONT}">${label}</text>` +
+    `<text class="hsi-${kind}-value" x="${x + SIDE_BOX_W - 5}" y="${baseline}" text-anchor="end" ` +
+    `fill="${colour}" font-size="12" font-weight="700" ` +
+    `font-family="${DIGIT_FONT}">${courseText(deg)}</text>`
+  )
+}
+
+/**
+ * The selected-heading bug — a notch on the card's outer edge, so it reads
+ * against the heading tape the way the lubber does.
+ *
+ * It rides the card, not the airframe: the bug marks a *magnetic* heading, so
+ * on screen it sits at `headingBug − heading` and drifts round to the nose as
+ * the aircraft turns onto it. Drawn at the top and rotated, like every other
+ * card mark here.
+ */
+function headingBug(bug: number): string {
+  const { cx, cy, roseR } = LAYOUT
+  const inner = cy - roseR
+  const outer = inner - BUG_H
+  const points =
+    `${cx - BUG_W / 2},${outer} ${cx + BUG_W / 2},${outer} ` +
+    `${cx + BUG_W / 4},${inner} ${cx - BUG_W / 4},${inner}`
+  return (
+    `<polygon class="hsi-bug" transform="rotate(${r2(bug)} ${cx} ${cy})" points="${points}" ` +
+    `fill="${PALETTE.pfd.bug}"/>`
+  )
+}
+
+/**
+ * The nav status line along the panel's foot: source, mode, fix, distance, flag.
+ *
+ * `OBS` is not decoration. On a real G1000 with GPS as the nav source and an
+ * active leg, the CRS knob is inoperative and a direct-to auto-slews the
+ * desired track, so the CDI stays centred — the picture above, a manually
+ * selected course with a live deflection, occurs in OBS/SUSP mode and nowhere
+ * else. Annunciating it is what makes the depiction honest rather than merely
+ * plausible.
+ *
+ * The flag word comes from the same `sense` the glyph on the card is drawn
+ * from, so the two cannot disagree; `hsi.test.ts` asserts that from outside, in
+ * case they are ever computed separately.
+ */
+function navStatus(nav: NavState, sense: CourseDeviation['sense']): string {
+  const { width, cx } = LAYOUT
+  const left = PANEL_MARGIN
+  const right = width - PANEL_MARGIN
+  const common = `y="${STATUS_Y}" font-size="${STATUS_SIZE}"`
+  return (
+    `<g class="hsi-status">` +
+    // GPS is the magenta nav source, matching the pointer and the bar it drives.
+    `<text class="hsi-nav-source" x="${left}" ${common} fill="${PALETTE.pfd.course}" ` +
+    `font-family="${LABEL_FONT}">GPS</text>` +
+    `<text class="hsi-obs" x="${left + 30}" ${common} fill="${PALETTE.pfd.card}" ` +
+    `font-family="${LABEL_FONT}">OBS</text>` +
+    `<text class="hsi-nav-fix" x="${cx}" ${common} text-anchor="middle" ` +
+    `fill="${PALETTE.pfd.card}" font-family="${LABEL_FONT}">${nav.fix}</text>` +
+    `<text class="hsi-nav-distance" x="${right - 34}" ${common} text-anchor="end" ` +
+    `fill="${PALETTE.pfd.card}" ` +
+    `font-family="${DIGIT_FONT}">${distanceText(nav.distanceNm)}</text>` +
+    `<text class="hsi-nav-sense" x="${right}" ${common} text-anchor="end" ` +
+    `fill="${PALETTE.pfd.course}" ` +
+    `font-family="${LABEL_FONT}">${sense.toUpperCase()}</text>` +
+    `</g>`
+  )
+}
+
 export function renderHSI(el: Element, props: HSIProps): void {
   const heading = normalizeDeg(props.heading)
   const course = props.course === undefined ? undefined : normalizeDeg(props.course)
+  const bug = props.headingBug === undefined ? undefined : normalizeDeg(props.headingBug)
   const { width, height, cx, cy, roseR } = LAYOUT
-  if (props.nav !== undefined && course === undefined) {
-    throw new TypeError('nav deviation needs a selected course to deviate from')
+
+  // Computed once and shared by the card's glyph, the status line's word and
+  // the accessible description, so no two of them can describe different
+  // aircraft. `courseDeviation` rejects a non-positive distance; that throw is
+  // the caller's to fix and is deliberately not swallowed here.
+  const nav = props.nav
+  let dev: CourseDeviation | undefined
+  if (nav !== undefined) {
+    if (course === undefined) {
+      throw new TypeError('nav deviation needs a selected course to deviate from')
+    }
+    dev = courseDeviation(heading, course, nav.distanceNm)
   }
 
+  // role="img" below: a screen reader gets this whole string or none of the
+  // picture, so a field that reaches the panel and not this line is invisible.
   const aria =
-    `Heading ${courseText(heading)}` + (course === undefined ? '' : `, course ${courseText(course)}`)
+    `Heading ${courseText(heading)}` +
+    (course === undefined ? '' : `, course ${courseText(course)}`) +
+    (nav === undefined || dev === undefined
+      ? ''
+      : `, ${nav.fix} ${distanceText(nav.distanceNm)}, ${dev.sense.toUpperCase()}`)
 
   el.innerHTML =
     `<svg class="hsi" viewBox="0 0 ${width} ${height}" role="img" aria-label="${aria}">` +
@@ -388,12 +520,19 @@ export function renderHSI(el: Element, props: HSIProps): void {
     (props.sectorOverlay ? sectorOverlay(props.sectorOverlay) : '') +
     ticks() +
     labels() +
-    (course === undefined ? '' : coursePointer(heading, course, props.nav)) +
+    (bug === undefined ? '' : headingBug(bug)) +
+    (course === undefined ? '' : coursePointer(course, dev)) +
     `</g>` +
-    // airframe-fixed: thumb band, lubber mark, aircraft symbol, heading readout
+    // airframe-fixed: thumb band, lubber mark, aircraft symbol, the three value
+    // boxes along the top and the nav status line along the foot
     (props.thumbOverlay ? thumbBand(props.thumbOverlay) : '') +
     lubber() +
     aircraft() +
+    (bug === undefined ? '' : valueBox('hdg', PANEL_MARGIN, bug, PALETTE.pfd.bug)) +
     headingReadout(heading) +
+    (course === undefined
+      ? ''
+      : valueBox('crs', width - PANEL_MARGIN - SIDE_BOX_W, course, PALETTE.pfd.course)) +
+    (nav === undefined || dev === undefined ? '' : navStatus(nav, dev.sense)) +
     `</svg>`
 }
