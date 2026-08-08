@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { determineEntry } from '../engine/entry'
 import { courseText, distanceText } from '../format'
-import { PALETTE } from './palette'
+import { OVERLAY_ALPHA, PALETTE } from './palette'
 import {
   DEVIATION_DOTS,
   FULL_SCALE_NM,
@@ -742,9 +742,17 @@ describe('sector overlay (engine is the oracle)', () => {
     }
   })
 
+  // All three, not just the first: the wedges are emitted by one `map`, but a
+  // later change that draws one of them separately (the entry being flown, say)
+  // could park it in the airframe-fixed half, where it would stand still while
+  // the card turned under it — and a check on `direct` alone would stay green.
   it('sectors are magnetic: they rotate with the card', () => {
     const el = render({ heading: 90, sectorOverlay: result.sectors })
-    expect(el.querySelector('.hsi-sector-direct')!.closest('.hsi-rose')).not.toBeNull()
+    for (const entry of ['direct', 'teardrop', 'parallel'] as const) {
+      const wedge = el.querySelector(`.hsi-sector-${entry}`)
+      expect(wedge, entry).not.toBeNull()
+      expect(wedge!.closest('.hsi-rose'), entry).not.toBeNull()
+    }
   })
 
   it('nonstandard sectors mirror through the engine and render verbatim', () => {
@@ -757,6 +765,55 @@ describe('sector overlay (engine is the oracle)', () => {
 
   it('is absent when not requested', () => {
     expect(render({ heading: 90 }).querySelector('.hsi-sector-direct')).toBeNull()
+  })
+})
+
+// What the overlays are *painted with*, as opposed to where they are drawn.
+// Both facts are load-bearing and neither was asserted here: palette.test.ts
+// composites `PALETTE.pfd.entry.*` at `OVERLAY_ALPHA.*` and judges the result,
+// but it reads this file only as source text — its scans say no colour literal
+// exists and every alpha comes from `OVERLAY_ALPHA`, which a wedge painted in
+// `pfd.card` at `OVERLAY_ALPHA.thumbBand` satisfies exactly. Then the measured
+// picture and the drawn one are different pictures.
+describe('overlay paint (the colours palette.test.ts composites)', () => {
+  const sectors = determineEntry(90, { inboundCourse: 340, turnDirection: 'right' }).sectors
+  const ENTRIES = ['direct', 'teardrop', 'parallel'] as const
+
+  it('paints each wedge in its own entry colour, from the PFD group', () => {
+    const el = render({ heading: 90, sectorOverlay: sectors })
+    for (const entry of ENTRIES) {
+      const wedge = el.querySelector(`.hsi-sector-${entry}`)!
+      // the PFD copy, not the plan view's: the two are held to one hue but the
+      // plate values are tuned for white paper and go dark-on-dark here
+      expect(wedge.getAttribute('fill'), entry).toBe(PALETTE.pfd.entry[entry])
+      expect(wedge.getAttribute('stroke'), entry).toBe(PALETTE.pfd.entry[entry])
+    }
+  })
+
+  // The boundary carries the sector; the fill only tints it. That split is not
+  // a style choice — the two cannot both be strong: a fill dark enough to reach
+  // SC 1.4.11's 3:1 against the face on its own drops the dim ticks crossing it
+  // to 2.2:1 (computed in palette.test.ts). The source scan there bans
+  // `stroke-opacity=` in this file, but it cannot see a wedge that stopped
+  // being stroked at all, which loses the sector the same way from the far side.
+  it('tints the wedge and leaves its boundary at full strength', () => {
+    const el = render({ heading: 90, sectorOverlay: sectors })
+    for (const entry of ENTRIES) {
+      const wedge = el.querySelector(`.hsi-sector-${entry}`)!
+      expect(Number(wedge.getAttribute('fill-opacity')), entry).toBe(OVERLAY_ALPHA.sectorFill)
+      expect(wedge.getAttribute('stroke-opacity'), entry).toBeNull()
+      expect(num(wedge, 'stroke-width'), entry).toBeGreaterThan(0)
+    }
+  })
+
+  // The band is the teardrop colour because that is the entry the shortcut
+  // resolves, and it is drawn at its own alpha — a solid marker, not a tint,
+  // and measured as one.
+  it('paints the thumb band in the teardrop colour at the band alpha', () => {
+    const band = render({ heading: 123, thumbOverlay: 'right' }).querySelector('.hsi-thumb')!
+    expect(band.getAttribute('fill')).toBe(PALETTE.pfd.entry.teardrop)
+    expect(Number(band.getAttribute('fill-opacity'))).toBe(OVERLAY_ALPHA.thumbBand)
+    expect(band.getAttribute('stroke-opacity')).toBeNull()
   })
 })
 

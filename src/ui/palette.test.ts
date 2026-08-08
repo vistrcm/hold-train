@@ -65,6 +65,43 @@ const TIERS: Readonly<Record<string, 'text' | 'graphic' | 'backdrop'>> = {
 
 const MINIMUM = { text: 4.5, graphic: 3 } as const
 
+/** What each PFD colour draws *inside the compass card*, where a sector wedge
+ * tints the face under it — and at which tier it draws it.
+ *
+ * A different question from `TIERS`, which asks what a colour draws anywhere on
+ * the panel. `pfd.course` renders the CRS box digits (text, 4.5:1), but that
+ * box sits on the bare face with its own fill; inside the card the same colour
+ * draws only the pointer, the bar and the flag, so over a wedge it answers at
+ * the graphic tier. Reusing `TIERS` here would demand 4.5:1 of a line and force
+ * the tint down for a case that never renders.
+ *
+ * `null` means no wedge is ever under it: `pfd.chrome` draws the card ring and
+ * the value-box frames, all outside `LAYOUT.tickR` where the wedges stop (it
+ * would fail at 1.96:1 if it did), and the entry colours *are* the wedges.
+ *
+ * Hand-written, so it gets the same exhaustiveness guard `TIERS` and
+ * `BACKDROPS` get. Raising `sectorFill` lowers the contrast of everything drawn
+ * over a wedge, not only of the marks that were listed when the list was
+ * typed. */
+const OVER_WEDGE: Readonly<Record<string, 'text' | 'graphic' | null>> = {
+  'pfd.face': null,
+  // the 30° labels; the major ticks, lubber and aircraft symbol are the same
+  // colour and only need the graphic tier, so text is what binds
+  'pfd.card': 'text',
+  // minor ticks and the deviation dots
+  'pfd.cardDim': 'graphic',
+  // the bug notch rides the card; its digits are in the HDG box, on bare face
+  'pfd.bug': 'graphic',
+  // course pointer, deviation bar and TO/FROM flag — the CRS digits, likewise,
+  // are on bare face
+  'pfd.course': 'graphic',
+  // card ring and value-box frames: drawn outside the wedges' radius
+  'pfd.chrome': null,
+  'pfd.entry.direct': null,
+  'pfd.entry.teardrop': null,
+  'pfd.entry.parallel': null,
+}
+
 /** Every `name → colour` leaf of the palette, nested keys dotted.
  *
  * Recursive, not two levels: the pre-split walk stopped at depth 2, and under
@@ -281,22 +318,62 @@ describe('instrument overlays, as composited', () => {
     )
   })
 
-  // Ticks and card labels are drawn over the wedges, so their contrast is
-  // against the tinted face, not the bare one. At the old 0.16 the minor ticks
-  // fell to 2.85:1 here while the suite reported 3.61:1.
-  it('keeps ticks and labels legible over a tinted sector', () => {
+  it('classifies every PFD colour for what it draws over a wedge', () => {
+    const unclassified = leaves()
+      .map(([name]) => name)
+      .filter((name) => groupOf(name) === 'pfd' && !(name in OVER_WEDGE))
+    expect(unclassified, 'add these to OVER_WEDGE as text/graphic/null').toEqual([])
+  })
+
+  // Card marks are drawn over the wedges, so their contrast is against the
+  // tinted face, not the bare one. At the old 0.16 on the white face the minor
+  // ticks fell to 2.85:1 here while the suite reported 3.61:1.
+  //
+  // Every card mark, not the two someone listed: raising `sectorFill` lowers
+  // the contrast of *everything* with a wedge under it, and the tuning this
+  // task performs is exactly such a raise. `cardDim` is the tightest of them at
+  // 3.79:1 and is what fixes the ceiling.
+  it('keeps every card mark legible over a tinted sector', () => {
+    const colours = new Map(leaves())
     const failures: string[] = []
     for (const [name, tint] of tints()) {
-      const tick = contrastRatio(PALETTE.pfd.cardDim, tint)
-      if (tick < MINIMUM.graphic) {
-        failures.push(`cardDim on ${name} tint ${tint}: ${tick.toFixed(2)} < ${MINIMUM.graphic}`)
-      }
-      const label = contrastRatio(PALETTE.pfd.card, tint)
-      if (label < MINIMUM.text) {
-        failures.push(`card on ${name} tint ${tint}: ${label.toFixed(2)} < ${MINIMUM.text}`)
+      for (const [mark, tier] of Object.entries(OVER_WEDGE)) {
+        if (tier === null) continue
+        const colour = colours.get(mark)
+        // A classified name that is not a colour is a typo in OVER_WEDGE, and
+        // skipping it silently would drop that mark from the measurement.
+        expect(colour, `OVER_WEDGE names ${mark}, which is not in the palette`).toBeDefined()
+        const ratio = contrastRatio(colour!, tint)
+        if (ratio < MINIMUM[tier]) {
+          failures.push(`${mark} on ${name} tint ${tint}: ${ratio.toFixed(2)} < ${MINIMUM[tier]}`)
+        }
       }
     }
     expect(failures).toEqual([])
+  })
+
+  // The floor, and the other half of the same tuning. 0.1 was the alpha for a
+  // white face, where the tint darkened paper; over near-black it renders at
+  // 1.15:1 against the bare panel — a wedge that is not there, teaching nothing
+  // while every ceiling above passes comfortably.
+  //
+  // Deliberately **not** an SC threshold, and it must not become one: the
+  // opaque boundary is what carries the sector under SC 1.4.11, because a fill
+  // that reached 3:1 against the face on its own needs alpha ≈ 0.44 and puts
+  // the dim ticks crossing it at 2.2:1. The two constraints are in direct
+  // tension and only the boundary can satisfy the standard. This is a floor the
+  // old white-face value fails, which is what stops it being reverted.
+  const TINT_FLOOR = 1.3
+
+  it('tints the wedge enough to be seen at all', () => {
+    const invisible: string[] = []
+    for (const [name, tint] of tints()) {
+      const ratio = contrastRatio(tint, face)
+      if (ratio < TINT_FLOOR) {
+        invisible.push(`${name} tint ${tint} on the face: ${ratio.toFixed(2)} < ${TINT_FLOOR}`)
+      }
+    }
+    expect(invisible).toEqual([])
   })
 
   // The thumb band is a solid marker rather than a tint, so it answers for

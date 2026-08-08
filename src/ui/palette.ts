@@ -34,9 +34,13 @@
  * certifies at full strength. That is exactly what happened — a sector fill at
  * 0.16 and a boundary at stroke-opacity 0.45 render at 1.27:1 and 2.03:1 on the
  * white face, and dropped the minor ticks crossing a wedge to 2.85:1, while the
- * suite reported the opaque 6.14:1. The wedge boundary is now stroked opaque,
- * so only the fill is a tint, and it stays faint enough for the ticks and card
- * labels that cross it.
+ * suite reported the opaque 6.14:1. The wedge boundary is stroked opaque, so
+ * only the fill is a tint.
+ *
+ * An alpha is tuned to a *face*, not to a palette: inverting the face inverts
+ * which direction the tint moves the backdrop, so both values are re-judged
+ * here whenever it changes. Both are measured against `pfd.face` and against
+ * every mark drawn over them, ceiling and floor.
  *
  * FLAT on purpose, unlike `PALETTE`. Every alpha here is a PFD alpha —
  * `mapview.ts` paints no translucent mark at all — so a `plate` group would be
@@ -45,9 +49,24 @@
  * declares` guard that exists to stop an unmeasured alpha shipping.
  */
 export const OVERLAY_ALPHA = Object.freeze({
-  /** Entry-sector wedge fill (the boundary stroke is opaque). */
-  sectorFill: 0.1,
-  /** The 20° thumb-band aid — a solid marker, not a tint. */
+  /**
+   * Entry-sector wedge fill (the boundary stroke is opaque).
+   *
+   * Bounded on both sides, and the two bounds are what fixes the value rather
+   * than taste. Ceiling: the tint *lightens* the near-black face, so every card
+   * mark crossing a wedge loses contrast — the dim minor ticks are the tightest
+   * at 3.79:1 here and reach SC 1.4.11's 3:1 at about 0.32. Floor: this was 0.1
+   * when the face was white, and 0.1 over near-black renders at 1.15:1 against
+   * the bare panel, a wedge that is not there.
+   */
+  sectorFill: 0.25,
+  /**
+   * The 20° thumb-band aid — a solid marker, not a tint, so it answers for
+   * itself at the graphic tier once composited: 8.83:1 on the dark face, up
+   * from the white face's ratio at the same 0.9. It needed no re-tuning, which
+   * is the point of measuring rather than assuming: only the fill's direction
+   * of travel reversed with the face.
+   */
   thumbBand: 0.9,
 })
 
