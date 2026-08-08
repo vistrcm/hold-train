@@ -26,7 +26,13 @@ import {
   type TurnDirection,
 } from '../engine/entry'
 import { angleDiff } from '../engine/geometry'
-import { renderHSI, type HSIProps } from '../ui/hsi'
+import {
+  DEVIATION_DOTS,
+  FULL_SCALE_NM,
+  FULL_SCALE_SOURCE,
+  renderHSI,
+  type HSIProps,
+} from '../ui/hsi'
 import { renderMap } from '../ui/mapview'
 import { courseText, distanceText } from '../format'
 
@@ -58,7 +64,14 @@ export const CLEARANCE_LEAD_ATC =
   'If the traffic situation requires holding an aircraft that is less than ' +
   '5 minutes from the holding fix, issue these items immediately.'
 
-/** How far ahead of the clearance limit holding instructions arrive, minutes. */
+/**
+ * The order's lead time, minutes.
+ *
+ * A FLOOR in the order ("at least 5 minutes"), used here as the far end of the
+ * drill's window: the drill draws the last 5 minutes before the fix, which is
+ * the tightest case the order contemplates, not the only one. A clearance
+ * issued 20 minutes out is equally legal and simply off this picture.
+ */
 export const CLEARANCE_LEAD_MINUTES = 5
 
 export const CLEARANCE_LEAD_SOURCE = 'FAA JO 7110.65BB 4-6-1 c.4'
@@ -94,7 +107,8 @@ export const NOMINAL_GROUNDSPEED_KT = 120
 /** Nearest the fix a scenario is drawn: the speed-reduction point, in miles. */
 export const MIN_DISTANCE_NM = (SPEED_REDUCTION_MINUTES / 60) * NOMINAL_GROUNDSPEED_KT
 
-/** Farthest: the moment the clearance is issued, in miles. */
+/** Farthest: the order's minimum lead, in miles — see `CLEARANCE_LEAD_MINUTES`
+ *  for why the floor of the rule is the ceiling of the picture. */
 export const MAX_DISTANCE_NM = (CLEARANCE_LEAD_MINUTES / 60) * NOMINAL_GROUNDSPEED_KT
 
 /**
@@ -113,6 +127,43 @@ export const LEAD_DISTANCE_NOTE =
   `assumed ${NOMINAL_GROUNDSPEED_KT} kt groundspeed. The groundspeed is a training assumption ` +
   `that sets the scale of the picture, not an FAA figure. The distance is display state either ` +
   `way: the entry sector comes from heading against the holding course alone.`
+
+/**
+ * What a dot on the deviation bar is worth, verbatim (AIM 1-1-17 b.4, verified
+ * against faa.gov/air_traffic/publications/atpubs/aim_html/chap1_section_1.html).
+ *
+ * The needle is read quantitatively — two dots a side, so each is worth half of
+ * `FULL_SCALE_NM` — which makes the scale a user-visible aviation fact under the
+ * CLAUDE.md citation convention, and a citation counts only once it is on the
+ * screen. `FULL_SCALE_SOURCE` lives with the constant in `src/ui/hsi.ts`; this
+ * is where it renders, because the instrument draws no prose of its own.
+ */
+export const CDI_SCALE_AIM =
+  'The GPS receiver must be set to terminal (±1 NM) CDI sensitivity and the ' +
+  'navigation routes contained in the database in order to fly published IFR ' +
+  'charted departures and DPs.'
+
+export const CDI_SCALE_SOURCE = FULL_SCALE_SOURCE
+
+/**
+ * The caveat, and why it is a separate string.
+ *
+ * The AIM sentence above cites the ±1 NM *value* and nothing else — it is about
+ * departures and DPs, and no FAA source says a hold is flown on terminal
+ * scaling. Terminal is this drill's assumption. Folding that inside the quoted
+ * span would present an assumption as FAA text, which is the failure the
+ * `OUTBOUND_TIMING_AIM`/`OUTBOUND_TIMING_NOTE` split exists to prevent; this is
+ * the same split for the CDI scale. Built from the constants so the sentence
+ * cannot outlive a re-tuned scale.
+ */
+export const CDI_SCALE_NOTE =
+  `The needle is drawn on that terminal scale: full scale is ±${FULL_SCALE_NM} NM, so each of ` +
+  `the ${DEVIATION_DOTS} dots a side is worth ${FULL_SCALE_NM / DEVIATION_DOTS} NM of ` +
+  `cross-track. Terminal sensitivity is this drill's assumption and not an FAA statement about ` +
+  `holds — what makes it honest is that the ${MIN_DISTANCE_NM}–${MAX_DISTANCE_NM} NM window above ` +
+  `sits well inside the 30 NM at which terminal scaling arms. Expect the needle pegged at that ` +
+  `range: unless you are nearly on the inbound course or its reciprocal, it is, and that is the ` +
+  `picture of being cleared to hold while not established.`
 
 export interface EntryScenario {
   seed: number
@@ -381,6 +432,8 @@ export function renderEntryDrill(el: HTMLElement, options: EntryDrillOptions = {
       <p class="entry-stats"></p>
       <p class="entry-lead">“${CLEARANCE_LEAD_ATC}” <cite>${CLEARANCE_LEAD_SOURCE}</cite>
         “${SPEED_REDUCTION_AIM}” <cite>${SPEED_REDUCTION_SOURCE}</cite> ${LEAD_DISTANCE_NOTE}</p>
+      <p class="entry-cdi">“${CDI_SCALE_AIM}” <cite>${CDI_SCALE_SOURCE}</cite>
+        ${CDI_SCALE_NOTE}</p>
     </section>
   `
 

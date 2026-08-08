@@ -388,6 +388,30 @@ describe('deviation bar', () => {
     )
   })
 
+  // The two goldens above both sit at exactly FULL_SCALE_NM, and both pegging
+  // goldens are 90° off course where ANY distance ≥ full scale pegs. So every
+  // deflection above survives a distance clamped to full scale before
+  // `courseDeviation` — which at the drill's own 6–10 NM turns a correctly
+  // pegged needle into a near-centred one, the worst possible wrong picture.
+  // This is the only golden where the distance itself carries the answer.
+  it('scales the deflection by the distance, well beyond full scale', () => {
+    // Drawn: course 000 runs north through the fix. Heading 010 tracking direct
+    // puts the aircraft on the 190 bearing FROM the fix, 4.0 NM out — 4·sin10°
+    // = 0.69 NM west of it and 3.94 NM south. West of a northbound course is the
+    // aircraft's LEFT, so cross-track is −0.69 NM: inside full scale even though
+    // the aircraft is four times full scale from the fix.
+    // The bar shows where the course is, so it deflects RIGHT by
+    // 0.6946 NM × 30 px/NM = 20.84 px — between the inner and outer dots.
+    expect(barX({ heading: 10, course: 0, nav: { fix: FIX, distanceNm: 4 } })).toBeCloseTo(
+      LAYOUT.cx + 20.84,
+      6,
+    )
+    // and it is genuinely off the peg, so the clamp is not what produced it
+    expect(barX({ heading: 10, course: 0, nav: { fix: FIX, distanceNm: 4 } })).toBeLessThan(
+      LAYOUT.cx + FULL_SCALE_NM * PX_PER_NM,
+    )
+  })
+
   it('centres exactly on course', () => {
     // Heading = course: the aircraft is on the course line, dead ahead of it.
     expect(barX({ heading: 90, course: 90, nav: { fix: FIX, distanceNm: 8 } })).toBeCloseTo(
@@ -848,6 +872,38 @@ describe('overlay geometry (drawn arcs, not just their data attributes)', () => 
     expect(Number(by)).toBeCloseTo(end.y, 1)
     expect(sweep).toBe('1') // clockwise, matching the compass rose
     expect(largeArc).toBe('0') // the direct sector is exactly 180°
+    // The radius is read out of the path above and then used to place the two
+    // endpoints, so the endpoint checks are radius-free by construction and a
+    // wedge grown to `roseR` would satisfy them. It must not grow: palette.test
+    // .ts classifies `pfd.chrome` as `null` in OVER_WEDGE — never over a tint —
+    // on the strength of the card ring at `roseR` sitting outside where the
+    // wedges stop. At `roseR` the ring would be over one, at 1.96:1, with the
+    // whole contrast suite still green.
+    expect(Number(r)).toBeCloseTo(LAYOUT.tickR, 6)
+  })
+
+  // The other half of the same OVER_WEDGE premise: "over a wedge" is a claim
+  // about PAINT ORDER, and SVG has no z-index — it is document order alone. Move
+  // the overlay after `labels()` and the 30° labels are under the tint instead
+  // of over it, so the picture palette.test.ts measures stops being the picture
+  // that renders, with every ratio it prints unchanged.
+  it('paints the sector wedges under the card marks, not over them', () => {
+    const sectors = determineEntry(340, { inboundCourse: 340, turnDirection: 'right' }).sectors
+    // With a course, so the pointer group is in the order too — it reads across
+    // the wedges and is the mark a covered wedge would hide first.
+    const rose = render({ heading: 0, course: 340, sectorOverlay: sectors }).querySelector(
+      '.hsi-rose',
+    )!
+    const order = [...rose.children]
+    const first = (selector: string): number => {
+      const i = order.findIndex((node) => node.matches(selector))
+      expect(i, `${selector} is not a direct child of .hsi-rose`).toBeGreaterThanOrEqual(0)
+      return i
+    }
+    const wedge = first('.hsi-sector')
+    expect(wedge, 'wedges must precede the ticks').toBeLessThan(first('.hsi-tick'))
+    expect(wedge, 'wedges must precede the labels').toBeLessThan(first('.hsi-label'))
+    expect(wedge, 'wedges must precede the course pointer').toBeLessThan(first('.hsi-course'))
   })
 
   it('the thumb band starts on the 70° line, right of the nose, for a standard hold', () => {

@@ -1233,6 +1233,11 @@ deck — the one place the app cannot reach to correct anything.
   there and unaffected by proximity: the entry track is `PALETTE.entry.parallel` (`#2f6fd0`),
   2 px, `stroke-dasharray="5 3"`; the racetrack is `PALETTE.ink` (`#10161c`), 1.8 px, solid.
   Recorded so the next iteration re-measures the geometry rather than re-litigating it.
+  *(Amended 2026-08-07: the palette split renamed those two symbols to
+  `PALETTE.plate.entry.parallel` and `PALETTE.plate.ink`. The hexes, widths and dash pattern are
+  unchanged — `mapview.test.ts` passed through the split unedited — so only the paths above are
+  stale; they are corrected here rather than left ungreppable, since this bullet exists to send
+  the next session to the drawn colours instead of back into the argument.)*
 - **Not re-fixed:** the mapview rollout kink, reported a fifth time. Unchanged deliberate deferral.
 - **Declined: `PARALLEL_INTERCEPT_DEG = 45` as an out-of-scope change** away from the ≈31° measured
   in `docs/parallel-entry-evidence.md`. Already settled and recorded in CLAUDE.md as a deliberate
@@ -1502,3 +1507,41 @@ recorded here on the same terms as a wrong sentence.
 
 Full plan, with the per-task mutation tables that establish each guard actually binds:
 `docs/plans/completed/20260807-g1000-hsi.md`.
+
+## Correction — 2026-08-07 (the CDI-scale citation was never rendered)
+
+Amends the `FULL_SCALE_NM` bullet above, which recorded the scale as "a user-visible aviation fact:
+**AIM 1-1-17 b.4**" and stopped there.
+
+- **Fixed: the citation existed only in a docblock** (`src/ui/hsi.ts` → `src/modules/entry-drill.ts`).
+  `FULL_SCALE_SOURCE = 'AIM 1-1-17 b.4'` was exported with **no consumer anywhere** — not rendered,
+  not asserted, not referenced. The CLAUDE.md convention is not "a fact has a source constant", it
+  is that the source is **rendered in the UI**, and the same paragraph requires a known caveat to
+  surface on screen. So the one fact on this branch the ledger itself flags as *value cited, mode
+  not* was the one the student could not see: a needle read quantitatively, with no statement that a
+  dot is 0.5 NM, no citation, and no warning that terminal scaling for a hold is this drill's
+  assumption. The failing half was invisible because the ledger and the docblock described a screen
+  state that did not exist.
+- The drill screen now carries a third cited footnote, `.entry-cdi`, split the way
+  `OUTBOUND_TIMING_AIM`/`_NOTE` is: `CDI_SCALE_AIM` is the AIM 1-1-17 b.4 sentence verbatim — which
+  is about *departures and DPs*, and cites the ±1 NM value and nothing more — with `CDI_SCALE_NOTE`
+  **outside** the quoted span carrying the arithmetic (0.5 NM a dot), the terminal-mode assumption
+  labelled as one, and why the needle is pegged at 6–10 NM. Folding the assumption inside the quote
+  would be the exact failure the 2026-08-02 rejoin audit corrects.
+- Regression tests, both in `src/modules/entry-drill.test.ts`:
+  `cites the CDI scale beside the needle, with the mode caveat outside the quote` (fails if the
+  span is not rendered, if the `<cite>` is missing, or if the caveat migrates inside the quotation
+  marks) and `quotes a scale the instrument still draws on` (fails when `FULL_SCALE_NM` or
+  `DEVIATION_DOTS` is re-tuned and leaves the AIM sentence quoted beside a scale it no longer
+  governs — the drift guard the lead-time timings already had). README's source list gains
+  AIM 1-1-17.
+- **Also fixed, same pass:** the deviation goldens all sat at exactly `FULL_SCALE_NM` or 90° off
+  course, so *clamping the distance to full scale before* `courseDeviation` passed 727/727 while
+  turning a correctly pegged needle at 6–10 NM into a near-centred one. Closed by
+  `scales the deflection by the distance, well beyond full scale` in `src/ui/hsi.test.ts` — a
+  hand-drawn 4 NM case whose deflection is neither centred nor pegged. Two premises of the new
+  contrast model were unpinned the same way: the sector wedge's **radius** (`OVER_WEDGE` marks
+  `pfd.chrome` as never-over-a-tint only because the card ring at `roseR` sits outside the wedges'
+  `tickR`) and its **paint order** (SVG has no z-index, so "over a wedge" is document order alone) —
+  now asserted in `a sector wedge sweeps clockwise between its two boundary radii` and
+  `paints the sector wedges under the card marks, not over them`.

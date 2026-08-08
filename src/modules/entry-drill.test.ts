@@ -10,6 +10,8 @@ import {
 } from '../engine/entry'
 import { normalizeDeg } from '../engine/geometry'
 import {
+  CDI_SCALE_AIM,
+  CDI_SCALE_NOTE,
   CLEARANCE_LEAD_ATC,
   CLEARANCE_LEAD_MINUTES,
   CLEARANCE_LEAD_SOURCE,
@@ -32,7 +34,7 @@ import {
   SPEED_REDUCTION_SOURCE,
 } from './entry-drill'
 import { courseText, distanceText } from '../format'
-import { DEVIATION_DOTS } from '../ui/hsi'
+import { DEVIATION_DOTS, FULL_SCALE_NM, FULL_SCALE_SOURCE } from '../ui/hsi'
 
 /** First seed whose generated clearance is a charted "as published" hold. */
 const CHARTED_SEED = 4
@@ -618,13 +620,39 @@ describe('renderEntryDrill screen', () => {
     answerButton(el, generateScenario(42).result.primary).click()
     el.querySelector<HTMLButtonElement>('.entry-next')!.click()
 
-    expect(el.querySelector('.entry-clearance')!.textContent).toContain(
-      generateScenario(43).clearanceText,
-    )
+    const next = generateScenario(43)
+    expect(el.querySelector('.entry-clearance')!.textContent).toContain(next.clearanceText)
     expect(el.querySelector('.entry-feedback')!.textContent).toBe('')
     for (const entry of ENTRIES) {
       expect(answerButton(el, entry).disabled).toBe(false)
     }
+  })
+
+  // The clearance is not the whole prompt: the scenario line and the panel's
+  // nav data are the aircraft's POSITION, and they are rendered from separate
+  // reads of `drill.scenario`. Checking the clearance alone leaves a Next that
+  // advances the answer key while the position stays on the previous scenario —
+  // a needle and a distance describing an aircraft the question is not about.
+  // Asserted against a seed pair that actually differs in each field, so the
+  // assertion cannot pass by the two scenarios coinciding.
+  it('next moves the position too, not just the clearance', () => {
+    const before = generateScenario(42)
+    const after = generateScenario(43)
+    expect(after.distanceNm, 'seeds 42/43 must differ for this to bind').not.toBe(before.distanceNm)
+
+    const { el } = setup('learn')
+    expect(el.querySelector('.hsi-nav-distance')!.textContent).toBe(distanceText(before.distanceNm))
+
+    answerButton(el, before.result.primary).click()
+    el.querySelector<HTMLButtonElement>('.entry-next')!.click()
+
+    expect(el.querySelector('.entry-scenario')!.textContent).toContain(
+      distanceText(after.distanceNm),
+    )
+    expect(el.querySelector('.entry-scenario')!.textContent).toContain(after.holdSpec.fix)
+    expect(el.querySelector('.hsi-nav-distance')!.textContent).toBe(distanceText(after.distanceNm))
+    expect(el.querySelector('.hsi-nav-fix')!.textContent).toBe(after.holdSpec.fix)
+    expect(el.querySelector('.hsi-hdg-value')!.textContent).toBe(courseText(after.heading))
   })
 
   it('mode toggle switches to cockpit and drops the aids', () => {
@@ -743,6 +771,37 @@ describe('renderEntryDrill screen', () => {
     expect(LEAD_DISTANCE_NOTE.toLowerCase()).toContain('assumption')
     expect(CLEARANCE_LEAD_ATC).not.toMatch(/kt|groundspeed/i)
     expect(SPEED_REDUCTION_AIM).not.toMatch(/kt|groundspeed/i)
+  })
+
+  // The scale is the one aviation fact on this screen a student reads off the
+  // instrument rather than out of the prose: two dots a side means each is worth
+  // half of FULL_SCALE_NM. That makes it a user-visible fact under the citation
+  // convention, and a `source` constant nothing renders satisfies none of it —
+  // `FULL_SCALE_SOURCE` had no consumer at all before this.
+  it('cites the CDI scale beside the needle, with the mode caveat outside the quote', () => {
+    const { el } = setup('cockpit')
+    const cdi = el.querySelector('.entry-cdi')!
+    expect(cdi.textContent).toContain(`“${CDI_SCALE_AIM}”`)
+    expect(cdi.textContent).toContain(CDI_SCALE_NOTE)
+    expect([...cdi.querySelectorAll('cite')].map((c) => c.textContent)).toEqual([FULL_SCALE_SOURCE])
+
+    // The AIM sentence cites the VALUE. Terminal mode for a hold is this drill's
+    // assumption — the AIM is talking about departures and DPs — so it stays
+    // outside the quoted span, exactly as LEAD_DISTANCE_NOTE does for the
+    // groundspeed and OUTBOUND_TIMING_NOTE does for the per-entry split.
+    expect(CDI_SCALE_AIM).not.toContain(CDI_SCALE_NOTE)
+    expect(CDI_SCALE_AIM).not.toMatch(/hold|assum/i)
+    expect(CDI_SCALE_NOTE.toLowerCase()).toContain('assumption')
+  })
+
+  // The quotation carries a number, so it can fall out of step with the constant
+  // it is cited for — the same drift `quotes timings that still say what the
+  // generator’s constants claim` guards on the lead-time side.
+  it('quotes a scale the instrument still draws on', () => {
+    expect(CDI_SCALE_AIM).toContain(`±${FULL_SCALE_NM} NM`)
+    expect(CDI_SCALE_NOTE).toContain(`±${FULL_SCALE_NM} NM`)
+    expect(CDI_SCALE_NOTE).toContain(`${FULL_SCALE_NM / DEVIATION_DOTS} NM`)
+    expect(CDI_SCALE_NOTE).toContain(`${MIN_DISTANCE_NM}–${MAX_DISTANCE_NM} NM`)
   })
 
   it('keeps the learn/cockpit aid gating unchanged now the panel carries nav data', () => {

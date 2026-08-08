@@ -39,8 +39,10 @@ const TIERS: Readonly<Record<string, 'text' | 'graphic' | 'backdrop'>> = {
   'plate.face': 'backdrop',
   // the fix name, the north letter, the racetrack and ownship symbols
   'plate.ink': 'text',
-  // the flown track
-  'plate.readout': 'text',
+  // the flown track, and nothing else — a polyline. It drew the HSI's heading
+  // digits too until the palette split moved that instrument onto `pfd.card`,
+  // so `text` here was left over from a rendering that no longer happens.
+  'plate.readout': 'graphic',
   // ghost track, north arrow — lines, never letters
   'plate.inkDim': 'graphic',
   'plate.bezel': 'graphic',
@@ -135,7 +137,12 @@ function styleColour(name: string): string {
   // straight to `contrastRatio`, so the two must agree on what a hex is. The
   // local copy read `{3,8}` and would have captured a `#rrggbbaa` the oracle
   // then threw on, from a helper whose whole job is to find a readable colour.
-  const match = STYLES.match(new RegExp(`${name}:\\s*(${HEX_COLOUR_SOURCE})\\s*;`))
+  // `(?=[;}])` and not `;`: CSS lets the last declaration of a block drop its
+  // semicolon, and requiring one would read straight past a `--bg` that ended
+  // up last in `:root`. styles.test.ts's own harvests use the lookahead for the
+  // same reason — two readers of one stylesheet must agree on where a value
+  // ends.
+  const match = STYLES.match(new RegExp(`${name}:\\s*(${HEX_COLOUR_SOURCE})\\s*(?=[;}])`))
   if (!match?.[1]) throw new Error(`styles.css declares no ${name}`)
   return match[1]
 }
@@ -153,13 +160,22 @@ function styleColour(name: string): string {
  *    page at 1.13:1 and its frame overhangs onto that page. Both backdrops.
  *  - `pfd.*` renders on the dark panel and on nothing else: the panel fills the
  *    whole viewBox, so no PFD mark ever touches the page. `pfd.face` answers to
- *    `--bg` on its own, in `separates the PFD panel from the page` below. */
-const BACKDROPS: Readonly<Record<string, ReadonlyArray<readonly [string, string]>>> = {
-  plate: [
-    ['plate.face', PALETTE.plate.face],
-    ['--bg', styleColour('--bg')],
-  ],
-  pfd: [['pfd.face', PALETTE.pfd.face]],
+ *    `--bg` on its own, in `separates the PFD panel from the page` below.
+ *
+ * A function, not a describe-scope const, for the same reason `tints()` is one:
+ * `styleColour` throws when the stylesheet read comes back blank or renamed, and
+ * at module scope that throw lands during COLLECTION — the file then reports
+ * "no tests" and every guard in it goes silent, including the `src/**` colour
+ * sweep and the `index.html` scan, under an error message about `--bg` that
+ * names nothing to do with colours. */
+function backdrops(): Readonly<Record<string, ReadonlyArray<readonly [string, string]>>> {
+  return {
+    plate: [
+      ['plate.face', PALETTE.plate.face],
+      ['--bg', styleColour('--bg')],
+    ],
+    pfd: [['pfd.face', PALETTE.pfd.face]],
+  }
 }
 
 describe('instrument palette', () => {
@@ -210,26 +226,28 @@ describe('instrument palette', () => {
   })
 
   it('measures every group it declares against a backdrop', () => {
-    const unmapped = Object.keys(PALETTE).filter((group) => !(group in BACKDROPS))
-    expect(unmapped, 'add these groups to BACKDROPS').toEqual([])
+    const mapped = backdrops()
+    const unmapped = Object.keys(PALETTE).filter((group) => !(group in mapped))
+    expect(unmapped, 'add these groups to backdrops()').toEqual([])
   })
 
   // A mark that only clears its tier on one of its group's backdrops is
   // unreadable wherever it crosses to the other, which the plate's frame does.
   it('clears WCAG contrast on every backdrop its group renders on', () => {
+    const mapped = backdrops()
     const failures: string[] = []
     for (const [name, value] of leaves()) {
       const tier = TIERS[name]
       if (tier === undefined || tier === 'backdrop') continue
-      const backdrops = BACKDROPS[groupOf(name)]
+      const against = mapped[groupOf(name)]
       // Not a skip: an unmapped group would otherwise pass this test by being
       // measured against nothing at all.
-      if (backdrops === undefined) {
+      if (against === undefined) {
         failures.push(`${name}: group ${groupOf(name)} has no backdrop`)
         continue
       }
-      for (const [backdrop, against] of backdrops) {
-        const ratio = contrastRatio(value, against)
+      for (const [backdrop, colour] of against) {
+        const ratio = contrastRatio(value, colour)
         if (ratio < MINIMUM[tier]) {
           failures.push(`${name} (${value}) on ${backdrop}: ${ratio.toFixed(2)} < ${MINIMUM[tier]}`)
         }

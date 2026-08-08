@@ -66,6 +66,15 @@ export const OVERLAY_ALPHA = Object.freeze({
    * from the white face's ratio at the same 0.9. It needed no re-tuning, which
    * is the point of measuring rather than assuming: only the fill's direction
    * of travel reversed with the face.
+   *
+   * At 0.9 it OCCLUDES rather than tints, which is why it gets no `OVER_WEDGE`
+   * treatment in palette.test.ts: the band spans radii `roseR`→`roseR − 9` and
+   * is painted after the card, so in its 20° arc it covers the outer half of
+   * every tick (`tickR` inward) and the inner half of the card ring, washing
+   * them to ~1.15:1 against itself. Measuring those marks over it would be
+   * measuring marks the band is deliberately hiding. Lower this materially and
+   * that stops being true — the band becomes a tint, and every card mark under
+   * it then needs the ceiling/floor treatment `sectorFill` gets.
    */
   thumbBand: 0.9,
 })

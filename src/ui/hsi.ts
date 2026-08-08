@@ -100,7 +100,15 @@ export interface HSIProps {
  */
 export const FULL_SCALE_NM = 1
 
-/** Where `FULL_SCALE_NM` comes from; the mode assumption above is not cited. */
+/**
+ * Where `FULL_SCALE_NM` comes from; the mode assumption above is not cited.
+ *
+ * A citation only satisfies the CLAUDE.md convention once it is *rendered*, and
+ * this instrument draws no prose of its own — so the drill screen carries it,
+ * beside the needle it explains: `CDI_SCALE_AIM`/`CDI_SCALE_NOTE` in
+ * src/modules/entry-drill.ts, quotation and derivation split the way
+ * `OUTBOUND_TIMING_AIM`/`_NOTE` are.
+ */
 export const FULL_SCALE_SOURCE = 'AIM 1-1-17 b.4'
 
 /** Deviation dots per side: one at half scale, one at full scale. */
@@ -124,8 +132,8 @@ export const PX_PER_NM = (DEVIATION_DOTS * DOT_SPACING) / FULL_SCALE_NM
  * supposed to be checking.
  *
  * The vertical budget, top to bottom: the value boxes, then the lubber mark,
- * then the card (`cy ± roseR`), then room under it for the nav status line
- * Task 5 adds. `cy` therefore sits below the panel's mid-height.
+ * then the card (`cy ± roseR`), then room under it for the nav status line.
+ * `cy` therefore sits below the panel's mid-height.
  */
 export const LAYOUT = Object.freeze({
   /** viewBox extent. The panel rect fills exactly this. */
@@ -384,7 +392,7 @@ function lubber(): string {
 }
 
 /** Fuselage, wing and tailplane, symmetric about the rose centre so the
- *  deviation bar (Task 4) reads across it. */
+ *  deviation bar reads across it. */
 function aircraft(): string {
   const { cx, cy } = LAYOUT
   const d =
@@ -417,11 +425,19 @@ function headingReadout(heading: number): string {
  * the box says which mark on the card it belongs to without a leader line. That
  * is why `pfd.bug` and `pfd.course` are classified `text` in palette.test.ts
  * rather than `graphic`: they render letters here, not only lines.
+ *
+ * Side and colour are resolved from `kind`, not passed in: both are facts about
+ * which value the box shows, and a caller free to supply them is a caller free
+ * to paint the CRS box cyan — which would break the rule above silently, since
+ * the type system cannot see it.
  */
-function valueBox(kind: 'hdg' | 'crs', x: number, deg: number, colour: string): string {
-  const { boxY, boxH } = LAYOUT
+function valueBox(kind: 'hdg' | 'crs', deg: number): string {
+  const { width, boxY, boxH } = LAYOUT
   const baseline = boxY + boxH - 4.5
-  const label = kind === 'hdg' ? 'HDG' : 'CRS'
+  const isHdg = kind === 'hdg'
+  const label = isHdg ? 'HDG' : 'CRS'
+  const x = isHdg ? PANEL_MARGIN : width - PANEL_MARGIN - SIDE_BOX_W
+  const colour = isHdg ? PALETTE.pfd.bug : PALETTE.pfd.course
   return (
     `<rect class="hsi-${kind}-box" x="${x}" y="${boxY}" width="${SIDE_BOX_W}" height="${boxH}" ` +
     `rx="2" fill="${PALETTE.pfd.face}" stroke="${PALETTE.pfd.chrome}"/>` +
@@ -543,11 +559,9 @@ export function renderHSI(el: Element, props: HSIProps): void {
     (props.thumbOverlay ? thumbBand(props.thumbOverlay) : '') +
     lubber() +
     aircraft() +
-    (bug === undefined ? '' : valueBox('hdg', PANEL_MARGIN, bug, PALETTE.pfd.bug)) +
+    (bug === undefined ? '' : valueBox('hdg', bug)) +
     headingReadout(heading) +
-    (course === undefined
-      ? ''
-      : valueBox('crs', width - PANEL_MARGIN - SIDE_BOX_W, course, PALETTE.pfd.course)) +
+    (course === undefined ? '' : valueBox('crs', course)) +
     (nav === undefined || dev === undefined ? '' : navStatus(nav, dev.sense)) +
     `</svg>`
 }
