@@ -194,6 +194,16 @@ button {
   font-size: var(--fs-sm);
 }
 
+/* Footnote: why the fix is still ahead when the entry is decided, and where the
+   miles on the panel come from. Static, so it sits at the foot rather than
+   between the picture and the answer buttons a cockpit-mode student is timed on. */
+.entry-lead {
+  font-size: var(--fs-sm);
+  color: var(--text-dim);
+  border-top: 1px solid var(--border);
+  padding-top: 0.6rem;
+}
+
 /* Written test */
 .written-modes {
   display: flex;

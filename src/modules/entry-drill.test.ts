@@ -10,6 +10,7 @@ import {
 } from '../engine/entry'
 import { normalizeDeg } from '../engine/geometry'
 import {
+  CLEARANCE_LEAD_ATC,
   CLEARANCE_LEAD_MINUTES,
   CLEARANCE_LEAD_SOURCE,
   COCKPIT_TARGET_SECONDS,
@@ -18,6 +19,7 @@ import {
   flyItText,
   generateScenario,
   gradeEntryAnswer,
+  LEAD_DISTANCE_NOTE,
   MAX_DISTANCE_NM,
   MIN_DISTANCE_NM,
   NOMINAL_GROUNDSPEED_KT,
@@ -25,10 +27,12 @@ import {
   OUTBOUND_TIMING_NOTE,
   OUTBOUND_TIMING_SOURCE,
   renderEntryDrill,
+  SPEED_REDUCTION_AIM,
   SPEED_REDUCTION_MINUTES,
   SPEED_REDUCTION_SOURCE,
 } from './entry-drill'
 import { courseText, distanceText } from '../format'
+import { DEVIATION_DOTS } from '../ui/hsi'
 
 /** First seed whose generated clearance is a charted "as published" hold. */
 const CHARTED_SEED = 4
@@ -187,6 +191,16 @@ describe('scenario distance to the fix', () => {
   it('cites both timings at sub-paragraph granularity', () => {
     expect(CLEARANCE_LEAD_SOURCE).toBe('FAA JO 7110.65BB 4-6-1 c.4')
     expect(SPEED_REDUCTION_SOURCE).toBe('AIM 5-3-8 d')
+  })
+
+  // The quoted sentences are verbatim FAA text, so they are NOT templated from
+  // the constants — a quotation with an interpolation in it is not a quotation.
+  // The agreement is asserted instead: retune either constant and the sentence
+  // rendered beside the distance stops supporting the number it explains, which
+  // is the failure mode of a source quoted next to a value it no longer governs.
+  it('quotes timings that still say what the generator’s constants claim', () => {
+    expect(CLEARANCE_LEAD_ATC).toContain(`at least ${CLEARANCE_LEAD_MINUTES} minutes`)
+    expect(SPEED_REDUCTION_AIM).toContain(`${SPEED_REDUCTION_MINUTES} minutes or less`)
   })
 })
 
@@ -633,6 +647,123 @@ describe('renderEntryDrill screen', () => {
   it('hides the plate line when the clearance states course and turns', () => {
     const { el } = setup('cockpit', 0)
     expect(el.querySelector<HTMLElement>('.entry-chart')!.hidden).toBe(true)
+  })
+
+  // --- the aircraft's position reaches the panel ------------------------------
+  //
+  // Every scenario used to imply the aircraft was overhead the fix: the drill
+  // carried no position and the HSI got heading and course only. These pin the
+  // wiring that ends that, from the screen side — `hsi.ts` cannot see its own
+  // consumers, and its no-nav contract is silent by design, so a drill that
+  // stopped passing `nav` would draw the written test's picture with the whole
+  // HSI suite still green.
+
+  it('gives the panel the fix, the distance and a bug parked on the nose', () => {
+    const { el } = setup('cockpit')
+    const s = generateScenario(42)
+    expect(el.querySelector('.hsi-nav-fix')!.textContent).toBe(s.holdSpec.fix)
+    expect(el.querySelector('.hsi-nav-distance')!.textContent).toBe(distanceText(s.distanceNm))
+    // The bug is parked on the current heading, so the HDG box reads it back —
+    // see the note on HSIProps.headingBug: same number three times, on purpose.
+    expect(el.querySelector('.hsi-bug')).not.toBeNull()
+    expect(el.querySelector('.hsi-hdg-value')!.textContent).toBe(courseText(s.heading))
+  })
+
+  it('shows the deviation indication the written-test figure suppresses', () => {
+    // The bar, the dots and the flag are exactly what `hsi.ts` drops when there
+    // is no position, so their presence here is the assertion that the position
+    // arrived — not that the panel merely rendered.
+    const { el } = setup('cockpit')
+    expect(el.querySelector('.hsi-cdi-bar')).not.toBeNull()
+    expect(el.querySelectorAll('.hsi-cdi-dot')).toHaveLength(DEVIATION_DOTS * 2)
+    expect(el.querySelector('.hsi-tofrom')).not.toBeNull()
+    expect(el.querySelector('.hsi-status')).not.toBeNull()
+  })
+
+  it('renders the distance in prose through distanceText, not a second rounding', () => {
+    // A bare `${distanceNm} NM` agrees with distanceText on 8.4 and disagrees on
+    // a whole mile ("9 NM" vs "9.0 NM"), so a whole-mile seed is the only one
+    // that can catch the second rounding rule distanceText exists to prevent.
+    // Found rather than hard-coded: the generator's window may be re-tuned.
+    const seeds = [...Array(200).keys()]
+    const wholeSeed = seeds.find((s) => Number.isInteger(generateScenario(s).distanceNm))
+    expect(wholeSeed, 'no whole-mile distance in the first 200 seeds').toBeDefined()
+
+    for (const seed of [42, wholeSeed!]) {
+      const { el } = setup('learn', seed)
+      const s = generateScenario(seed)
+      const line = el.querySelector('.entry-scenario')!.textContent!
+      expect(line, `seed ${seed}`).toContain(distanceText(s.distanceNm))
+      expect(line, `seed ${seed}`).toContain(s.holdSpec.fix)
+      // The direct-to assumption is what makes the panel's TO/FROM flag true
+      // (see the docblock on courseDeviation); the student is told it, not left
+      // to infer it from a needle.
+      expect(line, `seed ${seed}`).toMatch(/tracking direct/i)
+    }
+  })
+
+  it('names the fix in the scenario line exactly as the clearance names it', () => {
+    // One ident on the radio call, in the prose and on the panel. Two spellings
+    // of one fix on one screen would read as two fixes.
+    for (const seed of [0, 1, 42, DUAL_KEYED_SEED, CHARTED_SEED]) {
+      const { el } = setup('learn', seed)
+      const { holdSpec } = generateScenario(seed)
+      expect(el.querySelector('.entry-clearance')!.textContent, `seed ${seed}`).toContain(
+        holdSpec.fix,
+      )
+      expect(el.querySelector('.entry-scenario')!.textContent, `seed ${seed}`).toContain(
+        holdSpec.fix,
+      )
+      expect(el.querySelector('.hsi-nav-fix')!.textContent, `seed ${seed}`).toBe(holdSpec.fix)
+    }
+  })
+
+  it('quotes both timings verbatim with their sources, derivation kept outside', () => {
+    const { el } = setup('cockpit')
+    const lead = el.querySelector('.entry-lead')!
+    // Each quoted span CLOSES on the FAA sentence — asserted with the quotation
+    // marks, not merely with `toContain`. The two constants not containing each
+    // other (below) is a weaker claim than it looks: the template could still
+    // set the closing mark after the derivation and present the assumption as
+    // quoted text, with every plain `toContain` still passing.
+    expect(lead.textContent).toContain(`“${CLEARANCE_LEAD_ATC}”`)
+    expect(lead.textContent).toContain(`“${SPEED_REDUCTION_AIM}”`)
+    expect(lead.textContent).toContain(LEAD_DISTANCE_NOTE)
+    expect([...lead.querySelectorAll('cite')].map((c) => c.textContent)).toEqual([
+      CLEARANCE_LEAD_SOURCE,
+      SPEED_REDUCTION_SOURCE,
+    ])
+    // The miles are a derivation from an assumed groundspeed, and the FAA says
+    // nothing about groundspeed here. Folding it into either cited span would
+    // present the assumption as the citation — the failure the outbound-timing
+    // split above exists to prevent, repeated for the distance.
+    expect(CLEARANCE_LEAD_ATC).not.toContain(LEAD_DISTANCE_NOTE)
+    expect(SPEED_REDUCTION_AIM).not.toContain(LEAD_DISTANCE_NOTE)
+    expect(LEAD_DISTANCE_NOTE).toContain(`${NOMINAL_GROUNDSPEED_KT} kt`)
+    expect(LEAD_DISTANCE_NOTE.toLowerCase()).toContain('assumption')
+    expect(CLEARANCE_LEAD_ATC).not.toMatch(/kt|groundspeed/i)
+    expect(SPEED_REDUCTION_AIM).not.toMatch(/kt|groundspeed/i)
+  })
+
+  it('keeps the learn/cockpit aid gating unchanged now the panel carries nav data', () => {
+    const learn = setup('learn')
+    expect(learn.el.querySelector('.hsi-thumb')).not.toBeNull()
+    expect(learn.el.querySelector('.hsi-sector-direct')).not.toBeNull()
+
+    const cockpit = setup('cockpit')
+    expect(cockpit.el.querySelector('.hsi-thumb')).toBeNull()
+    expect(cockpit.el.querySelector('.hsi-sector-direct')).toBeNull()
+
+    // Feedback reveals the sectors — and only the sectors. The thumb band is a
+    // learn-mode aid; answering does not earn it.
+    answerButton(cockpit.el, generateScenario(42).result.primary).click()
+    expect(cockpit.el.querySelector('.hsi-sector-direct')).not.toBeNull()
+    expect(cockpit.el.querySelector('.hsi-thumb')).toBeNull()
+
+    // The nav picture is not an aid: it is the situation, so it survives the
+    // re-render that drops and restores the overlays.
+    expect(cockpit.el.querySelector('.hsi-status')).not.toBeNull()
+    expect(learn.el.querySelector('.hsi-status')).not.toBeNull()
   })
 
   it('shows session and cockpit-benchmark stats', () => {

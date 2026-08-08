@@ -28,7 +28,7 @@ import {
 import { angleDiff } from '../engine/geometry'
 import { renderHSI, type HSIProps } from '../ui/hsi'
 import { renderMap } from '../ui/mapview'
-import { courseText } from '../format'
+import { courseText, distanceText } from '../format'
 
 export type DrillMode = 'learn' | 'cockpit'
 
@@ -38,31 +38,45 @@ export const COCKPIT_TARGET_SECONDS = 15
 const DRILL_IDS: Record<DrillMode, string> = { cockpit: 'entry', learn: 'entry-learn' }
 
 /**
- * How far ahead of the clearance limit holding instructions arrive, minutes.
+ * The ATC rule that puts the fix ahead of the aircraft, verbatim.
  *
  * This is why the drill depicts an aircraft short of the fix rather than over
- * it: the entry decision is made while the fix is still ahead. Verbatim, from
- * FAA JO 7110.65BB 4-6-1 c.4 (verified against
+ * it: the entry decision is made while the fix is still ahead. Rendered on the
+ * screen inside its cited span, per the CLAUDE.md citation convention — and NOT
+ * templated from `CLEARANCE_LEAD_MINUTES`, because a quotation with an
+ * interpolation in it is no longer a quotation. `entry-drill.test.ts` asserts
+ * the two agree instead.
+ *
+ * Verified against
  * faa.gov/air_traffic/publications/atpubs/atc_html/chap4_section_6.html and the
- * order's own PDF): "When delay is expected, issue items in subparagraphs a and
- * b at least 5 minutes before the aircraft is estimated to reach the clearance
- * limit."
+ * order's own PDF (the HTML renders its list markers from CSS, so the
+ * sub-paragraph letter is not in the markup).
  */
+export const CLEARANCE_LEAD_ATC =
+  'When delay is expected, issue items in subparagraphs a and b at least ' +
+  '5 minutes before the aircraft is estimated to reach the clearance limit. ' +
+  'If the traffic situation requires holding an aircraft that is less than ' +
+  '5 minutes from the holding fix, issue these items immediately.'
+
+/** How far ahead of the clearance limit holding instructions arrive, minutes. */
 export const CLEARANCE_LEAD_MINUTES = 5
 
 export const CLEARANCE_LEAD_SOURCE = 'FAA JO 7110.65BB 4-6-1 c.4'
 
 /**
- * The near end of the window, minutes — where the pilot's own timeline starts.
+ * The pilot's end of the same timeline, verbatim.
  *
- * Verbatim, from AIM 5-3-8 d: "When an aircraft is 3 minutes or less from a
- * clearance limit and a clearance beyond the fix has not been received, the
- * pilot is expected to start a speed reduction so that the aircraft will cross
- * the fix, initially, at or below the maximum holding airspeed." The same
- * 3 minutes is what 7110.65's NOTE under 4-6-1 c.4 says the 5-minute
+ * The 3 minutes here is what 7110.65's NOTE under 4-6-1 c.4 says the 5-minute
  * requirement is built on, so the two timings are one rule seen from both
  * seats — which is what makes them a window rather than two unrelated numbers.
  */
+export const SPEED_REDUCTION_AIM =
+  'When an aircraft is 3 minutes or less from a clearance limit and a clearance ' +
+  'beyond the fix has not been received, the pilot is expected to start a speed ' +
+  'reduction so that the aircraft will cross the fix, initially, at or below the ' +
+  'maximum holding airspeed.'
+
+/** The near end of the window, minutes — where the pilot's own timeline starts. */
 export const SPEED_REDUCTION_MINUTES = 3
 
 export const SPEED_REDUCTION_SOURCE = 'AIM 5-3-8 d'
@@ -82,6 +96,23 @@ export const MIN_DISTANCE_NM = (SPEED_REDUCTION_MINUTES / 60) * NOMINAL_GROUNDSP
 
 /** Farthest: the moment the clearance is issued, in miles. */
 export const MAX_DISTANCE_NM = (CLEARANCE_LEAD_MINUTES / 60) * NOMINAL_GROUNDSPEED_KT
+
+/**
+ * How the two quoted timings become the miles on the panel — a derivation, and
+ * labelled as one.
+ *
+ * It renders OUTSIDE both cited spans for the same reason `OUTBOUND_TIMING_NOTE`
+ * does: neither the order nor the AIM says anything about groundspeed, so
+ * folding this into either quotation would present a training assumption as FAA
+ * text. Built from the constants rather than retyping their values, so the
+ * sentence a student reads cannot outlive a re-tuned window.
+ */
+export const LEAD_DISTANCE_NOTE =
+  `Those two timings bracket the window this drill draws from — ` +
+  `${SPEED_REDUCTION_MINUTES} to ${CLEARANCE_LEAD_MINUTES} minutes from the fix, flown at an ` +
+  `assumed ${NOMINAL_GROUNDSPEED_KT} kt groundspeed. The groundspeed is a training assumption ` +
+  `that sets the scale of the picture, not an FAA figure. The distance is display state either ` +
+  `way: the entry sector comes from heading against the holding course alone.`
 
 export interface EntryScenario {
   seed: number
@@ -337,6 +368,7 @@ export function renderEntryDrill(el: HTMLElement, options: EntryDrillOptions = {
       </div>
       <p class="entry-clearance"></p>
       <p class="entry-chart" hidden></p>
+      <p class="entry-scenario"></p>
       <div class="entry-hsi"></div>
       <div class="entry-answers">
         ${ENTRIES.map(
@@ -347,11 +379,14 @@ export function renderEntryDrill(el: HTMLElement, options: EntryDrillOptions = {
       <div class="entry-map"></div>
       <button class="entry-next" hidden>Next</button>
       <p class="entry-stats"></p>
+      <p class="entry-lead">“${CLEARANCE_LEAD_ATC}” <cite>${CLEARANCE_LEAD_SOURCE}</cite>
+        “${SPEED_REDUCTION_AIM}” <cite>${SPEED_REDUCTION_SOURCE}</cite> ${LEAD_DISTANCE_NOTE}</p>
     </section>
   `
 
   const clearanceEl = el.querySelector<HTMLElement>('.entry-clearance')!
   const chartEl = el.querySelector<HTMLElement>('.entry-chart')!
+  const scenarioEl = el.querySelector<HTMLElement>('.entry-scenario')!
   const hsiEl = el.querySelector<HTMLElement>('.entry-hsi')!
   const mapEl = el.querySelector<HTMLElement>('.entry-map')!
   const feedbackEl = el.querySelector<HTMLElement>('.entry-feedback')!
@@ -360,8 +395,19 @@ export function renderEntryDrill(el: HTMLElement, options: EntryDrillOptions = {
   const answerBtns = [...el.querySelectorAll<HTMLButtonElement>('.entry-answer')]
 
   function drawHSI(showSectors: boolean): void {
-    const { heading, holdSpec, result } = drill.scenario
-    const props: HSIProps = { heading, course: holdSpec.inboundCourse }
+    const { heading, holdSpec, result, distanceNm } = drill.scenario
+    const props: HSIProps = {
+      heading,
+      course: holdSpec.inboundCourse,
+      // The bug is parked on the nose: nothing else is selected, which is where
+      // a pilot leaves it, so the HDG box, the bug and the heading readout all
+      // show one number here (see the note on HSIProps.headingBug).
+      headingBug: heading,
+      // The position is what makes the deviation bar and the TO/FROM flag say
+      // something true rather than decorative. `courseDeviation` reads it under
+      // a direct-to assumption, which the scenario line below states out loud.
+      nav: { fix: holdSpec.fix, distanceNm },
+    }
     if (mode === 'learn') {
       props.thumbOverlay = holdSpec.turnDirection
     }
@@ -387,6 +433,13 @@ export function renderEntryDrill(el: HTMLElement, options: EntryDrillOptions = {
     const note = drill.scenario.chartNote
     chartEl.textContent = note ?? ''
     chartEl.hidden = note === undefined
+    // Where the aircraft is. "Tracking direct" is not scene-setting: it is the
+    // assumption `courseDeviation` derives the TO/FROM flag from, so a student
+    // reading the needle is told it rather than left to infer it. Distance goes
+    // through `distanceText`, the same function the panel's status line uses.
+    const { holdSpec, distanceNm } = drill.scenario
+    scenarioEl.textContent =
+      `You are ${distanceText(distanceNm)} from ${holdSpec.fix}, tracking direct to the fix.`
     drawHSI(false)
     // The plan view answers the question, so it only appears with the feedback.
     mapEl.innerHTML = ''
