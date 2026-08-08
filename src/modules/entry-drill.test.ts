@@ -10,6 +10,8 @@ import {
 } from '../engine/entry'
 import { normalizeDeg } from '../engine/geometry'
 import {
+  CDI_ARMING_AIM,
+  CDI_ARMING_SOURCE,
   CDI_SCALE_AIM,
   CDI_SCALE_NOTE,
   CLEARANCE_LEAD_ATC,
@@ -156,12 +158,19 @@ describe('scenario distance to the fix', () => {
     expect(SPEED_REDUCTION_MINUTES).toBeLessThan(CLEARANCE_LEAD_MINUTES)
     expect(MIN_DISTANCE_NM).toBeLessThan(MAX_DISTANCE_NM)
     // Hand check, deliberately not a restatement of the formula: 3 and 5
-    // minutes at 120 kt is 6 and 10 NM — single-digit miles, i.e. the terminal
-    // area, and well inside the 30 NM at which a GPS arms terminal (±1 NM) CDI
-    // scaling (AIM 1-1-17 b.5(e)), which is the scale hsi.ts draws. The defect
-    // these bounds exist to catch is the unit slip the derivation invites: drop
-    // the ÷ 60 and the window becomes 360–600 NM, which still passes every
-    // range assertion above because those are stated against the same constants.
+    // minutes at 120 kt is 6 and 10 NM — single-digit miles, which is the scale
+    // of picture the panel draws. The defect these bounds exist to catch is the
+    // unit slip the derivation invites: drop the ÷ 60 and the window becomes
+    // 360–600 NM, which still passes every range assertion above because those
+    // are stated against the same constants.
+    //
+    // ⚠️ The upper bound is a unit-slip guard and nothing more. It used to be
+    // justified here as "well inside the 30 NM at which a GPS arms terminal CDI
+    // scaling (AIM 1-1-17 b.5(e))" — a comparison between distance to a holding
+    // fix and distance to an airport reference point, which is not a comparison
+    // at all. That inference is withdrawn (see `CDI_ARMING_AIM`); do not restore
+    // it by reading 30 as an airspace or avionics threshold. Any bound that
+    // catches 360–600 NM would do.
     expect(MIN_DISTANCE_NM).toBeGreaterThan(1)
     expect(MAX_DISTANCE_NM).toBeLessThan(30)
     expect(NOMINAL_GROUNDSPEED_KT).toBeGreaterThan(0)
@@ -816,16 +825,48 @@ describe('renderEntryDrill screen', () => {
     const { el } = setup('cockpit')
     const cdi = el.querySelector('.entry-cdi')!
     expect(cdi.textContent).toContain(`“${CDI_SCALE_AIM}”`)
+    expect(cdi.textContent).toContain(`“${CDI_ARMING_AIM}”`)
     expect(cdi.textContent).toContain(CDI_SCALE_NOTE)
-    expect([...cdi.querySelectorAll('cite')].map((c) => c.textContent)).toEqual([FULL_SCALE_SOURCE])
+    expect([...cdi.querySelectorAll('cite')].map((c) => c.textContent)).toEqual([
+      FULL_SCALE_SOURCE,
+      CDI_ARMING_SOURCE,
+    ])
 
-    // The AIM sentence cites the VALUE. Terminal mode for a hold is this drill's
-    // assumption — the AIM is talking about departures and DPs — so it stays
-    // outside the quoted span, exactly as LEAD_DISTANCE_NOTE does for the
-    // groundspeed and OUTBOUND_TIMING_NOTE does for the per-entry split.
+    // The AIM sentences cite the VALUE and the arming CONDITIONS. Terminal mode
+    // for a hold is this drill's assumption — the AIM is talking about departures
+    // and DPs — so it stays outside both quoted spans, exactly as
+    // LEAD_DISTANCE_NOTE does for the groundspeed and OUTBOUND_TIMING_NOTE does
+    // for the per-entry split.
     expect(CDI_SCALE_AIM).not.toContain(CDI_SCALE_NOTE)
+    expect(CDI_ARMING_AIM).not.toContain(CDI_SCALE_NOTE)
     expect(CDI_SCALE_AIM).not.toMatch(/hold|assum/i)
+    expect(CDI_ARMING_AIM).not.toMatch(/hold|assum/i)
     expect(CDI_SCALE_NOTE.toLowerCase()).toContain('assumption')
+  })
+
+  // The withdrawn inference (docs/content-audit.md, 2026-08-07). The screen used
+  // to justify terminal scaling by "the 6–10 NM window sits well inside the 30 NM
+  // at which terminal scaling arms" — comparing distance to a HOLDING FIX against
+  // b.5(e)'s distance to an AIRPORT/HELIPORT REFERENCE POINT, with the approach
+  // loaded and armed. Neither condition follows from the drill's distance, so the
+  // claim was false and uncited, and a student reads it off the screen.
+  //
+  // This guards the *shape* of the correction, not just the deleted words: the
+  // 30 NM may only appear tied to its reference point, and the drill's own window
+  // may not be offered as the reason the mode is honest.
+  it('does not offer the drill’s distance as a reason for terminal scaling', () => {
+    const prose = `${CDI_SCALE_NOTE} ${CDI_SCALE_AIM}`
+    expect(prose).not.toMatch(/sits well inside/i)
+    // Every mention of the threshold carries what it is measured from.
+    for (const m of prose.matchAll(/30 NM/gi)) {
+      const after = prose.slice(m.index!, m.index! + 120)
+      expect(after).toMatch(/airport(\/heliport)? reference point/i)
+    }
+    // The quotation is the only place the arming conditions are asserted, and it
+    // is verbatim: the note may restate them but must not be the sole carrier.
+    expect(CDI_ARMING_AIM).toMatch(/airport\/heliport reference point/)
+    expect(CDI_ARMING_AIM).toMatch(/loaded in the navigation system/)
+    expect(CDI_ARMING_AIM).toMatch(/Without arming/)
   })
 
   // The quotation carries a number, so it can fall out of step with the constant

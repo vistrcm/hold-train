@@ -92,11 +92,17 @@ export interface HSIProps {
  * point, and ramps to ±0.3 NM approaching the FAWP.
  *
  * ⚠️ The *value* is cited; the *mode* is this drill's assumption and is not.
- * No FAA source says a hold is flown on terminal scaling — what makes it the
- * honest choice here is that the drill's own scenario window (6–10 NM, from
- * `MIN_DISTANCE_NM`/`MAX_DISTANCE_NM` in src/modules/entry-drill.ts) sits well
- * inside the 30 NM at which terminal scaling arms. Widen that window past
- * 30 NM and this constant becomes 5, not 1.
+ * No FAA source says a hold is flown on terminal scaling, and b.5(e) does not
+ * supply one. This docblock used to claim it did — that the drill's 6–10 NM
+ * window "sits well inside the 30 NM at which terminal scaling arms", so widening
+ * it past 30 NM would make this constant 5. That inference compares two different
+ * distances and is withdrawn: b.5(e)'s 30 NM is measured from the airport/heliport
+ * reference point with an approach loaded and armed, while the window is a
+ * distance to a *holding fix*, which implies neither. A hold 8 NM from its fix can
+ * sit hundreds of miles from any airport on en route ±5 NM. So the window in
+ * src/modules/entry-drill.ts neither justifies this constant nor bounds it, and
+ * re-tuning it is not a reason to revisit this value. See docs/content-audit.md,
+ * 2026-08-07; the withdrawal is rendered to the student by `CDI_ARMING_AIM`.
  */
 export const FULL_SCALE_NM = 1
 
@@ -532,6 +538,10 @@ export function renderHSI(el: Element, props: HSIProps): void {
   // picture, so a field that reaches the panel and not this line is invisible.
   const aria =
     `Heading ${courseText(heading)}` +
+    // The HDG box is a field on the panel, so it belongs here even though the
+    // drill parks it on the nose: at `headingBug === heading` this repeats a
+    // number the sighted panel also shows twice, which is the faithful reading.
+    (bug === undefined ? '' : `, heading bug ${courseText(bug)}`) +
     (course === undefined ? '' : `, course ${courseText(course)}`) +
     (nav === undefined || dev === undefined
       ? ''

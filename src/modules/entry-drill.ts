@@ -146,12 +146,41 @@ export const CDI_SCALE_AIM =
 export const CDI_SCALE_SOURCE = FULL_SCALE_SOURCE
 
 /**
+ * What terminal scaling is actually conditioned on, verbatim (AIM 1-1-17 b.5(e),
+ * verified against
+ * faa.gov/air_traffic/publications/atpubs/aim_html/chap1_section_1.html).
+ *
+ * This quotation is here to **withdraw** a claim, not to add one. The screen used
+ * to argue that terminal was the honest mode because the drill's 6–10 NM window
+ * "sits well inside the 30 NM at which terminal scaling arms" — which compares two
+ * different distances. The AIM's 30 NM is measured from the *airport/heliport
+ * reference point*, and only with an approach loaded and armed; neither follows
+ * from being 6–10 NM from a *holding fix*. A hold 8 NM from its fix can sit
+ * hundreds of miles from any airport, with the receiver still on en route ±5 NM —
+ * where this needle would be far *less* pegged than the panel draws it. Quoting
+ * the conditions makes the withdrawal checkable rather than a second bare
+ * assertion, which is why the fix is a citation and not a deletion.
+ */
+export const CDI_ARMING_AIM =
+  'When an approach has been loaded in the navigation system, GPS receivers will give an ' +
+  // Inner quotes downgraded to singles: the AIM writes “arm”, and this string is
+  // rendered inside a “…” span, so nesting the same mark ends the quotation early
+  // on screen. The words are untouched.
+  '‘arm’ annunciation 30 NM straight line distance from the airport/heliport reference point. ' +
+  'Pilots should arm the approach mode at this time if not already armed (some receivers arm ' +
+  'automatically). Without arming, the receiver will not change from en route CDI and RAIM ' +
+  'sensitivity of ±5 NM either side of centerline to ±1 NM terminal sensitivity.'
+
+export const CDI_ARMING_SOURCE = 'AIM 1-1-17 b.5(e)'
+
+/**
  * The caveat, and why it is a separate string.
  *
- * The AIM sentence above cites the ±1 NM *value* and nothing else — it is about
- * departures and DPs, and no FAA source says a hold is flown on terminal
- * scaling. Terminal is this drill's assumption. Folding that inside the quoted
- * span would present an assumption as FAA text, which is the failure the
+ * The AIM sentences above cite the ±1 NM *value* and the conditions terminal
+ * scaling arms under, and nothing else. No FAA source says a hold is flown on
+ * terminal scaling, and b.5(e) does not supply one — see `CDI_ARMING_AIM`.
+ * Terminal is this drill's assumption. Folding that inside either quoted span
+ * would present an assumption as FAA text, which is the failure the
  * `OUTBOUND_TIMING_AIM`/`OUTBOUND_TIMING_NOTE` split exists to prevent; this is
  * the same split for the CDI scale. Built from the constants so the sentence
  * cannot outlive a re-tuned scale.
@@ -160,10 +189,12 @@ export const CDI_SCALE_NOTE =
   `The needle is drawn on that terminal scale: full scale is ±${FULL_SCALE_NM} NM, so each of ` +
   `the ${DEVIATION_DOTS} dots a side is worth ${FULL_SCALE_NM / DEVIATION_DOTS} NM of ` +
   `cross-track. Terminal sensitivity is this drill's assumption and not an FAA statement about ` +
-  `holds — what makes it honest is that the ${MIN_DISTANCE_NM}–${MAX_DISTANCE_NM} NM window above ` +
-  `sits well inside the 30 NM at which terminal scaling arms. Expect the needle pegged at that ` +
-  `range: unless you are nearly on the inbound course or its reciprocal, it is, and that is the ` +
-  `picture of being cleared to hold while not established.`
+  `holds: what the AIM conditions it on is an approach loaded and armed within 30 NM of the ` +
+  `airport reference point, and how far you are from a holding fix settles neither. Read the ` +
+  `picture the needle draws, not a distance inferred from the scale. Expect it pegged across ` +
+  `this drill's ${MIN_DISTANCE_NM}–${MAX_DISTANCE_NM} NM window: unless you are nearly on the ` +
+  `inbound course or its reciprocal, it is, and that is the picture of being cleared to hold ` +
+  `while not established.`
 
 export interface EntryScenario {
   seed: number
@@ -433,6 +464,7 @@ export function renderEntryDrill(el: HTMLElement, options: EntryDrillOptions = {
       <p class="entry-lead">“${CLEARANCE_LEAD_ATC}” <cite>${CLEARANCE_LEAD_SOURCE}</cite>
         “${SPEED_REDUCTION_AIM}” <cite>${SPEED_REDUCTION_SOURCE}</cite> ${LEAD_DISTANCE_NOTE}</p>
       <p class="entry-cdi">“${CDI_SCALE_AIM}” <cite>${CDI_SCALE_SOURCE}</cite>
+        “${CDI_ARMING_AIM}” <cite>${CDI_ARMING_SOURCE}</cite>
         ${CDI_SCALE_NOTE}</p>
     </section>
   `

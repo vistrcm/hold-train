@@ -1393,10 +1393,21 @@ recorded here on the same terms as a wrong sentence.
   terminal (±1 NM) CDI sensitivity and the navigation routes contained in the database in order to
   fly published IFR charted departures and DPs."* ⚠️ **The value is cited; the mode is not.** No FAA
   source says a hold is flown on terminal scaling, and `1-1-17 b.5(e)` gives ±5 NM en route and
-  ±0.3 NM approach in the same sentence. What makes terminal the honest choice is that the drill's
+  ±0.3 NM approach in the same sentence. ~~What makes terminal the honest choice is that the drill's
   6–10 NM window sits well inside the 30 NM at which terminal scaling arms — labelled as an
   assumption in the `FULL_SCALE_NM` docblock, and if the window is ever widened past 30 NM the
-  constant becomes 5, not 1.
+  constant becomes 5, not 1.~~
+  **⚠️ Amended 2026-08-07 — the struck sentence is wrong and was rendered to the student.** It
+  compares two different distances. AIM 1-1-17 b.5(e), verbatim: *"When an approach has been loaded
+  in the navigation system, GPS receivers will give an 'arm' annunciation 30 NM straight line
+  distance from the **airport/heliport reference point**. … Without arming, the receiver will not
+  change from en route CDI and RAIM sensitivity of ±5 NM either side of centerline to ±1 NM terminal
+  sensitivity."* The 30 NM is measured from the airport, and it is gated on an approach being
+  **loaded and armed** — neither of which follows from being 6–10 NM from a **holding fix**. A hold
+  8 NM from its fix can sit hundreds of miles from any airport with no approach loaded, on en route
+  ±5 NM, where the needle would be far *less* pegged than the panel draws. The window therefore
+  neither justifies `FULL_SCALE_NM` nor bounds it, and the "widen past 30 NM and it becomes 5"
+  corollary falls with it. See the 2026-08-07 correction entry below.
 - **The needle is derived by one oracle, and the assumption behind it is on the screen**
   (`src/engine/nav.ts`). `courseDeviation(heading, course, distanceNm)` is the single source of the
   cross-track and the TO/FROM sense; the card's glyph, the status line's word and the `aria-label`
@@ -1584,3 +1595,65 @@ Amends the `FULL_SCALE_NM` bullet above, which recorded the scale as "a user-vis
   when the consumer reads it wrongly. The written-test half selects a question whose heading and
   inbound course **differ**: `entry-direct-inbound` is heading 090 on a 090 course, where a swap is
   invisible and the assertion could not fail.
+
+## Correction — 2026-08-07 (terminal CDI scaling was justified by a distance that does not apply)
+
+This section **reverses part of the 2026-08-07 "the CDI-scale citation was never rendered" entry**,
+argued in place rather than silently edited past: that entry now carries a struck sentence and an
+amendment note pointing here.
+
+- **Fixed: the drill told the student its 6–10 NM window was what made terminal scaling honest**
+  (`src/modules/entry-drill.ts`, `src/ui/hsi.ts`). `CDI_SCALE_NOTE` rendered, on screen, "Terminal
+  sensitivity is this drill's assumption and not an FAA statement about holds — what makes it honest
+  is that the 6–10 NM window above sits well inside the 30 NM at which terminal scaling arms." The
+  `FULL_SCALE_NM` docblock carried the same inference plus a corollary ("widen that window past
+  30 NM and this constant becomes 5, not 1"), and `entry-drill.test.ts` repeated it in a comment
+  justifying the `MAX_DISTANCE_NM < 30` bound. **The inference is invalid: it compares two different
+  distances.** AIM 1-1-17 b.5(e), fetched and verified verbatim against
+  faa.gov/air_traffic/publications/atpubs/aim_html/chap1_section_1.html (outline position confirmed
+  by walking the published `<ol>` nesting, not by reading the rendered text): *"When an approach has
+  been loaded in the navigation system, GPS receivers will give an 'arm' annunciation 30 NM straight
+  line distance from the airport/heliport reference point. Pilots should arm the approach mode at
+  this time if not already armed (some receivers arm automatically). Without arming, the receiver
+  will not change from en route CDI and RAIM sensitivity of ±5 NM either side of centerline to ±1 NM
+  terminal sensitivity."* The 30 NM is measured **from the airport/heliport reference point** and is
+  gated on an approach being **loaded and armed**. The drill's 6–10 NM is a distance to a **holding
+  fix**, which establishes neither: a hold 8 NM from its fix can sit hundreds of miles from any
+  airport with no approach loaded, on en route ±5 NM — where this needle would be far *less* pegged
+  than the panel draws it. The claim was also **uncited**: the paragraph's only `<cite>` was
+  `AIM 1-1-17 b.4`, which contains no 30 NM statement, so a derivation was presented as fact inside
+  a cited span — the failure the `OUTBOUND_TIMING_AIM`/`_NOTE` split exists to prevent.
+- **The fix is a citation, not a deletion.** Deleting the sentence would have left a bare assertion
+  ("terminal is our assumption") with nothing a student could check, and nothing stopping the next
+  session from re-deriving the same inference from the same paragraph. The screen now renders the
+  b.5(e) conditions verbatim beside the b.4 value quote (`CDI_ARMING_AIM`/`CDI_ARMING_SOURCE`), and
+  `CDI_SCALE_NOTE` states what those conditions do *not* settle: "what the AIM conditions it on is
+  an approach loaded and armed within 30 NM of the airport reference point, and how far you are from
+  a holding fix settles neither." `FULL_SCALE_NM`'s docblock records the withdrawal and that
+  re-tuning the window is no longer a reason to revisit the constant; the test comment records that
+  `MAX_DISTANCE_NM < 30` is a unit-slip guard only (it catches the dropped ÷ 60 that turns the window
+  into 360–600 NM) and not an avionics threshold.
+- Regression test: `does not offer the drill's distance as a reason for terminal scaling`
+  (`src/modules/entry-drill.test.ts`). It guards the **shape** of the correction, not the deleted
+  words: every `30 NM` in the rendered prose must be followed within 120 characters by its
+  airport/heliport reference point, and `sits well inside` may not reappear. Mutation-confirmed in
+  both directions — restoring the original sentence reds it, and so does the subtler mutation that
+  keeps the withdrawal's wording but strips `30 NM` of its reference point. The paragraph's `<cite>`
+  list is now asserted as `[FULL_SCALE_SOURCE, CDI_ARMING_SOURCE]` in order, so a quote rendered
+  without its source, or a source without its quote, fails.
+- **Accepted, unchanged:** the needle is still drawn on ±1 NM and is still pegged at 6–10 NM for
+  most headings (recorded as accepted in the overhead-fix correction above). What changed is only
+  the *justification* offered for the mode — the picture the student sees is the same one.
+
+- **Fixed: the `aria-label` omitted the HDG box, contradicting the contract written above it**
+  (`src/ui/hsi.ts`). The panel is `role="img"`, so the label is all a screen reader gets, and the
+  comment on the line above says so: "a field that reaches the panel and not this line is invisible."
+  The heading bug reached the panel and not the line. No shipping consumer was affected — the drill
+  parks the bug on the nose and the written-test figure omits it — but the omission was invisible to
+  the suite for the same reason the drawn bug angle needs `headingBug ≠ heading`: the test passed
+  `headingBug: 41` beside `heading: 41`, so `toContain(courseText(41))` was satisfied by the heading
+  alone and the bug field was never asserted. `HSIProps.headingBug`'s own docblock already records
+  this trap for the drawn angle; the label had the same hole one field over. Regression tests:
+  `names heading, bug, course, fix, distance and sense when it has nav data` (now at
+  `headingBug: 120`, `heading: 41`, mutation-confirmed) and `omits the bug when no heading is
+  selected` for the suppression half.

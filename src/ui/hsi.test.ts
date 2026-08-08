@@ -709,7 +709,14 @@ describe('the accessible description', () => {
 
   // role="img" hides the SVG's internals, so a screen reader gets this string
   // or none of the picture: every field on the panel has to be in it.
-  it('names heading, course, fix, distance and sense when it has nav data', () => {
+  //
+  // ⚠️ The bug is pinned at `headingBug ≠ heading` for the same reason the drawn
+  // bug angle is: at the drill's own values the two numbers coincide, so an
+  // omitted HDG box is indistinguishable from a rendered one and the assertion
+  // is satisfied by the heading alone. This test carried `headingBug: 41` beside
+  // `heading: 41` and could not see that the bug reached the panel and not the
+  // label — the exact gap the comment above claims it closes.
+  it('names heading, bug, course, fix, distance and sense when it has nav data', () => {
     // heading 041 with course 300: tracking direct puts the aircraft southwest
     // of the fix, which bears 041 from it. Following 300 from there differs
     // from 041 by 101°, more than a right angle, so the course opens away —
@@ -717,14 +724,21 @@ describe('the accessible description', () => {
     const text = label({
       heading: 41,
       course: 300,
-      headingBug: 41,
+      headingBug: 120,
       nav: { fix: FIX, distanceNm: 12.4 },
     })
     expect(text).toContain(courseText(41))
+    expect(text).toContain(courseText(120))
     expect(text).toContain(courseText(300))
     expect(text).toContain(FIX)
     expect(text).toContain(distanceText(12.4))
     expect(text).toContain('FROM')
+  })
+
+  // The suppression half: a field absent from the panel must be absent here too,
+  // or the label describes an instrument the student is not looking at.
+  it('omits the bug when no heading is selected', () => {
+    expect(label({ heading: 41, course: 300 })).not.toMatch(/bug/i)
   })
 })
 
