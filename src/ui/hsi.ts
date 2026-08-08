@@ -8,10 +8,15 @@
 //   - sector wedges: AIM 5-3-8 j3 entry sectors, magnetic (rotate with card)
 // Pure rendering: state in, SVG out. No internal state, no listeners.
 //
+// The nav picture — deviation bar, dots, TO/FROM — comes from `courseDeviation`
+// in src/engine/nav.ts. This file adds only the display decisions the engine
+// deliberately leaves out: full-scale deflection, dot spacing, pixels, and the
+// clamp that pegs the bar on the outer dot instead of sliding it off the card.
+//
 // Two consumers: the entry drill (`src/modules/entry-drill.ts`) and the written
 // test's entry figure (`src/modules/written-test.ts`), which passes heading and
-// course only. Both share the `.hsi` rule in styles.css, so the panel's aspect
-// ratio is a shared concern.
+// course only — see the no-nav contract on `HSIProps.nav`. Both share the `.hsi`
+// rule in styles.css, so the panel's aspect ratio is a shared concern.
 //
 // Draws from the `pfd` group of the instrument palette (src/ui/palette.ts) —
 // the dark half, matching the panel this instrument replicates. The plan view
@@ -22,19 +27,61 @@
 
 import type { Entry, SectorArc, TurnDirection } from '../engine/entry'
 import { normalizeDeg } from '../engine/geometry'
+import { courseDeviation } from '../engine/nav'
 import { courseText } from '../format'
 import { OVERLAY_ALPHA, PALETTE } from './palette'
+
+/** Where the aircraft is, which is what the deviation indication needs. */
+export interface NavState {
+  /** Distance to the fix, NM. Positive — `courseDeviation` rejects the rest. */
+  distanceNm: number
+}
 
 export interface HSIProps {
   /** Aircraft magnetic heading; the card rotates so it sits under the lubber. */
   heading: number
   /** Selected course (e.g. inbound holding course); omit to hide the pointer. */
   course?: number
+  /**
+   * Aircraft position relative to the fix. Omit for the **no-nav contract**:
+   * the course pointer is still drawn, and the deviation bar, its dots and the
+   * TO/FROM flag are all suppressed — which is what a real HSI does when it has
+   * no valid nav data. It does not centre the bar, because a centred bar reads
+   * as "established on course". The written test's entry figure
+   * (`src/modules/written-test.ts`) has no position at all and relies on this.
+   *
+   * Requires `course`: a deviation with nothing to deviate from is a caller
+   * mistake and throws rather than rendering nothing.
+   */
+  nav?: NavState
   /** Show the thumb band for a right-turn (standard) or left-turn hold. */
   thumbOverlay?: TurnDirection
   /** Entry sectors from `determineEntry` — rendered verbatim, engine is the oracle. */
   sectorOverlay?: Record<Entry, SectorArc>
 }
+
+/**
+ * Full-scale course deviation, in NM. This is what a dot means, and a student
+ * will read the needle quantitatively, so it is a user-visible aviation fact
+ * under the CLAUDE.md citation convention.
+ *
+ * ⚠️ UNVERIFIED. 1.0 NM is the GPS terminal-mode CDI scale as commonly
+ * described, but no FAA source has been checked for it here. Task 7 of
+ * docs/plans/20260807-g1000-hsi.md verifies it and either cites the source at
+ * sub-paragraph granularity or labels it unverified where the UI shows it.
+ */
+export const FULL_SCALE_NM = 1
+
+/** Deviation dots per side: one at half scale, one at full scale. */
+export const DEVIATION_DOTS = 2
+
+// Lateral gap between adjacent dots, in viewBox units. The primitive the scale
+// is built from — PX_PER_NM below is derived from it, so the bar offset and the
+// dot positions cannot drift apart.
+const DOT_SPACING = 15
+
+/** viewBox units per NM of cross-track. One source for the bar and the dots. */
+export const PX_PER_NM = (DEVIATION_DOTS * DOT_SPACING) / FULL_SCALE_NM
 
 /**
  * Panel geometry, in viewBox units.
@@ -77,12 +124,31 @@ const LUBBER_W = 13
 const MAJOR_TICK = 10
 const MINOR_TICK = 6
 
-// Course pointer, as radii from the rose centre. Transitional geometry — the
-// deviation bar splits this line in Task 4.
+// Course pointer, as radii from the rose centre. The middle of the course line
+// is *not* drawn by the pointer: that gap is where the deviation bar slides, and
+// it stays empty when there is no nav data — a real HSI shows the arrow and the
+// tail with the bar missing, rather than a centred bar that would read as
+// "established on course".
+//
+//   74 ┬ arrowhead tip
+//   60 ┴ arrowhead base, top of the stem
+//   50 ┴ stem inner end
+//   45 ┬ TO/FROM apex
+//   36 ┴ TO/FROM base
+//   30 ┴ deviation bar half-length
+//    0   rose centre (mirrored below, tail crossbar at 62)
 const POINTER_TIP = LAYOUT.tickR - 6
 const POINTER_HEAD = LAYOUT.tickR - 20
-const POINTER_TAIL = LAYOUT.tickR - 12
+const POINTER_TAIL = LAYOUT.tickR - 18
+const POINTER_STEM = LAYOUT.tickR - 30
 const POINTER_HALF_W = 7
+
+// Deviation bar and TO/FROM flag, also as radii from the rose centre.
+const BAR_HALF_LEN = 30
+const FLAG_BASE = 36
+const FLAG_APEX = 45
+const FLAG_HALF_W = 6
+const DOT_R = 2.4
 
 // Avionics readouts are monospaced: a proportional stack shuffles the digits
 // sideways as the value changes, which reads as jitter on a live heading. A
@@ -177,20 +243,71 @@ function sectorOverlay(sectors: Record<Entry, SectorArc>): string {
     .join('')
 }
 
-function coursePointer(course: number): string {
-  // Drawn pointing up, rotated into place; magenta per G1000 GPS guidance.
+/**
+ * The sliding bar, its dots and the TO/FROM flag, drawn in the course pointer's
+ * local frame: local +x is the aircraft's right when it is on the course.
+ *
+ * The needle shows **where the course is**, not where the aircraft is, so it
+ * deflects *opposite* the displacement — an aircraft right of course sees the
+ * bar left of centre, and flies toward the needle to close. That is the one
+ * sign in this file that inverts silently and plausibly; `hsi.test.ts` pins it
+ * against hand-drawn goldens rather than against `courseDeviation`, which would
+ * flip along with it.
+ */
+function deviation(heading: number, course: number, nav: NavState): string {
+  const m = PALETTE.pfd.course
+  const { cx, cy } = LAYOUT
+  const { crossTrackNm, sense } = courseDeviation(heading, course, nav.distanceNm)
+  const pegged = Math.max(-FULL_SCALE_NM, Math.min(FULL_SCALE_NM, crossTrackNm))
+  const barX = r2(cx - pegged * PX_PER_NM)
+
+  const dots: string[] = []
+  for (let i = 1; i <= DEVIATION_DOTS; i += 1) {
+    const dx = r2((i / DEVIATION_DOTS) * FULL_SCALE_NM * PX_PER_NM)
+    for (const x of [cx - dx, cx + dx]) {
+      dots.push(
+        `<circle class="hsi-cdi-dot" cx="${x}" cy="${cy}" r="${DOT_R}" ` +
+          `fill="${PALETTE.pfd.cardDim}"/>`,
+      )
+    }
+  }
+
+  // TO points at the arrowhead, FROM at the tail: the flag says which way the
+  // selected course would take you relative to the fix, not which way to turn.
+  const side = sense === 'to' ? -1 : 1
+  const base = cy + side * FLAG_BASE
+  const apex = cy + side * FLAG_APEX
+
+  return (
+    dots.join('') +
+    `<line class="hsi-cdi-bar" x1="${barX}" y1="${cy - BAR_HALF_LEN}" x2="${barX}" ` +
+    `y2="${cy + BAR_HALF_LEN}" stroke="${m}" stroke-width="3"/>` +
+    `<polygon class="hsi-tofrom" data-sense="${sense}" points="${cx},${apex} ` +
+    `${cx - FLAG_HALF_W},${base} ${cx + FLAG_HALF_W},${base}" fill="${m}"/>`
+  )
+}
+
+function coursePointer(heading: number, course: number, nav: NavState | undefined): string {
+  // Drawn pointing up, rotated into place; magenta per G1000 GPS guidance. The
+  // deviation rides inside this group, so it turns with the selected course and
+  // — through `.hsi-rose` above it — with the compass card as well.
   const m = PALETTE.pfd.course
   const { cx, cy } = LAYOUT
   const tip = cy - POINTER_TIP
   const head = cy - POINTER_HEAD
+  const stemTop = cy - POINTER_STEM
+  const stemBottom = cy + POINTER_STEM
   const tail = cy + POINTER_TAIL
   return (
     `<g class="hsi-course" transform="rotate(${course} ${cx} ${cy})">` +
-    `<polygon points="${cx},${tip} ${cx - POINTER_HALF_W},${head} ` +
+    `<polygon class="hsi-course-head" points="${cx},${tip} ${cx - POINTER_HALF_W},${head} ` +
     `${cx + POINTER_HALF_W},${head}" fill="${m}"/>` +
-    `<line x1="${cx}" y1="${head}" x2="${cx}" y2="${tail}" stroke="${m}" stroke-width="2.6"/>` +
+    `<line x1="${cx}" y1="${head}" x2="${cx}" y2="${stemTop}" stroke="${m}" stroke-width="2.6"/>` +
+    `<line x1="${cx}" y1="${stemBottom}" x2="${cx}" y2="${tail}" stroke="${m}" ` +
+    `stroke-width="2.6"/>` +
     `<line x1="${cx - POINTER_HALF_W}" y1="${tail}" x2="${cx + POINTER_HALF_W}" y2="${tail}" ` +
     `stroke="${m}" stroke-width="2.6"/>` +
+    (nav === undefined ? '' : deviation(heading, course, nav)) +
     `</g>`
   )
 }
@@ -250,6 +367,9 @@ export function renderHSI(el: Element, props: HSIProps): void {
   const heading = normalizeDeg(props.heading)
   const course = props.course === undefined ? undefined : normalizeDeg(props.course)
   const { width, height, cx, cy, roseR } = LAYOUT
+  if (props.nav !== undefined && course === undefined) {
+    throw new TypeError('nav deviation needs a selected course to deviate from')
+  }
 
   const aria =
     `Heading ${courseText(heading)}` + (course === undefined ? '' : `, course ${courseText(course)}`)
@@ -268,7 +388,7 @@ export function renderHSI(el: Element, props: HSIProps): void {
     (props.sectorOverlay ? sectorOverlay(props.sectorOverlay) : '') +
     ticks() +
     labels() +
-    (course === undefined ? '' : coursePointer(course)) +
+    (course === undefined ? '' : coursePointer(heading, course, props.nav)) +
     `</g>` +
     // airframe-fixed: thumb band, lubber mark, aircraft symbol, heading readout
     (props.thumbOverlay ? thumbBand(props.thumbOverlay) : '') +

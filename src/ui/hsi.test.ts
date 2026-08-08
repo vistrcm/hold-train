@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import { determineEntry } from '../engine/entry'
 import { courseText } from '../format'
-import { LAYOUT, renderHSI, type HSIProps } from './hsi'
+import {
+  DEVIATION_DOTS,
+  FULL_SCALE_NM,
+  LAYOUT,
+  PX_PER_NM,
+  renderHSI,
+  type HSIProps,
+} from './hsi'
 
 function render(props: HSIProps): HTMLElement {
   const el = document.createElement('div')
@@ -43,6 +50,28 @@ function coordsOf(el: Element): Array<{ x: number; y: number }> {
 /** Distance from the rose centre — the card convention is polar about it. */
 function radiusFromCentre(x: number, y: number): number {
   return Math.hypot(x - LAYOUT.cx, y - LAYOUT.cy)
+}
+
+/**
+ * Total rotation `el` receives on screen: its own `transform` plus every
+ * ancestor's.
+ *
+ * The course assembly's own transform reads `rotate(course)` no matter where it
+ * is parented, so reading that attribute alone would stay green with the whole
+ * assembly lifted out of the rotating card — the needle would then stand still
+ * while the compass turned under it. Composing the chain is what names that
+ * failure, and it needs `heading ≠ 0` **and** `course ≠ 0` to do so: at either
+ * zero the composed angle collapses onto the local one.
+ */
+function composedRotation(el: Element): number {
+  let total = 0
+  for (let node: Element | null = el; node !== null; node = node.parentElement) {
+    const m = (node.getAttribute('transform') ?? '').match(/rotate\(\s*(-?[\d.]+)/)
+    if (m !== null) {
+      total += Number(m[1])
+    }
+  }
+  return total
 }
 
 describe('the PFD panel', () => {
@@ -237,6 +266,210 @@ describe('course pointer', () => {
 
   it('is absent when no course is given', () => {
     expect(render({ heading: 90 }).querySelector('.hsi-course')).toBeNull()
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Deviation indication. Sign conventions invert easily and an inverted needle
+// looks subtly plausible, so every golden below was drawn on paper first and
+// then written down — never read back out of the renderer, and never
+// re-derived by calling `courseDeviation` inside the expectation. That last one
+// is the `turnToInbound` tautology verbatim: renderer and expectation would
+// flip together the moment the engine flipped.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Deviation bar's x, checked to be vertical (it slides; it never tilts). */
+function barX(props: HSIProps): number {
+  const bar = render(props).querySelector('.hsi-cdi-bar')
+  expect(bar, 'no deviation bar drawn').not.toBeNull()
+  const x1 = num(bar!, 'x1')
+  expect(num(bar!, 'x2')).toBeCloseTo(x1, 6)
+  return x1
+}
+
+describe('the no-nav contract', () => {
+  // `written-test.ts` renders this instrument for every entry question with a
+  // heading and a course and nothing else — it has no aircraft position at all.
+  // A real HSI *removes* the deviation indication when it has no valid nav
+  // data; it does not centre it, which would read as "established on course"
+  // on a graded question. That contract was unspecified until this task.
+  it('draws the course pointer and no deviation indication when nav is absent', () => {
+    const el = render({ heading: 90, course: 340 })
+    expect(el.querySelector('.hsi-course')).not.toBeNull()
+    expect(el.querySelector('.hsi-cdi-bar')).toBeNull()
+    expect(el.querySelectorAll('.hsi-cdi-dot')).toHaveLength(0)
+    expect(el.querySelector('.hsi-tofrom')).toBeNull()
+  })
+
+  it('drops the whole assembly when no course is given', () => {
+    const el = render({ heading: 90 })
+    expect(el.querySelector('.hsi-course')).toBeNull()
+    expect(el.querySelector('.hsi-cdi-bar')).toBeNull()
+    expect(el.querySelectorAll('.hsi-cdi-dot')).toHaveLength(0)
+    expect(el.querySelector('.hsi-tofrom')).toBeNull()
+  })
+
+  // A deviation with nothing to deviate from is a caller mistake, not a
+  // drawing decision — silently rendering nothing would hide it.
+  it('rejects nav data with no course to deviate from', () => {
+    const el = document.createElement('div')
+    expect(() => renderHSI(el, { heading: 90, nav: { distanceNm: 8 } })).toThrow(TypeError)
+  })
+
+  // Over the fix the cross-track is 0 for every heading and the sense has no
+  // geometric meaning, so `courseDeviation` rejects it rather than let a
+  // caller depict it. The instrument must not swallow that.
+  it('propagates the engine’s rejection of a non-positive distance', () => {
+    const el = document.createElement('div')
+    expect(() => renderHSI(el, { heading: 90, course: 90, nav: { distanceNm: 0 } })).toThrow(
+      RangeError,
+    )
+    expect(() => renderHSI(el, { heading: 90, course: 90, nav: { distanceNm: -4 } })).toThrow(
+      RangeError,
+    )
+  })
+})
+
+describe('deviation bar', () => {
+  it('lands one dot right of centre for a half-scale left cross-track', () => {
+    // Drawn first: course 090 runs east through the fix. Heading 120 tracking
+    // direct means the aircraft lies on the 300 bearing FROM the fix, 1.0 NM
+    // out — 0.87 NM west of it and 0.50 NM north of it. The course line runs
+    // east, so north of it is the aircraft's LEFT: cross-track −0.50 NM.
+    // The needle shows where the course is, not where you are, so the course
+    // lies 0.50 NM to the aircraft's RIGHT and the bar deflects right of
+    // centre by 0.50 NM × 30 px/NM = 15 px — exactly the inner (half-scale) dot.
+    //
+    // ⚠️ 1.0 NM is deliberately shorter than any distance the drill generates.
+    // An unpegged needle *requires* a distance inside FULL_SCALE_NM, and the
+    // shipping app never produces one (see "Two accepted consequences" in
+    // docs/plans/20260807-g1000-hsi.md). Do not "fix" this to a realistic
+    // distance — the golden would peg and stop measuring the arithmetic.
+    expect(barX({ heading: 120, course: 90, nav: { distanceNm: 1 } })).toBeCloseTo(
+      LAYOUT.cx + 15,
+      6,
+    )
+  })
+
+  it('deflects LEFT when the aircraft is RIGHT of the course', () => {
+    // Course 090 again, heading 060 at 1.0 NM: tracking direct puts the
+    // aircraft on the 240 bearing from the fix — 0.87 NM west and 0.50 NM
+    // SOUTH. South of an eastbound course is its RIGHT, cross-track +0.50 NM.
+    // Fly toward the needle: the course is off the left wing, so the bar sits
+    // left of centre, on the inner dot at cx − 15.
+    expect(barX({ heading: 60, course: 90, nav: { distanceNm: 1 } })).toBeCloseTo(LAYOUT.cx - 15, 6)
+  })
+
+  it('pegs on the outer dot instead of sliding off the card', () => {
+    // Course 090, heading 180 at 8 NM: the aircraft lies on the 360 bearing
+    // from the fix, i.e. 8 NM due north of it — 8 NM LEFT of the eastbound
+    // course, eight times full scale. The bar deflects right and stops on the
+    // outer dot.
+    const full = FULL_SCALE_NM * PX_PER_NM
+    expect(barX({ heading: 180, course: 90, nav: { distanceNm: 8 } })).toBeCloseTo(
+      LAYOUT.cx + full,
+      6,
+    )
+    // Mirrored: heading 000 at 8 NM sits 8 NM due south of the fix, 8 NM RIGHT
+    // of the same course, so the bar pegs on the opposite outer dot.
+    expect(barX({ heading: 0, course: 90, nav: { distanceNm: 8 } })).toBeCloseTo(
+      LAYOUT.cx - full,
+      6,
+    )
+  })
+
+  it('centres exactly on course', () => {
+    // Heading = course: the aircraft is on the course line, dead ahead of it.
+    expect(barX({ heading: 90, course: 90, nav: { distanceNm: 8 } })).toBeCloseTo(LAYOUT.cx, 6)
+  })
+
+  // Bar and dots are two readings of one scale, so this is drawn-against-drawn
+  // rather than against a constant: it keeps binding if PX_PER_NM is re-tuned,
+  // which a pair of hand-typed pixel goldens would not. (Swapping PX_PER_NM for
+  // a literal of the *same* value is undetectable by construction — nothing can
+  // see the difference; this is what catches the two drifting apart afterwards.)
+  it('puts a half-scale deflection exactly on the drawn inner dot', () => {
+    const el = render({ heading: 120, course: 90, nav: { distanceNm: 1 } })
+    const bar = el.querySelector('.hsi-cdi-bar')!
+    const dots = [...el.querySelectorAll('.hsi-cdi-dot')].map((d) => num(d, 'cx'))
+    expect(dots).toContain(num(bar, 'x1'))
+  })
+})
+
+describe('deviation dots', () => {
+  it('draws DEVIATION_DOTS a side, evenly spaced out to full scale', () => {
+    const el = render({ heading: 90, course: 90, nav: { distanceNm: 8 } })
+    const dots = [...el.querySelectorAll('.hsi-cdi-dot')]
+    expect(dots).toHaveLength(2 * DEVIATION_DOTS)
+    const full = FULL_SCALE_NM * PX_PER_NM
+    const expected: number[] = []
+    for (let i = DEVIATION_DOTS; i >= 1; i -= 1) {
+      expected.push((-i * full) / DEVIATION_DOTS)
+    }
+    for (let i = 1; i <= DEVIATION_DOTS; i += 1) {
+      expected.push((i * full) / DEVIATION_DOTS)
+    }
+    const offsets = dots.map((d) => num(d, 'cx') - LAYOUT.cx).sort((a, b) => a - b)
+    expect(offsets).toEqual(expected)
+    // and they lie on the lateral line through the centre, where the bar reads
+    for (const dot of dots) {
+      expect(num(dot, 'cy')).toBe(LAYOUT.cy)
+    }
+  })
+})
+
+describe('TO/FROM flag', () => {
+  function flag(props: HSIProps): Element {
+    const el = render(props).querySelector('.hsi-tofrom')
+    expect(el, 'no TO/FROM flag drawn').not.toBeNull()
+    return el!
+  }
+
+  /** Apex, and the midpoint of the base — a triangle points where its apex is. */
+  function pointing(el: Element): { apexY: number; baseY: number } {
+    const pts = pointsOf(el)
+    expect(pts).toHaveLength(3)
+    const [apex, left, right] = pts as [
+      { x: number; y: number },
+      { x: number; y: number },
+      { x: number; y: number },
+    ]
+    return { apexY: apex.y, baseY: (left.y + right.y) / 2 }
+  }
+
+  it('points up the course arrow when the course closes on the fix', () => {
+    // Course 090, heading 090, 5 NM out: tracking direct, the aircraft is 5 NM
+    // west of the fix flying east at it, so following 090 from here reaches the
+    // fix — TO. The flag points toward the arrowhead, up the local course line.
+    const f = flag({ heading: 90, course: 90, nav: { distanceNm: 5 } })
+    expect(f.getAttribute('data-sense')).toBe('to')
+    const { apexY, baseY } = pointing(f)
+    expect(apexY).toBeLessThan(baseY) // apex above its base: pointing up
+    expect(apexY).toBeLessThan(LAYOUT.cy) // and sitting on the arrowhead's side
+  })
+
+  it('points down the tail when the course opens away from the fix', () => {
+    // Course 090, heading 270, 5 NM out: tracking direct on 270 means the fix
+    // is west of the aircraft, so the aircraft is 5 NM EAST of it. Following
+    // 090 from there flies away from the fix — FROM.
+    const f = flag({ heading: 270, course: 90, nav: { distanceNm: 5 } })
+    expect(f.getAttribute('data-sense')).toBe('from')
+    const { apexY, baseY } = pointing(f)
+    expect(apexY).toBeGreaterThan(baseY) // apex below its base: pointing down
+    expect(apexY).toBeGreaterThan(LAYOUT.cy) // and sitting on the tail's side
+  })
+})
+
+describe('the course assembly rides the compass card', () => {
+  it('composes to course − heading on screen, not to the local rotate()', () => {
+    // heading 041, course 300 — both non-zero, so the composed angle is
+    // distinguishable from either term: −41 + 300 = 259° on screen.
+    const el = render({ heading: 41, course: 300, nav: { distanceNm: 8 } })
+    for (const selector of ['.hsi-course', '.hsi-cdi-bar', '.hsi-cdi-dot', '.hsi-tofrom']) {
+      const node = el.querySelector(selector)
+      expect(node, selector).not.toBeNull()
+      expect(composedRotation(node!), selector).toBeCloseTo(259, 6)
+    }
   })
 })
 

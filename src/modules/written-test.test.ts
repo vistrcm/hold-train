@@ -275,6 +275,38 @@ describe('renderWrittenTest (jsdom)', () => {
     expect(el2.querySelector<HTMLElement>('.written-figure')!.hidden).toBe(true)
   })
 
+  // This screen has no aircraft position — it passes heading and course only.
+  // renderHSI's deviation indication is therefore opt-in: a bar centred on a
+  // course the figure has no position for would read as "established on
+  // course" on a graded question, and a bar drawn anywhere else would be
+  // fiction. Pinned from this side because `hsi.ts` cannot see its consumers.
+  it('shows the entry figure with no deviation indication, and still grades', () => {
+    const entryBank = QUESTIONS.filter((q) => q.entry !== undefined)
+    const el = document.createElement('div')
+    renderWrittenTest(el, { mode: 'practice', seed: 1, store: testStore(), bank: entryBank })
+    const figure = el.querySelector<HTMLElement>('.written-figure')!
+    expect(figure.querySelector('svg.hsi')).not.toBeNull()
+    expect(figure.querySelector('.hsi-course')).not.toBeNull() // the pointer stays
+    expect(figure.querySelector('.hsi-cdi-bar')).toBeNull()
+    expect(figure.querySelectorAll('.hsi-cdi-dot')).toHaveLength(0)
+    expect(figure.querySelector('.hsi-tofrom')).toBeNull()
+
+    // …and the question still grades exactly as before. Same seed and bank, so
+    // this controller sees the same first question in the same option order.
+    const shadow = createWrittenTest({
+      mode: 'practice',
+      seed: 1,
+      store: testStore(),
+      bank: entryBank,
+    })
+    const keyed = shadow.question.options[shadow.question.answerIndex]
+    const buttons = [...el.querySelectorAll<HTMLButtonElement>('.written-option')]
+    const correctBtn = buttons.find((b) => b.textContent === keyed)
+    expect(correctBtn, `no option reads ${JSON.stringify(keyed)}`).toBeDefined()
+    correctBtn!.click()
+    expect(el.querySelector('.written-verdict')!.textContent).toBe('Correct.')
+  })
+
   it('registers as a screen', () => {
     expect(writtenTestScreen.path).toBe('written-test')
     expect(writtenTestScreen.title.length).toBeGreaterThan(0)
