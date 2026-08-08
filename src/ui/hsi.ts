@@ -81,12 +81,27 @@ export interface HSIProps {
  * will read the needle quantitatively, so it is a user-visible aviation fact
  * under the CLAUDE.md citation convention.
  *
- * ⚠️ UNVERIFIED. 1.0 NM is the GPS terminal-mode CDI scale as commonly
- * described, but no FAA source has been checked for it here. Task 7 of
- * docs/plans/20260807-g1000-hsi.md verifies it and either cites the source at
- * sub-paragraph granularity or labels it unverified where the UI shows it.
+ * 1.0 NM is GPS **terminal**-mode CDI sensitivity, verified against
+ * faa.gov/air_traffic/publications/atpubs/aim_html/chap1_section_1.html. AIM
+ * 1-1-17 b.4, verbatim: "The GPS receiver must be set to terminal (±1 NM) CDI
+ * sensitivity and the navigation routes contained in the database in order to
+ * fly published IFR charted departures and DPs." AIM 1-1-17 b.5(e) gives the
+ * other two modes in one sentence — the receiver changes "from en route CDI and
+ * RAIM sensitivity of ±5 NM either side of centerline to ±1 NM terminal
+ * sensitivity" when the approach is armed, 30 NM from the airport reference
+ * point, and ramps to ±0.3 NM approaching the FAWP.
+ *
+ * ⚠️ The *value* is cited; the *mode* is this drill's assumption and is not.
+ * No FAA source says a hold is flown on terminal scaling — what makes it the
+ * honest choice here is that the drill's own scenario window (6–10 NM, from
+ * `MIN_DISTANCE_NM`/`MAX_DISTANCE_NM` in src/modules/entry-drill.ts) sits well
+ * inside the 30 NM at which terminal scaling arms. Widen that window past
+ * 30 NM and this constant becomes 5, not 1.
  */
 export const FULL_SCALE_NM = 1
+
+/** Where `FULL_SCALE_NM` comes from; the mode assumption above is not cited. */
+export const FULL_SCALE_SOURCE = 'AIM 1-1-17 b.4'
 
 /** Deviation dots per side: one at half scale, one at full scale. */
 export const DEVIATION_DOTS = 2

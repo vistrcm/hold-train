@@ -37,10 +37,65 @@ export const COCKPIT_TARGET_SECONDS = 15
 /** Cockpit results live under 'entry' — the drill the stored benchmark scores. */
 const DRILL_IDS: Record<DrillMode, string> = { cockpit: 'entry', learn: 'entry-learn' }
 
+/**
+ * How far ahead of the clearance limit holding instructions arrive, minutes.
+ *
+ * This is why the drill depicts an aircraft short of the fix rather than over
+ * it: the entry decision is made while the fix is still ahead. Verbatim, from
+ * FAA JO 7110.65BB 4-6-1 c.4 (verified against
+ * faa.gov/air_traffic/publications/atpubs/atc_html/chap4_section_6.html and the
+ * order's own PDF): "When delay is expected, issue items in subparagraphs a and
+ * b at least 5 minutes before the aircraft is estimated to reach the clearance
+ * limit."
+ */
+export const CLEARANCE_LEAD_MINUTES = 5
+
+export const CLEARANCE_LEAD_SOURCE = 'FAA JO 7110.65BB 4-6-1 c.4'
+
+/**
+ * The near end of the window, minutes — where the pilot's own timeline starts.
+ *
+ * Verbatim, from AIM 5-3-8 d: "When an aircraft is 3 minutes or less from a
+ * clearance limit and a clearance beyond the fix has not been received, the
+ * pilot is expected to start a speed reduction so that the aircraft will cross
+ * the fix, initially, at or below the maximum holding airspeed." The same
+ * 3 minutes is what 7110.65's NOTE under 4-6-1 c.4 says the 5-minute
+ * requirement is built on, so the two timings are one rule seen from both
+ * seats — which is what makes them a window rather than two unrelated numbers.
+ */
+export const SPEED_REDUCTION_MINUTES = 3
+
+export const SPEED_REDUCTION_SOURCE = 'AIM 5-3-8 d'
+
+/**
+ * Groundspeed the window is converted to miles at, knots.
+ *
+ * ⚠️ NOT an FAA figure and never cited as one — a training assumption, chosen
+ * as a typical light single's cruise and comfortably under the 200 KIAS maximum
+ * holding airspeed at or below 6,000 ft (AIM 5-3-8 j2, TBL 5-3-1). It sets the
+ * scale of the picture, not the answer: `determineEntry` never sees it.
+ */
+export const NOMINAL_GROUNDSPEED_KT = 120
+
+/** Nearest the fix a scenario is drawn: the speed-reduction point, in miles. */
+export const MIN_DISTANCE_NM = (SPEED_REDUCTION_MINUTES / 60) * NOMINAL_GROUNDSPEED_KT
+
+/** Farthest: the moment the clearance is issued, in miles. */
+export const MAX_DISTANCE_NM = (CLEARANCE_LEAD_MINUTES / 60) * NOMINAL_GROUNDSPEED_KT
+
 export interface EntryScenario {
   seed: number
   /** Aircraft heading when the clearance is received. */
   heading: number
+  /**
+   * Distance to the holding fix, NM — the aircraft is tracking direct to it.
+   *
+   * Display state only. It drives the HSI's deviation bar and status line
+   * (`courseDeviation` in src/engine/nav.ts is the oracle for both) and touches
+   * the answer key nowhere: AIM 5-3-8 j3 decides the entry sector from heading
+   * against the holding course alone.
+   */
+  distanceNm: number
   clearanceText: string
   /**
    * What the plate says, for "as published" clearances only. ATC omits course
@@ -86,9 +141,17 @@ export function generateScenario(seed: number): EntryScenario {
   // of whatever the clearance generator drew.
   const rng = mulberry32(Math.trunc(seed) ^ 0x9e3779b9)
   const heading = Math.floor(rng() * 360)
+  // Appended AFTER the heading draw, never inserted before it: a stored miss
+  // and its exported Anki card are keyed by seed, so moving the heading a seed
+  // produces would rewrite questions already in a user's deck. Rounded to the
+  // one decimal `distanceText` renders, so the status line and the needle are
+  // computed from the same number.
+  const distanceNm =
+    Math.round((MIN_DISTANCE_NM + rng() * (MAX_DISTANCE_NM - MIN_DISTANCE_NM)) * 10) / 10
   const scenario: EntryScenario = {
     seed,
     heading,
+    distanceNm,
     clearanceText: clearance.text,
     holdSpec,
     result: determineEntry(heading, holdSpec),

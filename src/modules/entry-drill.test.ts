@@ -10,18 +10,25 @@ import {
 } from '../engine/entry'
 import { normalizeDeg } from '../engine/geometry'
 import {
+  CLEARANCE_LEAD_MINUTES,
+  CLEARANCE_LEAD_SOURCE,
   COCKPIT_TARGET_SECONDS,
   createEntryDrill,
   entryDrillScreen,
   flyItText,
   generateScenario,
   gradeEntryAnswer,
+  MAX_DISTANCE_NM,
+  MIN_DISTANCE_NM,
+  NOMINAL_GROUNDSPEED_KT,
   OUTBOUND_TIMING_AIM,
   OUTBOUND_TIMING_NOTE,
   OUTBOUND_TIMING_SOURCE,
   renderEntryDrill,
+  SPEED_REDUCTION_MINUTES,
+  SPEED_REDUCTION_SOURCE,
 } from './entry-drill'
-import { courseText } from '../format'
+import { courseText, distanceText } from '../format'
 
 /** First seed whose generated clearance is a charted "as published" hold. */
 const CHARTED_SEED = 4
@@ -95,6 +102,91 @@ describe('generateScenario', () => {
   it('rejects a non-finite seed', () => {
     expect(() => generateScenario(NaN)).toThrow(RangeError)
     expect(() => generateScenario(Infinity)).toThrow(RangeError)
+  })
+})
+
+describe('scenario distance to the fix', () => {
+  /**
+   * Regression pin, captured BEFORE `distanceNm` existed.
+   *
+   * A stored miss and the Anki card exported from it are keyed by seed alone
+   * (`store.recordMiss` here, `missesToCards` in src/app/anki-export.ts), so
+   * what a seed produces is history rather than an implementation detail:
+   * shifting the RNG stream would silently rewrite every card already in a
+   * user's deck to a different question. The distance draw is therefore
+   * APPENDED after the heading draw, and this is what pins that.
+   *
+   * Both halves are hand-derived, not only read back:
+   *  - headings, from `mulberry32(seed ^ 0x9e3779b9)` — seed 7 → 353,
+   *    seed 42 → 173;
+   *  - answers, from the heading against the fixture hold. Seed 7 is inbound
+   *    080 with right turns, and 353 − 080 = 273°, inside the 180°–290°
+   *    parallel sector of a standard pattern. Seed 42 is inbound 250 with left
+   *    turns, and 173 − 250 = 283°, inside the mirrored 250°–360° direct
+   *    sector. That is also the plan's before/after check on the answer key:
+   *    distance is display state and must not reach `determineEntry`.
+   */
+  it('keeps every existing seed on its original heading and answer', () => {
+    const a = generateScenario(7)
+    expect(a.heading).toBe(353)
+    expect(a.result.primary).toBe('parallel')
+
+    const b = generateScenario(42)
+    expect(b.heading).toBe(173)
+    expect(b.result.primary).toBe('direct')
+  })
+
+  it('places the aircraft inside the ATC lead window on every seed', () => {
+    for (let seed = 0; seed < 200; seed++) {
+      const { distanceNm } = generateScenario(seed)
+      expect(distanceNm).toBeGreaterThanOrEqual(MIN_DISTANCE_NM)
+      expect(distanceNm).toBeLessThanOrEqual(MAX_DISTANCE_NM)
+    }
+  })
+
+  it('spans the window between the two verified timings', () => {
+    // Ordering first: the speed-reduction point is inside the lead time, which
+    // is the whole reason the two bracket a window rather than name a point.
+    expect(SPEED_REDUCTION_MINUTES).toBeLessThan(CLEARANCE_LEAD_MINUTES)
+    expect(MIN_DISTANCE_NM).toBeLessThan(MAX_DISTANCE_NM)
+    // Hand check, deliberately not a restatement of the formula: 3 and 5
+    // minutes at 120 kt is 6 and 10 NM — single-digit miles, i.e. the terminal
+    // area, and well inside the 30 NM at which a GPS arms terminal (±1 NM) CDI
+    // scaling (AIM 1-1-17 b.5(e)), which is the scale hsi.ts draws. The defect
+    // these bounds exist to catch is the unit slip the derivation invites: drop
+    // the ÷ 60 and the window becomes 360–600 NM, which still passes every
+    // range assertion above because those are stated against the same constants.
+    expect(MIN_DISTANCE_NM).toBeGreaterThan(1)
+    expect(MAX_DISTANCE_NM).toBeLessThan(30)
+    expect(NOMINAL_GROUNDSPEED_KT).toBeGreaterThan(0)
+  })
+
+  it('spreads across the window rather than parking on one end', () => {
+    const seen = new Set<number>()
+    for (let seed = 0; seed < 200; seed++) {
+      seen.add(generateScenario(seed).distanceNm)
+    }
+    expect(seen.size).toBeGreaterThan(20)
+    const mid = (MIN_DISTANCE_NM + MAX_DISTANCE_NM) / 2
+    expect([...seen].some((d) => d < mid)).toBe(true)
+    expect([...seen].some((d) => d > mid)).toBe(true)
+  })
+
+  it('quantises to the resolution distanceText renders', () => {
+    // The status line shows one decimal. A stored 7.3365 would put "7.3 NM" on
+    // the panel beside a needle computed from a different number — small, but
+    // it is the same class of two-roundings-disagree defect `distanceText`
+    // itself exists to prevent.
+    for (let seed = 0; seed < 60; seed++) {
+      const { distanceNm } = generateScenario(seed)
+      expect(Number(distanceNm.toFixed(1))).toBe(distanceNm)
+      expect(distanceText(distanceNm)).toBe(`${distanceNm.toFixed(1)} NM`)
+    }
+  })
+
+  it('cites both timings at sub-paragraph granularity', () => {
+    expect(CLEARANCE_LEAD_SOURCE).toBe('FAA JO 7110.65BB 4-6-1 c.4')
+    expect(SPEED_REDUCTION_SOURCE).toBe('AIM 5-3-8 d')
   })
 })
 
