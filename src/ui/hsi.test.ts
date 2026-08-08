@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { determineEntry } from '../engine/entry'
-import { renderHSI, type HSIProps } from './hsi'
+import { courseText } from '../format'
+import { LAYOUT, renderHSI, type HSIProps } from './hsi'
 
 function render(props: HSIProps): HTMLElement {
   const el = document.createElement('div')
@@ -13,17 +14,74 @@ function rotationOf(el: Element | null): string {
   return el!.getAttribute('transform') ?? ''
 }
 
-describe('renderHSI basics', () => {
+function num(el: Element, attr: string): number {
+  const raw = el.getAttribute(attr)
+  expect(raw, `${el.tagName} has no ${attr}`).not.toBeNull()
+  return Number(raw)
+}
+
+/** The `x,y` pairs of a `<polygon points="…">`. */
+function pointsOf(el: Element): Array<{ x: number; y: number }> {
+  return (el.getAttribute('points') ?? '')
+    .trim()
+    .split(/\s+/)
+    .map((pair) => {
+      const [x, y] = pair.split(',')
+      return { x: Number(x), y: Number(y) }
+    })
+}
+
+/** Every absolute move/line coordinate of a `<path d="…">`. */
+function coordsOf(el: Element): Array<{ x: number; y: number }> {
+  const d = el.getAttribute('d') ?? ''
+  return [...d.matchAll(/[ML]\s*(-?[\d.]+)[\s,](-?[\d.]+)/g)].map((m) => ({
+    x: Number(m[1]),
+    y: Number(m[2]),
+  }))
+}
+
+/** Distance from the rose centre — the card convention is polar about it. */
+function radiusFromCentre(x: number, y: number): number {
+  return Math.hypot(x - LAYOUT.cx, y - LAYOUT.cy)
+}
+
+describe('the PFD panel', () => {
   it('renders one scalable svg into the container', () => {
     const el = render({ heading: 0 })
     const svgs = el.querySelectorAll('svg')
     expect(svgs).toHaveLength(1)
     const svg = svgs[0]!
-    expect(svg.getAttribute('viewBox')).toBe('0 0 200 200')
+    expect(svg.getAttribute('viewBox')).toBe(`0 0 ${LAYOUT.width} ${LAYOUT.height}`)
     // no fixed pixel size — CSS scales it to the container (320 px phones)
     expect(svg.getAttribute('width')).toBeNull()
     expect(svg.getAttribute('height')).toBeNull()
     expect(svg.classList.contains('hsi')).toBe(true)
+  })
+
+  // Cross-checked against the viewBox parsed off the svg rather than against
+  // LAYOUT twice: the claim is that the dark face reaches every edge, which is
+  // what lets palette.test.ts measure every instrument colour against one
+  // backdrop. A rect inset by a few px would satisfy a LAYOUT-vs-LAYOUT check
+  // and still leave marks hanging onto the light page.
+  it('fills the whole viewBox with a single dark panel', () => {
+    const el = render({ heading: 0 })
+    const panels = el.querySelectorAll('.hsi-panel')
+    expect(panels).toHaveLength(1)
+    const panel = panels[0]!
+    const box = el.querySelector('svg')!.getAttribute('viewBox')!.split(/\s+/).map(Number)
+    const [vx, vy, vw, vh] = box as [number, number, number, number]
+    expect(panel.tagName.toLowerCase()).toBe('rect')
+    expect(num(panel, 'x')).toBe(vx)
+    expect(num(panel, 'y')).toBe(vy)
+    expect(num(panel, 'width')).toBe(vw)
+    expect(num(panel, 'height')).toBe(vh)
+  })
+
+  // A panel painted last is an opaque cover, not a backdrop: every assertion
+  // below would still pass while the instrument rendered as a black rectangle.
+  it('paints the panel first, behind the instrument', () => {
+    const svg = render({ heading: 0 }).querySelector('svg')!
+    expect(svg.firstElementChild!.classList.contains('hsi-panel')).toBe(true)
   })
 
   it('re-render replaces previous content instead of appending', () => {
@@ -31,9 +89,18 @@ describe('renderHSI basics', () => {
     renderHSI(el, { heading: 0 })
     renderHSI(el, { heading: 90 })
     expect(el.querySelectorAll('svg')).toHaveLength(1)
+    expect(el.querySelectorAll('.hsi-panel')).toHaveLength(1)
   })
 
-  it('draws the compass card: 72 ticks and G1000-style labels', () => {
+  it('rejects non-finite heading and course', () => {
+    const el = document.createElement('div')
+    expect(() => renderHSI(el, { heading: NaN })).toThrow(RangeError)
+    expect(() => renderHSI(el, { heading: 0, course: NaN })).toThrow(RangeError)
+  })
+})
+
+describe('the compass card', () => {
+  it('draws 72 ticks and the 12 G1000-style labels', () => {
     const el = render({ heading: 0 })
     expect(el.querySelectorAll('.hsi-tick')).toHaveLength(72)
     const labels = [...el.querySelectorAll('.hsi-label')].map((t) => t.textContent)
@@ -46,33 +113,116 @@ describe('renderHSI basics', () => {
     expect(labels).toHaveLength(12)
   })
 
-  it('rejects non-finite heading and course', () => {
-    const el = document.createElement('div')
-    expect(() => renderHSI(el, { heading: NaN })).toThrow(RangeError)
-    expect(() => renderHSI(el, { heading: 0, course: NaN })).toThrow(RangeError)
+  // Geometry, not just a count: the ticks moved with the rose centre in this
+  // task, and a tick ring still centred on the old (100, 100) would render 72
+  // ticks off-axis and pass the count above.
+  it('hangs every tick off the exported tick radius, about the rose centre', () => {
+    const ticks = [...render({ heading: 0 }).querySelectorAll('.hsi-tick')]
+    for (const tick of ticks) {
+      expect(radiusFromCentre(num(tick, 'x1'), num(tick, 'y1'))).toBeCloseTo(LAYOUT.tickR, 1)
+    }
+    // ticks are generated from 0° up, so the first one points at the card's N
+    const north = ticks[0]!
+    expect(num(north, 'x1')).toBeCloseTo(LAYOUT.cx, 6)
+    expect(num(north, 'y1')).toBeCloseTo(LAYOUT.cy - LAYOUT.tickR, 6)
+  })
+
+  it('sets the 30° labels on the card at the exported label radius', () => {
+    const labels = [...render({ heading: 0 }).querySelectorAll('.hsi-label')]
+    const north = labels[0]!
+    expect(north.textContent).toBe('N')
+    expect(num(north, 'x')).toBe(LAYOUT.cx)
+    expect(num(north, 'y')).toBe(LAYOUT.cy - LAYOUT.labelR)
+    expect(north.getAttribute('transform')).toBe(`rotate(0 ${LAYOUT.cx} ${LAYOUT.cy})`)
+    // every label is the same text node rotated into place, so E pins the step
+    const east = labels[3]!
+    expect(east.textContent).toBe('E')
+    expect(east.getAttribute('transform')).toBe(`rotate(90 ${LAYOUT.cx} ${LAYOUT.cy})`)
   })
 })
 
 describe('rose rotation (heading up)', () => {
-  it('rotates the card so the current heading is under the lubber line', () => {
+  it('rotates the card so the current heading is under the lubber mark', () => {
     const el = render({ heading: 90 })
-    expect(rotationOf(el.querySelector('.hsi-rose'))).toBe('rotate(-90 100 100)')
+    expect(rotationOf(el.querySelector('.hsi-rose'))).toBe(`rotate(-90 ${LAYOUT.cx} ${LAYOUT.cy})`)
   })
 
   it('heading 0 leaves the card unrotated', () => {
     const el = render({ heading: 0 })
-    expect(rotationOf(el.querySelector('.hsi-rose'))).toBe('rotate(0 100 100)')
+    expect(rotationOf(el.querySelector('.hsi-rose'))).toBe(`rotate(0 ${LAYOUT.cx} ${LAYOUT.cy})`)
   })
 
   it('normalizes out-of-range headings', () => {
     const el = render({ heading: 450 })
-    expect(rotationOf(el.querySelector('.hsi-rose'))).toBe('rotate(-90 100 100)')
+    expect(rotationOf(el.querySelector('.hsi-rose'))).toBe(`rotate(-90 ${LAYOUT.cx} ${LAYOUT.cy})`)
+  })
+})
+
+describe('airframe-fixed marks', () => {
+  it('points the lubber mark down the centreline at the top of the card', () => {
+    const lubber = render({ heading: 41 }).querySelector('.hsi-lubber')!
+    const points = pointsOf(lubber)
+    expect(points).toHaveLength(3)
+    const [apex, left, right] = points as [
+      { x: number; y: number },
+      { x: number; y: number },
+      { x: number; y: number },
+    ]
+    // apex touches the card edge, so the mark reads against the heading tape
+    expect(apex.x).toBeCloseTo(LAYOUT.cx, 6)
+    expect(apex.y).toBeCloseTo(LAYOUT.cy - LAYOUT.roseR, 6)
+    // and the base sits above it — a triangle pointing down, not up
+    expect(left.y).toBeLessThan(apex.y)
+    expect(right.y).toBeLessThan(apex.y)
+    expect(left.x + right.x).toBeCloseTo(2 * LAYOUT.cx, 6)
   })
 
-  it('shows a three-digit heading readout', () => {
+  it('keeps the lubber fixed to the airframe, not the rotating card', () => {
+    const lubber = render({ heading: 41 }).querySelector('.hsi-lubber')!
+    expect(lubber.closest('.hsi-rose')).toBeNull()
+  })
+
+  it('centres the aircraft symbol on the rose centre', () => {
+    const aircraft = render({ heading: 41 }).querySelector('.hsi-aircraft')!
+    const points = coordsOf(aircraft)
+    expect(points.length).toBeGreaterThan(3)
+    // symmetric left/right about the centreline
+    for (const { x } of points) {
+      expect(points.some((p) => Math.abs(p.x - (2 * LAYOUT.cx - x)) < 1e-6)).toBe(true)
+    }
+    // and straddling the centre vertically, so the deviation bar reads across it
+    expect(Math.min(...points.map((p) => p.y))).toBeLessThan(LAYOUT.cy)
+    expect(Math.max(...points.map((p) => p.y))).toBeGreaterThan(LAYOUT.cy)
+    expect(aircraft.closest('.hsi-rose')).toBeNull()
+  })
+
+  it('centres the heading readout box above the rose, clear of the card', () => {
+    const el = render({ heading: 41 })
+    const box = el.querySelector('.hsi-heading-box')!
+    expect(num(box, 'x') + num(box, 'width') / 2).toBeCloseTo(LAYOUT.cx, 6)
+    expect(num(box, 'y')).toBe(LAYOUT.boxY)
+    expect(num(box, 'height')).toBe(LAYOUT.boxH)
+    // the box lives above the card, not on top of it
+    expect(num(box, 'y') + num(box, 'height')).toBeLessThan(LAYOUT.cy - LAYOUT.roseR)
+    expect(box.closest('.hsi-rose')).toBeNull()
+  })
+
+  it('shows the heading through courseText — three digits, 0 shown as 360', () => {
     expect(render({ heading: 90 }).querySelector('.hsi-heading-readout')!.textContent).toBe('090°')
     expect(render({ heading: 5 }).querySelector('.hsi-heading-readout')!.textContent).toBe('005°')
     expect(render({ heading: 0 }).querySelector('.hsi-heading-readout')!.textContent).toBe('360°')
+    // and it is that function, not a second rounding rule that agrees on those
+    for (const heading of [0.4, 129.6, 359.5]) {
+      const text = render({ heading }).querySelector('.hsi-heading-readout')!.textContent
+      expect(text, `heading ${heading}`).toBe(courseText(heading))
+    }
+  })
+
+  // Avionics readouts are monospaced so the digits do not shuffle sideways as
+  // the value changes; a proportional stack makes a live heading jitter.
+  it('sets the readout digits in a monospace stack', () => {
+    const readout = render({ heading: 41 }).querySelector('.hsi-heading-readout')!
+    expect(readout.getAttribute('font-family')).toMatch(/monospace/)
   })
 })
 
@@ -80,7 +230,7 @@ describe('course pointer', () => {
   it('sits at the course position on the card (rotates with the rose)', () => {
     const el = render({ heading: 90, course: 340 })
     const pointer = el.querySelector('.hsi-course')
-    expect(rotationOf(pointer)).toBe('rotate(340 100 100)')
+    expect(rotationOf(pointer)).toBe(`rotate(340 ${LAYOUT.cx} ${LAYOUT.cy})`)
     // inside the rotating rose group, so on screen it appears at course − heading
     expect(pointer!.closest('.hsi-rose')).not.toBeNull()
   })
@@ -154,7 +304,7 @@ describe('overlay geometry (drawn arcs, not just their data attributes)', () => 
   /** The card convention under test: 0° at the top, clockwise, y grows down. */
   function cardPoint(deg: number, radius: number): { x: number; y: number } {
     const rad = (deg * Math.PI) / 180
-    return { x: 100 + radius * Math.sin(rad), y: 100 - radius * Math.cos(rad) }
+    return { x: LAYOUT.cx + radius * Math.sin(rad), y: LAYOUT.cy - radius * Math.cos(rad) }
   }
 
   it('a sector wedge sweeps clockwise between its two boundary radii', () => {
@@ -162,7 +312,11 @@ describe('overlay geometry (drawn arcs, not just their data attributes)', () => 
     const path = render({ heading: 0, sectorOverlay: sectors })
       .querySelector('.hsi-sector-direct')!
       .getAttribute('d')!
-    const m = /^M 100 100 L (\S+) (\S+) A (\S+) \S+ 0 (\d) (\d) (\S+) (\S+) Z$/.exec(path)
+    const m = path.match(
+      new RegExp(
+        `^M ${LAYOUT.cx} ${LAYOUT.cy} L (\\S+) (\\S+) A (\\S+) \\S+ 0 (\\d) (\\d) (\\S+) (\\S+) Z$`,
+      ),
+    )
     expect(m, path).not.toBeNull()
     const [, ax, ay, r, largeArc, sweep, bx, by] = m!
     const start = cardPoint(sectors.direct.from, Number(r))
@@ -179,12 +333,12 @@ describe('overlay geometry (drawn arcs, not just their data attributes)', () => 
     const path = render({ heading: 123, thumbOverlay: 'right' })
       .querySelector('.hsi-thumb')!
       .getAttribute('d')!
-    const m = /^M (\S+) (\S+) A (\S+) /.exec(path)
+    const m = path.match(/^M (\S+) (\S+) A (\S+) /)
     expect(m, path).not.toBeNull()
     const [, ax, ay, outer] = m!
     const start = cardPoint(70, Number(outer))
     expect(Number(ax)).toBeCloseTo(start.x, 1)
     expect(Number(ay)).toBeCloseTo(start.y, 1)
-    expect(Number(ax)).toBeGreaterThan(100) // right of the nose, not left
+    expect(Number(ax)).toBeGreaterThan(LAYOUT.cx) // right of the nose, not left
   })
 })

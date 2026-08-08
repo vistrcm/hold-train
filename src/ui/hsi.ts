@@ -1,15 +1,24 @@
-// HSI (horizontal situation indicator) approximating a G1000 PFD compass
-// rose: heading-up rotating card, magenta course pointer, fixed lubber line
-// and aircraft symbol. Two optional teaching overlays:
+// HSI (horizontal situation indicator) drawn as a self-contained G1000-style
+// PFD panel: a dark rounded plate filling the whole viewBox, carrying a
+// heading-up rotating compass card, an airframe-fixed lubber mark, the aircraft
+// symbol and the heading readout. Two optional teaching overlays a real G1000
+// does not have:
 //   - thumb band: the 20° entry-shortcut aid from the 70° line down to the
 //     3 o'clock index (9 o'clock side for nonstandard holds) — airframe-fixed
 //   - sector wedges: AIM 5-3-8 j3 entry sectors, magnetic (rotate with card)
 // Pure rendering: state in, SVG out. No internal state, no listeners.
 //
+// Two consumers: the entry drill (`src/modules/entry-drill.ts`) and the written
+// test's entry figure (`src/modules/written-test.ts`), which passes heading and
+// course only. Both share the `.hsi` rule in styles.css, so the panel's aspect
+// ratio is a shared concern.
+//
 // Draws from the `pfd` group of the instrument palette (src/ui/palette.ts) —
 // the dark half, matching the panel this instrument replicates. The plan view
 // draws from `plate`; the two groups' entry colours are held to the same hue by
-// palette.test.ts, so an entry keeps one colour code across both.
+// palette.test.ts, so an entry keeps one colour code across both. The panel
+// rect is what makes that measurable: it fills the viewBox, so every instrument
+// mark sits on `pfd.face` and none of them straddles the light page.
 
 import type { Entry, SectorArc, TurnDirection } from '../engine/entry'
 import { normalizeDeg } from '../engine/geometry'
@@ -27,10 +36,59 @@ export interface HSIProps {
   sectorOverlay?: Record<Entry, SectorArc>
 }
 
-const C = 100 // rose center
-const ROSE_R = 78
-const TICK_R = 74
-const LABEL_R = 52
+/**
+ * Panel geometry, in viewBox units.
+ *
+ * Exported so `hsi.test.ts` can place a mark against the layout instead of
+ * against a retyped magic number: every one of these moved when the square
+ * white rose became a taller dark panel, and a coordinate hard-coded in a test
+ * would have had to be re-derived by hand alongside the very change it is
+ * supposed to be checking.
+ *
+ * The vertical budget, top to bottom: the value boxes, then the lubber mark,
+ * then the card (`cy ± roseR`), then room under it for the nav status line
+ * Task 5 adds. `cy` therefore sits below the panel's mid-height.
+ */
+export const LAYOUT = Object.freeze({
+  /** viewBox extent. The panel rect fills exactly this. */
+  width: 240,
+  height: 230,
+  /** Rose centre — everything polar is measured from here. */
+  cx: 120,
+  cy: 122,
+  /** Compass card outer edge, where the lubber mark's apex lands. */
+  roseR: 84,
+  /** Outer end of the heading ticks, just inside the card edge. */
+  tickR: 80,
+  /** Baseline radius of the 30° card labels. */
+  labelR: 56,
+  /** Top edge and height of the value boxes along the panel's top. */
+  boxY: 4,
+  boxH: 17,
+  /** Width of the centred heading readout box. */
+  readoutW: 48,
+})
+
+// The lubber is a downward triangle whose apex touches the card edge.
+const LUBBER_H = 13
+const LUBBER_W = 13
+
+// Tick lengths inward from `tickR`; the 10° marks are the long, bright ones.
+const MAJOR_TICK = 10
+const MINOR_TICK = 6
+
+// Course pointer, as radii from the rose centre. Transitional geometry — the
+// deviation bar splits this line in Task 4.
+const POINTER_TIP = LAYOUT.tickR - 6
+const POINTER_HEAD = LAYOUT.tickR - 20
+const POINTER_TAIL = LAYOUT.tickR - 12
+const POINTER_HALF_W = 7
+
+// Avionics readouts are monospaced: a proportional stack shuffles the digits
+// sideways as the value changes, which reads as jitter on a live heading. A
+// system stack, so this costs no webfont (and no new dependency).
+const DIGIT_FONT = 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace'
+const LABEL_FONT = 'system-ui, sans-serif'
 
 // Card labels every 30°, G1000 style: cardinal letters, numbers without the
 // trailing zero elsewhere.
@@ -43,7 +101,10 @@ function r2(v: number): number {
 /** Point at `deg` (0 = up, clockwise) and radius from the rose center. */
 function polar(deg: number, radius: number): { x: number; y: number } {
   const rad = (deg * Math.PI) / 180
-  return { x: r2(C + radius * Math.sin(rad)), y: r2(C - radius * Math.cos(rad)) }
+  return {
+    x: r2(LAYOUT.cx + radius * Math.sin(rad)),
+    y: r2(LAYOUT.cy - radius * Math.cos(rad)),
+  }
 }
 
 /** Pie wedge from `from` to `to` clockwise, out to `radius`. */
@@ -51,7 +112,10 @@ function pieWedge(from: number, to: number, radius: number): string {
   const a = polar(from, radius)
   const b = polar(to, radius)
   const largeArc = normalizeDeg(to - from) > 180 ? 1 : 0
-  return `M ${C} ${C} L ${a.x} ${a.y} A ${radius} ${radius} 0 ${largeArc} 1 ${b.x} ${b.y} Z`
+  return (
+    `M ${LAYOUT.cx} ${LAYOUT.cy} L ${a.x} ${a.y} ` +
+    `A ${radius} ${radius} 0 ${largeArc} 1 ${b.x} ${b.y} Z`
+  )
 }
 
 /** Ring segment from `from` to `to` clockwise between two radii. */
@@ -71,12 +135,12 @@ function ticks(): string {
   const parts: string[] = []
   for (let deg = 0; deg < 360; deg += 5) {
     const major = deg % 10 === 0
-    const outer = polar(deg, TICK_R)
-    const inner = polar(deg, TICK_R - (major ? 9 : 5))
+    const outer = polar(deg, LAYOUT.tickR)
+    const inner = polar(deg, LAYOUT.tickR - (major ? MAJOR_TICK : MINOR_TICK))
     const color = major ? PALETTE.pfd.card : PALETTE.pfd.cardDim
     parts.push(
       `<line class="hsi-tick" x1="${outer.x}" y1="${outer.y}" x2="${inner.x}" y2="${inner.y}" ` +
-        `stroke="${color}" stroke-width="${major ? 1.6 : 1}"/>`,
+        `stroke="${color}" stroke-width="${major ? 1.7 : 1.1}"/>`,
     )
   }
   return parts.join('')
@@ -87,9 +151,10 @@ function labels(): string {
     const deg = i * 30
     const cardinal = label.length === 1
     return (
-      `<text class="hsi-label" x="${C}" y="${C - LABEL_R}" transform="rotate(${deg} ${C} ${C})" ` +
-      `text-anchor="middle" fill="${PALETTE.pfd.card}" font-size="${cardinal ? 13 : 11}" ` +
-      `font-weight="${cardinal ? 700 : 400}" font-family="system-ui, sans-serif">${label}</text>`
+      `<text class="hsi-label" x="${LAYOUT.cx}" y="${LAYOUT.cy - LAYOUT.labelR}" ` +
+      `transform="rotate(${deg} ${LAYOUT.cx} ${LAYOUT.cy})" text-anchor="middle" ` +
+      `fill="${PALETTE.pfd.card}" font-size="${cardinal ? 14 : 12}" ` +
+      `font-weight="${cardinal ? 700 : 400}" font-family="${LABEL_FONT}">${label}</text>`
     )
   }).join('')
 }
@@ -105,8 +170,8 @@ function sectorOverlay(sectors: Record<Entry, SectorArc>): string {
       // 1.4.11 asks of a graphical object); the fill only tints the wedge.
       return (
         `<path class="hsi-sector hsi-sector-${entry}" data-from="${from}" data-to="${to}" ` +
-        `d="${pieWedge(from, to, TICK_R)}" fill="${color}" fill-opacity="${OVERLAY_ALPHA.sectorFill}" ` +
-        `stroke="${color}" stroke-width="0.8"/>`
+        `d="${pieWedge(from, to, LAYOUT.tickR)}" fill="${color}" ` +
+        `fill-opacity="${OVERLAY_ALPHA.sectorFill}" stroke="${color}" stroke-width="0.9"/>`
       )
     })
     .join('')
@@ -115,11 +180,17 @@ function sectorOverlay(sectors: Record<Entry, SectorArc>): string {
 function coursePointer(course: number): string {
   // Drawn pointing up, rotated into place; magenta per G1000 GPS guidance.
   const m = PALETTE.pfd.course
+  const { cx, cy } = LAYOUT
+  const tip = cy - POINTER_TIP
+  const head = cy - POINTER_HEAD
+  const tail = cy + POINTER_TAIL
   return (
-    `<g class="hsi-course" transform="rotate(${course} ${C} ${C})">` +
-    `<polygon points="100,32 94,46 106,46" fill="${m}"/>` +
-    `<line x1="100" y1="46" x2="100" y2="162" stroke="${m}" stroke-width="2.4"/>` +
-    `<line x1="94" y1="162" x2="106" y2="162" stroke="${m}" stroke-width="2.4"/>` +
+    `<g class="hsi-course" transform="rotate(${course} ${cx} ${cy})">` +
+    `<polygon points="${cx},${tip} ${cx - POINTER_HALF_W},${head} ` +
+    `${cx + POINTER_HALF_W},${head}" fill="${m}"/>` +
+    `<line x1="${cx}" y1="${head}" x2="${cx}" y2="${tail}" stroke="${m}" stroke-width="2.6"/>` +
+    `<line x1="${cx - POINTER_HALF_W}" y1="${tail}" x2="${cx + POINTER_HALF_W}" y2="${tail}" ` +
+    `stroke="${m}" stroke-width="2.6"/>` +
     `</g>`
   )
 }
@@ -133,38 +204,76 @@ function thumbBand(turnDirection: TurnDirection): string {
   const [from, to] = turnDirection === 'right' ? [70, 90] : [270, 290]
   return (
     `<path class="hsi-thumb" data-from="${from}" data-to="${to}" ` +
-    `d="${bandWedge(from, to, ROSE_R, ROSE_R - 8)}" fill="${PALETTE.pfd.entry.teardrop}" ` +
-    `fill-opacity="${OVERLAY_ALPHA.thumbBand}"/>`
+    `d="${bandWedge(from, to, LAYOUT.roseR, LAYOUT.roseR - 9)}" ` +
+    `fill="${PALETTE.pfd.entry.teardrop}" fill-opacity="${OVERLAY_ALPHA.thumbBand}"/>`
+  )
+}
+
+/** Downward triangle on the centreline, apex touching the card edge. */
+function lubber(): string {
+  const { cx, cy, roseR } = LAYOUT
+  const apex = cy - roseR
+  const base = apex - LUBBER_H
+  return (
+    `<polygon class="hsi-lubber" points="${cx},${apex} ${cx - LUBBER_W / 2},${base} ` +
+    `${cx + LUBBER_W / 2},${base}" fill="${PALETTE.pfd.card}"/>`
+  )
+}
+
+/** Fuselage, wing and tailplane, symmetric about the rose centre so the
+ *  deviation bar (Task 4) reads across it. */
+function aircraft(): string {
+  const { cx, cy } = LAYOUT
+  const d =
+    `M ${cx} ${cy - 13} L ${cx} ${cy + 13} ` +
+    `M ${cx - 12} ${cy - 1} L ${cx + 12} ${cy - 1} ` +
+    `M ${cx - 5} ${cy + 9} L ${cx + 5} ${cy + 9}`
+  return (
+    `<path class="hsi-aircraft" d="${d}" stroke="${PALETTE.pfd.card}" stroke-width="2.2" ` +
+    `fill="none" stroke-linecap="round"/>`
+  )
+}
+
+/** The current-heading box, centred above the lubber mark. */
+function headingReadout(heading: number): string {
+  const { cx, boxY, boxH, readoutW } = LAYOUT
+  return (
+    `<rect class="hsi-heading-box" x="${cx - readoutW / 2}" y="${boxY}" width="${readoutW}" ` +
+    `height="${boxH}" rx="2" fill="${PALETTE.pfd.face}" stroke="${PALETTE.pfd.chrome}"/>` +
+    `<text class="hsi-heading-readout" x="${cx}" y="${boxY + boxH - 4.5}" text-anchor="middle" ` +
+    `fill="${PALETTE.pfd.card}" font-size="12" font-weight="700" ` +
+    `font-family="${DIGIT_FONT}">${courseText(heading)}</text>`
   )
 }
 
 export function renderHSI(el: Element, props: HSIProps): void {
   const heading = normalizeDeg(props.heading)
   const course = props.course === undefined ? undefined : normalizeDeg(props.course)
+  const { width, height, cx, cy, roseR } = LAYOUT
 
   const aria =
     `Heading ${courseText(heading)}` + (course === undefined ? '' : `, course ${courseText(course)}`)
 
   el.innerHTML =
-    `<svg class="hsi" viewBox="0 0 200 200" role="img" aria-label="${aria}">` +
-    // rotating card: bezel, sector wedges, ticks, labels, course pointer
-    `<g class="hsi-rose" transform="rotate(${r2(-heading)} ${C} ${C})">` +
-    `<circle cx="${C}" cy="${C}" r="${ROSE_R}" fill="${PALETTE.pfd.face}" ` +
-    `stroke="${PALETTE.pfd.chrome}" stroke-width="2"/>` +
+    `<svg class="hsi" viewBox="0 0 ${width} ${height}" role="img" aria-label="${aria}">` +
+    // The panel is the backdrop, so it is painted first and fills the viewBox:
+    // no instrument mark touches the light page, which is what lets
+    // palette.test.ts measure the whole `pfd` group against a single face.
+    `<rect class="hsi-panel" x="0" y="0" width="${width}" height="${height}" rx="10" ` +
+    `fill="${PALETTE.pfd.face}"/>` +
+    // rotating card: card ring, sector wedges, ticks, labels, course pointer
+    `<g class="hsi-rose" transform="rotate(${r2(-heading)} ${cx} ${cy})">` +
+    `<circle class="hsi-card-ring" cx="${cx}" cy="${cy}" r="${roseR}" fill="none" ` +
+    `stroke="${PALETTE.pfd.chrome}" stroke-width="1.6"/>` +
     (props.sectorOverlay ? sectorOverlay(props.sectorOverlay) : '') +
     ticks() +
     labels() +
     (course === undefined ? '' : coursePointer(course)) +
     `</g>` +
-    // airframe-fixed: thumb band, lubber line, aircraft symbol, readout
+    // airframe-fixed: thumb band, lubber mark, aircraft symbol, heading readout
     (props.thumbOverlay ? thumbBand(props.thumbOverlay) : '') +
-    `<polygon class="hsi-lubber" points="100,26 95,15 105,15" fill="${PALETTE.pfd.card}"/>` +
-    `<path class="hsi-aircraft" d="M100 90 L100 112 M90 99 L110 99 M95 109 L105 109" ` +
-    `stroke="${PALETTE.pfd.card}" stroke-width="2" fill="none" stroke-linecap="round"/>` +
-    `<rect x="79" y="0" width="42" height="15" rx="2" fill="${PALETTE.pfd.face}" ` +
-    `stroke="${PALETTE.pfd.chrome}"/>` +
-    `<text class="hsi-heading-readout" x="${C}" y="11.5" text-anchor="middle" ` +
-    `fill="${PALETTE.pfd.card}" ` +
-    `font-size="11" font-weight="700" font-family="system-ui, sans-serif">${courseText(heading)}</text>` +
+    lubber() +
+    aircraft() +
+    headingReadout(heading) +
     `</svg>`
 }
