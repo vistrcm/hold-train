@@ -1325,3 +1325,180 @@ failure this ledger records for the rejoin prose scan.
   state both-sides-protected / non-holding-narrower with the 8260.3G Table 16-6-1 citation.
   No regression test: the content-bank scans cover `src/content/` and the wind-lab screen,
   not `docs/` — docs prose remains guarded only by review.
+
+## Correction — 2026-08-07 (the entry drill depicted every clearance overhead the fix)
+
+Unlike most entries in this ledger, nothing here was a *false statement*. Every fact the drill
+rendered was correct; what was wrong was the **picture** — the only moment it could depict was one
+that is not the moment the decision is made, and the instrument depicting it showed an RMI's
+information content in an HSI's shape. A depiction a student rehearses is content, so it is
+recorded here on the same terms as a wrong sentence.
+
+- **Fixed: every scenario implied the aircraft was directly over the fix**
+  (`src/modules/entry-drill.ts`, `src/engine/nav.ts`, `src/ui/hsi.ts`). `generateScenario` produced
+  `seed → clearance + heading` and nothing else — the drill carried **no position at all**, so the
+  only picture the instrument could draw was the overhead one. A holding clearance arrives *before*
+  the clearance limit. **FAA JO 7110.65BB 4-6-1 c.4**, verbatim: *"When delay is expected, issue
+  items in subparagraphs a and b at least 5 minutes before the aircraft is estimated to reach the
+  clearance limit. If the traffic situation requires holding an aircraft that is less than 5 minutes
+  from the holding fix, issue these items immediately."* Its NOTE 1 ties that to the pilot's end of
+  the same timeline, **AIM 5-3-8 d**, verbatim: *"When an aircraft is 3 minutes or less from a
+  clearance limit and a clearance beyond the fix has not been received, the pilot is expected to
+  start a speed reduction so that the aircraft will cross the fix, initially, at or below the
+  maximum holding airspeed."* One rule from both seats, which is what makes the two numbers a
+  *window* rather than two unrelated figures. `EntryScenario` now carries `distanceNm`, drawn
+  uniformly across `MIN_DISTANCE_NM`–`MAX_DISTANCE_NM` and quantised to 0.1 NM (the resolution
+  `distanceText` renders — a stored 7.3365 would otherwise put "7.3 NM" on the panel beside a needle
+  computed from a different number). Both quotations are rendered on the screen inside their cited
+  spans (`.entry-lead`) and are **not** templated from the constants: a quotation with an
+  interpolation in it is not a quotation. ⚠️ The sub-paragraph is `c.4`, **not** `g` — the five
+  paragraphs after `c` are nested *under* it, which the rendered HTML and the order's PDF agree on
+  and recollection does not; the HTML renders its list markers from CSS and carries none in the
+  markup, so the letter was cross-checked against the PDF. `WebFetch` returns 403 on faa.gov;
+  `curl` with a browser UA was used. Regression tests: `cites both timings at sub-paragraph
+  granularity`, `quotes both timings verbatim with their sources, derivation kept outside`,
+  `places the aircraft inside the ATC lead window on every seed`,
+  `spans the window between the two verified timings`,
+  `spreads across the window rather than parking on one end` and
+  `quantises to the resolution distanceText renders` in `src/modules/entry-drill.test.ts`.
+- **⚠️ The groundspeed is a training assumption and must never become a citation.**
+  `NOMINAL_GROUNDSPEED_KT = 120` converts the two verified *timings* into the miles on the panel;
+  no FAA source supplies it. It is a typical light single's cruise, comfortably under the 200 KIAS
+  maximum holding airspeed at or below 6,000 ft (**AIM 5-3-8 j2**, TBL 5-3-1). The derivation
+  therefore renders **outside** both quoted spans, as `LEAD_DISTANCE_NOTE` — the same
+  `OUTBOUND_TIMING_AIM`/`OUTBOUND_TIMING_NOTE` split this ledger's citation convention requires.
+  The guard for that had to be strengthened after a mutation walked through it: asserting
+  `CLEARANCE_LEAD_ATC).not.toContain(LEAD_DISTANCE_NOTE)` is a claim about the *constants*, and the
+  template can still put the closing quotation mark after the derivation — presenting a training
+  assumption as FAA text with every plain `toContain` green. The test now asserts
+  ``toContain(`“${CLEARANCE_LEAD_ATC}”`)``: the quoted span must close *on* the FAA sentence. The
+  existing `OUTBOUND_TIMING_AIM`/`NOTE` pair has the same constant-level-only shape and the same
+  hole. Window: 3–5 min × 120 kt = **6.0–10.0 NM**. Regression test:
+  `quotes timings that still say what the generator’s constants claim` in
+  `src/modules/entry-drill.test.ts`, which fails when a constant is re-tuned and leaves a source
+  quoted beside a number it no longer governs.
+- **Fixed: the "course pointer" was an RMI needle wearing an HSI's shape** (`src/ui/hsi.ts`). A
+  full-length magenta line through the rose centre with no deviation bar, no TO/FROM flag and no
+  nav-status field carries exactly an RMI needle's information content — *the course is oriented
+  that way* — while being labelled and read as an HSI. The instrument is now a dark G1000-style PFD
+  panel: white card, cyan HDG box and heading bug, magenta CRS box and course pointer, a sliding
+  deviation bar with two dots a side, a TO/FROM glyph and a `GPS OBS <fix> <dist> TO/FROM` status
+  line. `FULL_SCALE_NM = 1` is what a dot means and a student reads it quantitatively, so it is a
+  user-visible aviation fact: **AIM 1-1-17 b.4**, verbatim: *"The GPS receiver must be set to
+  terminal (±1 NM) CDI sensitivity and the navigation routes contained in the database in order to
+  fly published IFR charted departures and DPs."* ⚠️ **The value is cited; the mode is not.** No FAA
+  source says a hold is flown on terminal scaling, and `1-1-17 b.5(e)` gives ±5 NM en route and
+  ±0.3 NM approach in the same sentence. What makes terminal the honest choice is that the drill's
+  6–10 NM window sits well inside the 30 NM at which terminal scaling arms — labelled as an
+  assumption in the `FULL_SCALE_NM` docblock, and if the window is ever widened past 30 NM the
+  constant becomes 5, not 1.
+- **The needle is derived by one oracle, and the assumption behind it is on the screen**
+  (`src/engine/nav.ts`). `courseDeviation(heading, course, distanceNm)` is the single source of the
+  cross-track and the TO/FROM sense; the card's glyph, the status line's word and the `aria-label`
+  are all threaded from one call, because three renderings of one flag that each compute their own
+  are three chances to disagree on one panel. The geometry: the aircraft lies at bearing
+  `heading + 180` from the fix, `xtk = -D·sin(heading - course)` with **positive = right of the
+  course line**, and the needle deflects **opposite** the displacement. `sense` is `to` on the open
+  ±90° semicircle, `from` at exactly 90°. ⚠️ `sense` is derived from **heading alone**, which is
+  valid *only* because bearing-to-fix equals heading under direct-to tracking — a vectored aircraft
+  would get a wrong flag. That assumption is stated in the docblock **and** rendered to the student
+  in the `.entry-scenario` line ("You are 8.4 NM from ZORVU, tracking direct to the fix."), rather
+  than left to be inferred from a needle. `distanceNm === 0` is **rejected** (`RangeError`, same
+  branch as negatives and non-finites): over the fix the cross-track is zero for every heading and
+  the sense reduces to an angle comparison with no geometric meaning, so callers must not depict it.
+  Regression tests: the ten hand-drawn goldens and four properties in `src/engine/nav.test.ts`
+  (notably `heading = course + 90: aircraft LEFT of course, FROM at the exact tie-break`,
+  `puts the aircraft left of course whenever its heading is right of course`,
+  `reports TO for exactly the open semicircle within 90 degrees of the course` and
+  `rejects zero distance: over the fix there is no geometry to report`); at the drawing level,
+  `lands one dot right of centre for a half-scale left cross-track`,
+  `deflects LEFT when the aircraft is RIGHT of the course`,
+  `pegs on the outer dot instead of sliding off the card`,
+  `points up the course arrow when the course closes on the fix` and
+  `points down the tail when the course opens away from the fix` in `src/ui/hsi.test.ts`. Every one
+  of those is hand-derived from the drawn picture, never re-read from `courseDeviation` — the same
+  tautology trap CLAUDE.md records for `turnToInbound`, where renderer and expectation flip together
+  if the engine inverts.
+- **OBS is a fidelity decision, not decoration** (`src/ui/hsi.ts`, `navStatus`). On a real G1000
+  with GPS as the nav source and an active leg, the CRS knob is **inoperative** and a direct-to
+  auto-slews the desired track, so the CDI stays centred. The picture this drill needs — a manually
+  selected course with a large live deflection — therefore cannot occur in that configuration; it
+  occurs in **OBS/SUSP mode and nowhere else**. Annunciating `OBS` on the status line is what makes
+  the depiction honest rather than merely plausible, and it is consistent with content the app
+  already ships (the `g1000-obs-hold` oral item covers SUSP/OBS holds; Garmin Pilot's Guides,
+  non-FAA and caveat-flagged, per the sources table at the top of this file). The selected course
+  is the **inbound holding course** — the pilot has set it to visualise the hold — which is what
+  keeps the lubber-vs-pointer relationship that *is* the entry technique on the instrument.
+  Regression test: `annunciates OBS, the only mode this picture occurs in` in `src/ui/hsi.test.ts`.
+- **Recorded, not fixed: the needle is pegged in the large majority of scenarios.** With a 6–10 NM
+  lead distance and ±1 NM full scale, the bar is on scale only when the heading is within roughly
+  6–10° of the holding course or its reciprocal. This is not an artifact of the chosen scale — an
+  angular VOR-style scale pegs at 10° for the same reason. It is the physics of receiving a hold
+  clearance while not established on the holding course, and it is the picture worth teaching: *the
+  needle is pinned because you are not on the inbound course — that is what an entry is for.*
+  **Do not shorten the distances to make the needle livelier**; that trades a true picture for a
+  busy one. Consequence for the tests: the one unpegged golden uses 1.0 NM, deliberately shorter
+  than anything the drill generates, and says so in its comment so a later reader does not "fix" it
+  to a realistic distance and quietly turn it into a peg test.
+- **Recorded, not fixed: TO/FROM plus the bar's side together fix the quadrant of
+  `heading − course`,** and two of the four quadrants determine the entry outright. No information
+  is leaked — heading and course are both already on the rose — but it is a shortcut a student could
+  adopt in place of the sector reasoning. Accepted: the shortcut exists only because the instrument
+  is honest, and cockpit mode still withholds the drawn sectors and the thumb band.
+- **The written-test entry figure has an explicit no-nav contract** (`src/ui/hsi.ts`,
+  `src/modules/written-test.ts`). `renderHSI` has **two** consumers, and the written bank's entry
+  questions supply `{ heading, course }` with no position. With `course` and no `nav`, the course
+  pointer is drawn and the deviation bar, dots, TO/FROM glyph and status line are all **suppressed**
+  — a real HSI removes the deviation indication when it has no valid nav data, and a bar centred on
+  a course the figure has no position for reads as "established on course" on a graded question.
+  The pointer's middle is left empty (that gap is the bar's track) so nothing fills it. This was
+  previously unspecified. Those are fixed content items; giving them a position is a separate
+  decision, deliberately not taken here. Regression tests:
+  `draws the course pointer and no deviation indication when nav is absent`,
+  `drops the whole assembly when no course is given` and
+  `is absent when the instrument has no nav data` in `src/ui/hsi.test.ts`;
+  `shows the entry figure with no deviation indication, and still grades` in
+  `src/modules/written-test.test.ts`.
+- **Colour meaning is now pinned across two instruments** (`src/ui/palette.ts`,
+  `src/ui/palette.test.ts`). The dark panel forced `PALETTE` to split into `plate.*` (the map,
+  values unchanged) and `pfd.*` (new, dark), which duplicates the three entry colours — and the HSI
+  and the plan-view map appear **together** in the feedback view, so a hue drift would teach two
+  colour codes for one entry type on one screen. `keeps each entry colour the same hue on both
+  instruments` holds each `pfd.entry.X` within 5° of hue of its `plate.entry.X` (measured gaps:
+  1.58°, 0.16°, 0.00°). Every colour is still computed against WCAG thresholds rather than judged by
+  eye, now per group (`clears WCAG contrast on every backdrop its group renders on`,
+  `measures every group it declares against a backdrop`), and the dark panel is its own SC 1.4.11
+  boundary at 17.10:1 against `--bg` (`separates the PFD panel from the page`). ⚠️ **An alpha is
+  tuned to a face, not to a palette:** inverting the backdrop inverts which way a tint moves it, so
+  `OVERLAY_ALPHA.sectorFill` at the white-face value of 0.1 rendered the learn-mode wedge at 1.15:1
+  on near-black — a wedge that is not there — while every existing assertion passed, because all of
+  them were *ceilings*. It is now 0.25, held between a floor (`tints the wedge enough to be seen at
+  all`) and the ceiling (`keeps every card mark legible over a tinted sector`).
+- **Deliberately unchanged** (verified, not overlooked): `determineEntry` and the whole answer key —
+  distance and deviation are **display state only**, and the AIM 5-3-8 j3 sector is decided by
+  heading alone; the plan-view map, which stays a light chart-like plate and gains no aircraft
+  position (`mapview.test.ts` passed unedited through the palette split, so its output is
+  byte-identical); the miss snapshot and `missesToCards`, since the entry answer is already rebuilt
+  from `heading` + `holdSpec` and distance cannot reach it; and the seed stream — `distanceNm` is
+  drawn from a **second `rng()` call appended after** the heading draw, so every existing seed keeps
+  its heading and its answer. That last one is the "rewrites history" harm: stored misses and Anki
+  cards are keyed by seed, and shifting the stream would swap the question the student actually
+  missed. Pinned by `keeps every existing seed on its original heading and answer` in
+  `src/modules/entry-drill.test.ts`, whose expectations are hand-derived on both halves — headings
+  from `mulberry32(seed ^ 0x9e3779b9)`, answers from the heading against the fixture hold (seed 7:
+  inbound 080 right, 353 − 080 = 273° in the 180°–290° parallel sector; seed 42: inbound 250 left,
+  173 − 250 = 283° in the mirrored 250°–360° direct sector).
+- **Screen wiring** (`src/modules/entry-drill.ts`). `drawHSI` passes `headingBug: heading` (parked
+  on the nose — realistic and intentional, so the HDG box, the bug and the heading readout all show
+  the same number) and `nav: { fix: holdSpec.fix, distanceNm }`. The `.entry-lead` footnote carrying
+  both timings sits at the **foot** of the screen, not under the panel: it is static, and a cockpit
+  student is timed on the distance from the picture to the answer buttons. Regression tests:
+  `gives the panel the fix, the distance and a bug parked on the nose`,
+  `shows the deviation indication the written-test figure suppresses`,
+  `renders the distance in prose through distanceText, not a second rounding`,
+  `names the fix in the scenario line exactly as the clearance names it` and
+  `keeps the learn/cockpit aid gating unchanged now the panel carries nav data` in
+  `src/modules/entry-drill.test.ts`.
+
+Full plan, with the per-task mutation tables that establish each guard actually binds:
+`docs/plans/20260807-g1000-hsi.md`.
