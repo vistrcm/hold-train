@@ -36,7 +36,14 @@ import {
   SPEED_REDUCTION_SOURCE,
 } from './entry-drill'
 import { courseText, distanceText } from '../format'
-import { DEVIATION_DOTS, FULL_SCALE_NM, FULL_SCALE_SOURCE, LAYOUT } from '../ui/hsi'
+import {
+  DEVIATION_DOTS,
+  FULL_SCALE_NM,
+  FULL_SCALE_SOURCE,
+  LAYOUT,
+  PX_PER_NM,
+  renderHSI,
+} from '../ui/hsi'
 
 /** First seed whose generated clearance is a charted "as published" hold. */
 const CHARTED_SEED = 4
@@ -854,8 +861,16 @@ describe('renderEntryDrill screen', () => {
   // This guards the *shape* of the correction, not just the deleted words: the
   // 30 NM may only appear tied to its reference point, and the drill's own window
   // may not be offered as the reason the mode is honest.
+  //
+  // Scanned off the RENDERED paragraph, not off the two constants it was built
+  // from: the screen composes `.entry-cdi` from five strings, so a scan of two
+  // of them lets the withdrawn claim back in through a sixth — a scope narrower
+  // than the claim, which is the failure mode CLAUDE.md records for the prose
+  // and README globs. What a student reads is the unit under test.
   it('does not offer the drill’s distance as a reason for terminal scaling', () => {
-    const prose = `${CDI_SCALE_NOTE} ${CDI_SCALE_AIM}`
+    const { el } = setup('cockpit')
+    const prose = el.querySelector('.entry-cdi')!.textContent ?? ''
+    expect(prose.length, 'the CDI footnote rendered empty').toBeGreaterThan(200)
     expect(prose).not.toMatch(/sits well inside/i)
     // Every mention of the threshold carries what it is measured from.
     for (const m of prose.matchAll(/30 NM/gi)) {
@@ -889,6 +904,41 @@ describe('renderEntryDrill screen', () => {
     expect(CDI_SCALE_NOTE).toContain('2 dots a side')
     expect(CDI_SCALE_NOTE).toContain('0.5 NM')
     expect(CDI_SCALE_NOTE).toContain('6–10 NM')
+  })
+
+  // "Expect it pegged across this drill's 6–10 NM window: unless you are nearly
+  // on the inbound course or its reciprocal, it is" is a claim about the DRAWN
+  // needle, and the test above only string-matches numbers. Re-tune
+  // `FULL_SCALE_NM` to the en route ±5 NM the withdrawn docblock once
+  // contemplated and the needle is essentially never pegged in this window while
+  // the screen goes on telling the student to expect it — negative training with
+  // the suite green. Asserted against the rendered bar, and both ways round, so
+  // it also fails a clamp that pegs everything and never lets go.
+  it('draws the pegged needle its own prose tells the student to expect', () => {
+    const course = 90
+    const full = FULL_SCALE_NM * PX_PER_NM
+    const deflection = (heading: number, distanceNm: number): number => {
+      const el = document.createElement('div')
+      renderHSI(el, { heading, course, nav: { fix: PUBLISHED_HOLDS[0]!.fix, distanceNm } })
+      return Math.abs(Number(el.querySelector('.hsi-cdi-bar')!.getAttribute('x1')) - LAYOUT.cx)
+    }
+    // "nearly on the course or its reciprocal" is asin(full scale / distance),
+    // widest at the near edge of the window. The note claims a narrow band.
+    const band = (Math.asin(FULL_SCALE_NM / MIN_DISTANCE_NM) * 180) / Math.PI
+    expect(band, 'the note promises a pegged needle, not a lively one').toBeLessThan(15)
+
+    for (const distanceNm of [MIN_DISTANCE_NM, MAX_DISTANCE_NM]) {
+      // every heading well clear of 090 and 270 pegs, either side
+      for (const heading of [0, 60, 120, 180, 240, 300]) {
+        expect(deflection(heading, distanceNm), `heading ${heading} at ${distanceNm} NM`).toBeCloseTo(
+          full,
+          6,
+        )
+      }
+      // and on the course it is genuinely centred, so the peg is the geometry
+      // rather than a bar stuck on the outer dot
+      expect(deflection(course, distanceNm), `on course at ${distanceNm} NM`).toBeCloseTo(0, 6)
+    }
   })
 
   it('keeps the learn/cockpit aid gating unchanged now the panel carries nav data', () => {

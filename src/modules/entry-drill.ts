@@ -143,8 +143,6 @@ export const CDI_SCALE_AIM =
   'navigation routes contained in the database in order to fly published IFR ' +
   'charted departures and DPs.'
 
-export const CDI_SCALE_SOURCE = FULL_SCALE_SOURCE
-
 /**
  * What terminal scaling is actually conditioned on, verbatim (AIM 1-1-17 b.5(e),
  * verified against
@@ -463,7 +461,7 @@ export function renderEntryDrill(el: HTMLElement, options: EntryDrillOptions = {
       <p class="entry-stats"></p>
       <p class="entry-lead">“${CLEARANCE_LEAD_ATC}” <cite>${CLEARANCE_LEAD_SOURCE}</cite>
         “${SPEED_REDUCTION_AIM}” <cite>${SPEED_REDUCTION_SOURCE}</cite> ${LEAD_DISTANCE_NOTE}</p>
-      <p class="entry-cdi">“${CDI_SCALE_AIM}” <cite>${CDI_SCALE_SOURCE}</cite>
+      <p class="entry-cdi">“${CDI_SCALE_AIM}” <cite>${FULL_SCALE_SOURCE}</cite>
         “${CDI_ARMING_AIM}” <cite>${CDI_ARMING_SOURCE}</cite>
         ${CDI_SCALE_NOTE}</p>
     </section>

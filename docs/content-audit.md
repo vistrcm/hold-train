@@ -1461,6 +1461,19 @@ recorded here on the same terms as a wrong sentence.
   is leaked — heading and course are both already on the rose — but it is a shortcut a student could
   adopt in place of the sector reasoning. Accepted: the shortcut exists only because the instrument
   is honest, and cockpit mode still withholds the drawn sectors and the thumb band.
+  *Amended 2026-08-08 with the arithmetic, which is sharper than "two of four quadrants" and worth
+  having on the record before anyone re-decides this.* With `d = angleDiff(inboundCourse, heading)`,
+  bar-right ⟺ `sin d > 0` and TO ⟺ `|d| < 90`, against `classify()` in `src/engine/entry.ts`
+  (direct `(−70, 110)`, teardrop `[110, 180]`, parallel `(−180, −70]`): bar-right + TO → `d ∈ (0, 90)`,
+  all direct; bar-left + FROM → `d ∈ (−180, −90)`, all parallel; bar-right + FROM → `d ∈ [90, 180)`,
+  **78% teardrop**; bar-left + TO → `d ∈ (−90, 0)`, **78% direct**. Guessing the majority in the two
+  "ambiguous" quadrants scores `(90 + 90 + 70 + 70)/360 = 88.9%` with no sector reasoning at all,
+  against a cockpit benchmark of 18/20 = 90% — and it is fast, which is the other half of what the
+  benchmark certifies. **Still accepted, and the reason is the first clause above, not the size of
+  the number**: `d` is fully determined by the pointer's angle against the lubber, both of which the
+  panel draws regardless, so withholding `nav` in cockpit mode would remove an honest picture
+  without removing the shortcut. What it would cost is the depiction of being cleared to hold while
+  not established, which is the whole reason the scenario carries a position.
 - **The written-test entry figure has an explicit no-nav contract** (`src/ui/hsi.ts`,
   `src/modules/written-test.ts`). `renderHSI` has **two** consumers, and the written bank's entry
   questions supply `{ heading, course }` with no position. With `course` and no `nav`, the course

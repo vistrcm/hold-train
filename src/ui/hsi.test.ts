@@ -127,10 +127,15 @@ describe('the PFD panel', () => {
     expect(el.querySelectorAll('.hsi-panel')).toHaveLength(1)
   })
 
-  it('rejects non-finite heading and course', () => {
+  // Every angle this instrument takes goes through `normalizeDeg`, so every one
+  // of them rejects — including the bug, which was added a task later than the
+  // other two and left out of the list they are checked in.
+  it('rejects a non-finite heading, course or heading bug', () => {
     const el = document.createElement('div')
     expect(() => renderHSI(el, { heading: NaN })).toThrow(RangeError)
     expect(() => renderHSI(el, { heading: 0, course: NaN })).toThrow(RangeError)
+    expect(() => renderHSI(el, { heading: 0, headingBug: NaN })).toThrow(RangeError)
+    expect(() => renderHSI(el, { heading: 0, headingBug: Infinity })).toThrow(RangeError)
   })
 })
 
@@ -273,6 +278,39 @@ describe('course pointer', () => {
   it('is absent when no course is given', () => {
     expect(render({ heading: 90 }).querySelector('.hsi-course')).toBeNull()
   })
+
+  // The gap in the middle of the pointer IS the no-nav contract, and it was the
+  // one part of it nothing looked at: `the no-nav contract` below only counts
+  // the deviation elements as absent. Draw the stem as one line from the
+  // arrowhead to the tail and a full course line runs straight through the
+  // aircraft symbol — visually a centred CDI, i.e. "established on course" on a
+  // graded written question — with the whole suite green.
+  //
+  // The gap is measured against a *rendered* bar rather than a retyped
+  // half-length, so the two facts stay one fact: the empty span exists for the
+  // needle that slides in it, and lengthening either alone reds this.
+  it('leaves the pointer’s centre empty, wide enough for the bar that slides there', () => {
+    const pointer = render({ heading: 90, course: 340 }).querySelector('.hsi-course')!
+    const segments = [...pointer.querySelectorAll('line')]
+    expect(segments.length).toBeGreaterThan(0)
+    let gapTop = -Infinity
+    let gapBottom = Infinity
+    for (const line of segments) {
+      const top = Math.min(num(line, 'y1'), num(line, 'y2'))
+      const bottom = Math.max(num(line, 'y1'), num(line, 'y2'))
+      expect(
+        top >= LAYOUT.cy || bottom <= LAYOUT.cy,
+        `a pointer segment spans the rose centre: ${top}–${bottom}`,
+      ).toBe(true)
+      if (bottom <= LAYOUT.cy) gapTop = Math.max(gapTop, bottom)
+      if (top >= LAYOUT.cy) gapBottom = Math.min(gapBottom, top)
+    }
+    const bar = render({ heading: 90, course: 340, nav: { fix: FIX, distanceNm: 8 } }).querySelector(
+      '.hsi-cdi-bar',
+    )!
+    const barLength = Math.abs(num(bar, 'y2') - num(bar, 'y1'))
+    expect(gapBottom - gapTop).toBeGreaterThanOrEqual(barLength)
+  })
 })
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -326,9 +364,13 @@ describe('the no-nav contract', () => {
   // Over the fix the cross-track is 0 for every heading and the sense has no
   // geometric meaning, so `courseDeviation` rejects it rather than let a
   // caller depict it. The instrument must not swallow that.
-  it('propagates the engine’s rejection of a non-positive distance', () => {
+  // NaN and Infinity take the other half of `courseDeviation`'s guard: they are
+  // not "non-positive", so a guard written as `distanceNm <= 0` alone would let
+  // them through and draw a bar at `NaN` — an attribute the DOM accepts and
+  // renders as nothing.
+  it('propagates the engine’s rejection of a distance that is not positive and finite', () => {
     const el = document.createElement('div')
-    for (const distanceNm of [0, -4]) {
+    for (const distanceNm of [0, -4, NaN, Infinity]) {
       expect(() =>
         renderHSI(el, { heading: 90, course: 90, nav: { fix: FIX, distanceNm } }),
       ).toThrow(RangeError)
@@ -418,6 +460,22 @@ describe('deviation bar', () => {
       LAYOUT.cx,
       6,
     )
+  })
+
+  // `barX` reads x only, so the needle's *length* was entirely unpinned — a bar
+  // with `y1 === y2` is an invisible needle and every deflection golden above
+  // still passes on it. Symmetry as well as length: the bar reads across the
+  // aircraft symbol, which is itself centred on the rose.
+  it('draws the bar as a visible needle, symmetric about the rose centre', () => {
+    const bar = render({
+      heading: 120,
+      course: 90,
+      nav: { fix: FIX, distanceNm: 1 },
+    }).querySelector('.hsi-cdi-bar')!
+    const top = num(bar, 'y1')
+    const bottom = num(bar, 'y2')
+    expect(LAYOUT.cy - top).toBeCloseTo(bottom - LAYOUT.cy, 6)
+    expect(bottom - top).toBeGreaterThan(0)
   })
 
   // Bar and dots are two readings of one scale, so this is drawn-against-drawn
@@ -705,6 +763,17 @@ describe('the accessible description', () => {
     expect(text).toContain(courseText(41))
     expect(text).toContain(courseText(300))
     expect(text).not.toContain('NM')
+    // and says nothing about a needle it does not draw
+    expect(text).not.toMatch(/deviation/i)
+  })
+
+  // The premise every assertion in this block rests on, and it was the one thing
+  // here nothing read: `role="presentation"` makes the label decorative — a
+  // screen reader announces nothing at all — while each test below still reads
+  // the attribute off the element and passes.
+  it('marks the panel as an image, so the label is what gets announced', () => {
+    const svg = render({ heading: 41, course: 300 }).querySelector('svg')!
+    expect(svg.getAttribute('role')).toBe('img')
   })
 
   // role="img" hides the SVG's internals, so a screen reader gets this string
@@ -716,11 +785,14 @@ describe('the accessible description', () => {
   // is satisfied by the heading alone. This test carried `headingBug: 41` beside
   // `heading: 41` and could not see that the bug reached the panel and not the
   // label — the exact gap the comment above claims it closes.
-  it('names heading, bug, course, fix, distance and sense when it has nav data', () => {
+  it('names heading, bug, course, deviation, mode, fix, distance and sense', () => {
     // heading 041 with course 300: tracking direct puts the aircraft southwest
     // of the fix, which bears 041 from it. Following 300 from there differs
     // from 041 by 101°, more than a right angle, so the course opens away —
-    // FROM, hand-derived rather than read back off the flag.
+    // FROM, hand-derived rather than read back off the flag. 12.4 NM at 101°
+    // off course is 12.2 NM of cross-track, twelve times full scale, and the
+    // aircraft is LEFT of the course (sin 101° > 0 puts the course to its
+    // right), so the needle pegs to the RIGHT.
     const text = label({
       heading: 41,
       course: 300,
@@ -730,9 +802,36 @@ describe('the accessible description', () => {
     expect(text).toContain(courseText(41))
     expect(text).toContain(courseText(120))
     expect(text).toContain(courseText(300))
+    expect(text).toContain('deviation full scale right')
+    expect(text).toContain('GPS OBS')
     expect(text).toContain(FIX)
     expect(text).toContain(distanceText(12.4))
     expect(text).toContain('FROM')
+  })
+
+  // The bar is the one reading on this panel that is a drawn mark rather than a
+  // box of digits, so it is the one a `role="img"` label can lose entirely — and
+  // it is the mark this instrument exists for. Goldens hand-derived from the
+  // drawn picture, like the pixel ones above, never re-read off `courseDeviation`.
+  it('reads the needle in dots, and names the peg rather than numbering it', () => {
+    // course 090, heading 120 at 1.0 NM: 0.50 NM left of course, so the course
+    // is 0.50 NM to the right — one of the two dots a side.
+    expect(label({ heading: 120, course: 90, nav: { fix: FIX, distanceNm: 1 } })).toContain(
+      'deviation 1.0 dots right',
+    )
+    // mirrored about the course
+    expect(label({ heading: 60, course: 90, nav: { fix: FIX, distanceNm: 1 } })).toContain(
+      'deviation 1.0 dots left',
+    )
+    // on course, and not "0.0 dots" either side — which would put a side on an
+    // aircraft that has none
+    const on = label({ heading: 90, course: 90, nav: { fix: FIX, distanceNm: 8 } })
+    expect(on).toContain('deviation centred')
+    expect(on).not.toMatch(/left|right/)
+    // and past full scale the needle stops, so the label stops counting too
+    expect(label({ heading: 180, course: 90, nav: { fix: FIX, distanceNm: 8 } })).toContain(
+      'deviation full scale right',
+    )
   })
 
   // The suppression half: a field absent from the panel must be absent here too,
@@ -853,6 +952,73 @@ describe('overlay paint (the colours palette.test.ts composites)', () => {
     expect(band.getAttribute('fill')).toBe(PALETTE.pfd.entry.teardrop)
     expect(Number(band.getAttribute('fill-opacity'))).toBe(OVERLAY_ALPHA.thumbBand)
     expect(band.getAttribute('stroke-opacity')).toBeNull()
+  })
+
+  // The other half of the same hole, and the larger one: `OVER_WEDGE` and
+  // `TIERS` in palette.test.ts are maps from a PALETTE key to what that colour
+  // draws — "pfd.card: the 30° labels, the major ticks, the lubber and the
+  // aircraft symbol" — and that premise is what fixes the tier each colour is
+  // measured at. Nothing checked it. Repaint `labels()` with `pfd.cardDim` and
+  // the 30° labels render at 3.79:1 over a tinted sector while
+  // `keeps every card mark legible over a tinted sector` goes on reporting the
+  // 4.5:1 that `pfd.card` satisfies — an SC 1.4.3 failure with the contrast
+  // suite green. Every mark either map names, asserted against the DOM.
+  it('paints every mark in the colour palette.test.ts measures it as', () => {
+    const el = render({
+      heading: 90,
+      course: 340,
+      headingBug: 120,
+      nav: { fix: FIX, distanceNm: 8 },
+    })
+    const paint = (selector: string, attr: 'fill' | 'stroke'): string => {
+      const node = el.querySelector(selector)
+      expect(node, selector).not.toBeNull()
+      return node!.getAttribute(attr) ?? ''
+    }
+
+    expect(paint('.hsi-panel', 'fill'), 'pfd.face is the backdrop').toBe(PALETTE.pfd.face)
+
+    // pfd.card — text tier, because the labels and the readouts are letters
+    for (const [selector, attr] of [
+      ['.hsi-label', 'fill'],
+      ['.hsi-lubber', 'fill'],
+      ['.hsi-aircraft', 'stroke'],
+      ['.hsi-heading-readout', 'fill'],
+      ['.hsi-obs', 'fill'],
+      ['.hsi-nav-fix', 'fill'],
+      ['.hsi-nav-distance', 'fill'],
+    ] as const) {
+      expect(paint(selector, attr), selector).toBe(PALETTE.pfd.card)
+    }
+
+    // pfd.cardDim — graphic tier, and the tightest colour over a tinted wedge
+    expect(paint('.hsi-cdi-dot', 'fill'), 'the deviation dots').toBe(PALETTE.pfd.cardDim)
+
+    // The ticks are one loop painted two ways: the 10° marks bright, the 5°
+    // marks dim. Both colours must appear, and which is which decides whether
+    // the bright or the dim value is the one measured on the card.
+    const strokes = [...el.querySelectorAll('.hsi-tick')].map((t) => t.getAttribute('stroke'))
+    expect(new Set(strokes)).toEqual(new Set([PALETTE.pfd.card, PALETTE.pfd.cardDim]))
+    expect(strokes[0], 'ticks start at 0°, a 10° mark').toBe(PALETTE.pfd.card)
+    expect(strokes[1], 'and 5° is not').toBe(PALETTE.pfd.cardDim)
+
+    // pfd.course — the nav source and the flag word as well as the card marks
+    for (const [selector, attr] of [
+      ['.hsi-course-head', 'fill'],
+      ['.hsi-cdi-bar', 'stroke'],
+      ['.hsi-tofrom', 'fill'],
+      ['.hsi-nav-source', 'fill'],
+      ['.hsi-nav-sense', 'fill'],
+    ] as const) {
+      expect(paint(selector, attr), selector).toBe(PALETTE.pfd.course)
+    }
+
+    expect(paint('.hsi-bug', 'fill'), 'the bug notch rides the card').toBe(PALETTE.pfd.bug)
+
+    // pfd.chrome — classified `null` in OVER_WEDGE (never over a tint) on the
+    // strength of these sitting outside the wedges' radius
+    expect(paint('.hsi-card-ring', 'stroke'), 'the card ring').toBe(PALETTE.pfd.chrome)
+    expect(paint('.hsi-hdg-box', 'stroke'), 'a value-box frame').toBe(PALETTE.pfd.chrome)
   })
 })
 

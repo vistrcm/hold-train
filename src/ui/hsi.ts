@@ -515,6 +515,25 @@ function navStatus(nav: NavState, sense: CourseDeviation['sense']): string {
   )
 }
 
+/**
+ * What the deviation bar reads, for the accessible description.
+ *
+ * In dots, because that is the unit the card draws and the student counts —
+ * `FULL_SCALE_NM / DEVIATION_DOTS` per dot. The bar shows where the *course* is,
+ * so it deflects opposite the cross-track: an aircraft right of course sees the
+ * needle left, and this says which way the needle went, not which way the
+ * aircraft is displaced. Pegged is named rather than numbered, because a bar on
+ * the outer dot means "at least this far" — which at the drill's 6–10 NM is the
+ * usual picture, and a number there would read as a measurement.
+ */
+function deviationText(crossTrackNm: number): string {
+  if (crossTrackNm === 0) return 'deviation centred'
+  const side = crossTrackNm > 0 ? 'left' : 'right'
+  if (Math.abs(crossTrackNm) >= FULL_SCALE_NM) return `deviation full scale ${side}`
+  const dots = Math.abs(crossTrackNm) / (FULL_SCALE_NM / DEVIATION_DOTS)
+  return `deviation ${dots.toFixed(1)} dots ${side}`
+}
+
 export function renderHSI(el: Element, props: HSIProps): void {
   const heading = normalizeDeg(props.heading)
   const course = props.course === undefined ? undefined : normalizeDeg(props.course)
@@ -536,6 +555,11 @@ export function renderHSI(el: Element, props: HSIProps): void {
 
   // role="img" below: a screen reader gets this whole string or none of the
   // picture, so a field that reaches the panel and not this line is invisible.
+  // That includes the deviation bar — the one reading here that is a drawn mark
+  // rather than a box of digits, and the reason this instrument replaced an
+  // overhead-the-fix rose — and the two annunciators, which say which nav source
+  // and mode the picture is of. Ordered as the panel is read: the value boxes,
+  // then the card, then the status line along the foot.
   const aria =
     `Heading ${courseText(heading)}` +
     // The HDG box is a field on the panel, so it belongs here even though the
@@ -545,7 +569,8 @@ export function renderHSI(el: Element, props: HSIProps): void {
     (course === undefined ? '' : `, course ${courseText(course)}`) +
     (nav === undefined || dev === undefined
       ? ''
-      : `, ${nav.fix} ${distanceText(nav.distanceNm)}, ${dev.sense.toUpperCase()}`)
+      : `, ${deviationText(dev.crossTrackNm)}, GPS OBS, ` +
+        `${nav.fix} ${distanceText(nav.distanceNm)}, ${dev.sense.toUpperCase()}`)
 
   el.innerHTML =
     `<svg class="hsi" viewBox="0 0 ${width} ${height}" role="img" aria-label="${aria}">` +
