@@ -1717,3 +1717,57 @@ amendment note pointing here.
   `names heading, bug, course, deviation, mode, fix, distance and sense`. That entry's own Task 9 note
   says names were harvested from source so every cross-reference resolves, "a stale name is worse than
   none".
+
+## Post-completion review fixes — 2026-08-08 (code review iteration 4)
+
+- **Fixed: `role="img"` hid the entire learn-mode teaching aid from screen readers**
+  (`src/ui/hsi.ts`). The panel's `aria-label` docblock states the governing rule — "a screen reader
+  gets this whole string or none of the picture, so a field that reaches the panel and not this line
+  is invisible" — and then the two overlays the drill layers *on top* of the instrument, the entry
+  sector wedges and the 20° thumb band, reached the panel and not the line. Every other omission that
+  rule has caught was a readout duplicated somewhere else on screen; this one was not. In learn mode
+  the wedges and the band **are** the content, the drill prints no other description of them before
+  the answer, and `flyItText` only appears after it — so a screen-reader user got the instrument and
+  none of the aid the mode exists for. Not a rendering bug: `OVERLAY_ALPHA` and `OVER_WEDGE` are
+  carefully tuned so the wedges are legible, but every one of those measurements is about the sighted
+  case, which is exactly how the gap stayed invisible to the contrast suite.
+- The label now carries `overlayText(props)`, read **last** — the instrument is what the student is
+  graded on and the aid is layered over it. Sector boundaries ride the card, so they are magnetic and
+  go through `courseText` like any other bearing; the band is airframe-fixed, so its numbers are angles
+  off the nose and deliberately **do not** (`courseText` would pad `70` to `070°`, which reads as a
+  heading). The suppression half matters more here than usual and is asserted: the drill draws the
+  sectors only in learn mode or *after* the answer, so a label naming them on a graded question would
+  hand the answer to a screen-reader user alone.
+- **The band's `[70, 90]` is now single-sourced** as `THUMB_BAND_DEG`. It was about to exist twice —
+  drawn in `thumbBand`, spoken in `overlayText` — which is the drift class this repo keeps re-learning:
+  the label would go on announcing a band the card had stopped drawing. Mirroring to the 9 o'clock side
+  for a nonstandard hold stays in the drawing, the only place that needs card angles. Mutation-confirmed
+  as genuinely one source: widening the constant to `[60, 90]` fails the spoken assertion **and** the
+  three drawn-band assertions together (4 failures), which a second copy could not do.
+- **Fixed: the "every mark" paint sweep left two rendered letters unmeasured** (`src/ui/hsi.test.ts`).
+  `paints every mark in the colour palette.test.ts measures it as` closes the hole where `TIERS`/
+  `OVER_WEDGE` assume what each colour draws and nothing checks it — its docblock claims "Every mark
+  either map names, asserted against the DOM". It asserted neither the `HDG`/`CRS` captions nor their
+  digits. The captions are load-bearing: `valueBox`'s own docblock says they are *why* `pfd.bug` is
+  classified `text` rather than `graphic`. Repainting them `pfd.chrome` — a plausible "quieten the
+  caption" edit — ships two rendered letters at 3.38:1, an SC 1.4.3 failure, while `palette.test.ts`
+  goes on certifying `chrome` at its graphic tier and the whole suite stays green. No live defect: the
+  shipping paint was already correct, which is precisely why only a coverage assertion closes it.
+  Same "a scope narrower than the claim reads as coverage" pattern as the ICAO-citation glob.
+- **Regression tests**, each mutation-confirmed against the defect it names: `names the entry sectors
+  it shades` (fails when the spoken arc ends are reversed, and when a sector name is paired with
+  another sector's arc — reordering the list alone correctly does *not* fail it, since no label→arc
+  pairing changes); `names the thumb band on the side it draws it`, asserted on **both** turn
+  directions because the side is the whole point — a label saying "right" over a nonstandard hold's
+  left-side band teaches the shortcut backwards; `says nothing about overlays it does not draw`; and
+  the four caption/digit paint assertions added to the sweep above.
+- **Reviewed and not changed: `nav.fix` is interpolated into the SVG text node and the `aria-label`
+  without escaping** (`src/ui/hsi.ts`), and the result is assigned through `el.innerHTML`. There is no
+  injection path today and it is not a latent one by accident: every value reaching it comes from the
+  frozen fixture lists in `src/engine/clearance.ts` (`PUBLISHED_HOLDS`, `VOR_NAMES`, `NDB_NAMES`),
+  which the fixture-name convention already constrains to invented five-letter idents, and the app has
+  no server, no import path and no free-text field feeding a hold. Escaping now would buy nothing and
+  add a hand-written HTML escaper to a zero-dependency codebase. Recorded because the calculus flips
+  the moment a fix name becomes user-supplied — a "build your own hold" screen or an imported
+  clearance makes this stored XSS with nothing else in the way, and that change must bring escaping
+  or an ident whitelist with it.

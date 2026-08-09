@@ -372,13 +372,23 @@ function coursePointer(course: number, dev: CourseDeviation | undefined): string
   )
 }
 
+/**
+ * The thumb band's edges in degrees **off the nose**: the nose-side edge is the
+ * 70° line (on a heading-up card the direct/parallel boundary, d = −70 in
+ * entry.ts, sits at course − heading = +70°) and the band runs 20° out from
+ * there to the 3 o'clock index.
+ *
+ * Held here rather than inside `thumbBand` because the band is drawn in one
+ * place and *spoken* in another (`overlayText`), and two hand-written copies of
+ * "70 to 90" drift — the label would go on announcing a band the card had
+ * stopped drawing. Mirroring to the 9 o'clock side for a nonstandard hold stays
+ * in the drawing, which is the only place that needs card angles.
+ */
+const THUMB_BAND_DEG = Object.freeze([70, 90] as const)
+
 function thumbBand(turnDirection: TurnDirection): string {
-  // Screen-fixed 20° band whose nose-side edge is the 70° line: on a
-  // heading-up card the direct/parallel boundary (d = −70 in entry.ts) sits
-  // at course − heading = +70°, i.e. 70° right of the nose. The band spans
-  // from there down to the 3 o'clock index; mirrored to the 9 o'clock side
-  // for a nonstandard (left-turn) hold.
-  const [from, to] = turnDirection === 'right' ? [70, 90] : [270, 290]
+  const [near, far] = THUMB_BAND_DEG
+  const [from, to] = turnDirection === 'right' ? [near, far] : [360 - far, 360 - near]
   return (
     `<path class="hsi-thumb" data-from="${from}" data-to="${to}" ` +
     `d="${bandWedge(from, to, LAYOUT.roseR, LAYOUT.roseR - 9)}" ` +
@@ -548,6 +558,39 @@ function deviationText(crossTrackNm: number): string {
   return `deviation ${(tenths / 10).toFixed(1)} dots ${side}`
 }
 
+/**
+ * The two teaching overlays, for the accessible description.
+ *
+ * They are drawn marks and nothing else on the panel repeats them, so without
+ * this they are the half of learn mode a screen reader never receives — the
+ * same silent loss `role="img"` inflicts on the deviation bar, but larger,
+ * because here the marks *are* the teaching content and the drill prints no
+ * other description of them before the answer.
+ *
+ * Read last, after the instrument: the panel is what the student is graded on
+ * and the aid is layered over it, which is also the order the eye takes them in.
+ *
+ * The sector boundaries ride the card, so they are magnetic and go through
+ * `courseText` like any other bearing. The band is airframe-fixed, so its
+ * numbers are angles off the nose, not bearings — deliberately not `courseText`,
+ * which would pad "70" to "070°" and read as a heading.
+ */
+function overlayText(props: HSIProps): string {
+  let text = ''
+  const sectors = props.sectorOverlay
+  if (sectors !== undefined) {
+    const arc = (entry: Entry): string =>
+      `${entry} ${courseText(sectors[entry].from)} to ${courseText(sectors[entry].to)}`
+    text += `, entry sectors: ${arc('direct')}, ${arc('teardrop')}, ${arc('parallel')}`
+  }
+  if (props.thumbOverlay !== undefined) {
+    const [near, far] = THUMB_BAND_DEG
+    // `turnDirection` is the side the band is drawn on, so it names the side.
+    text += `, thumb band ${near}° to ${far}° ${props.thumbOverlay} of the nose`
+  }
+  return text
+}
+
 export function renderHSI(el: Element, props: HSIProps): void {
   const heading = normalizeDeg(props.heading)
   const course = props.course === undefined ? undefined : normalizeDeg(props.course)
@@ -572,8 +615,10 @@ export function renderHSI(el: Element, props: HSIProps): void {
   // That includes the deviation bar — the one reading here that is a drawn mark
   // rather than a box of digits, and the reason this instrument replaced an
   // overhead-the-fix rose — and the two annunciators, which say which nav source
-  // and mode the picture is of. Ordered as the panel is read: the value boxes,
-  // then the card, then the status line along the foot.
+  // and mode the picture is of, and the two teaching overlays, which are drawn
+  // marks no readout repeats. Ordered as the panel is read: the value boxes,
+  // then the card, then the status line along the foot, then the overlays
+  // layered over all three.
   const aria =
     `Heading ${courseText(heading)}` +
     // The HDG box is a field on the panel, so it belongs here even though the
@@ -584,7 +629,8 @@ export function renderHSI(el: Element, props: HSIProps): void {
     (nav === undefined || dev === undefined
       ? ''
       : `, ${deviationText(dev.crossTrackNm)}, GPS OBS, ` +
-        `${nav.fix} ${distanceText(nav.distanceNm)}, ${dev.sense.toUpperCase()}`)
+        `${nav.fix} ${distanceText(nav.distanceNm)}, ${dev.sense.toUpperCase()}`) +
+    overlayText(props)
 
   el.innerHTML =
     `<svg class="hsi" viewBox="0 0 ${width} ${height}" role="img" aria-label="${aria}">` +

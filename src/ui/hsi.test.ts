@@ -896,6 +896,47 @@ describe('the accessible description', () => {
   it('omits the bug when no heading is selected', () => {
     expect(label({ heading: 41, course: 300 })).not.toMatch(/bug/i)
   })
+
+  // The two overlays are drawn marks that no box of digits repeats, so they are
+  // exactly what `role="img"` loses silently — the same hole the deviation bar
+  // was rescued from above, but larger: in learn mode the wedges and the band
+  // ARE the teaching content, and the drill offers no other description of them
+  // before the answer. A screen reader was getting the instrument and none of
+  // the aid the mode exists for.
+  it('names the entry sectors it shades', () => {
+    const hold = { inboundCourse: 340, turnDirection: 'right' } as const
+    const { sectors } = determineEntry(90, hold)
+    const text = label({ heading: 90, course: 340, sectorOverlay: sectors })
+    for (const entry of ['direct', 'teardrop', 'parallel'] as const) {
+      // Read off the engine, which is the oracle for the wedge that is drawn —
+      // the boundaries are magnetic, so they are spoken as bearings.
+      expect(text, entry).toContain(
+        `${entry} ${courseText(sectors[entry].from)} to ${courseText(sectors[entry].to)}`,
+      )
+    }
+  })
+
+  // Mirrored, because the band is the one overlay whose SIDE is the whole point:
+  // a label that says "right" over a nonstandard hold's left-side band teaches
+  // the shortcut backwards. Hand-derived from the drawn band rather than from
+  // the constant: the nose-side edge is the 70° line either way.
+  it('names the thumb band on the side it draws it', () => {
+    expect(label({ heading: 123, thumbOverlay: 'right' })).toContain(
+      'thumb band 70° to 90° right of the nose',
+    )
+    expect(label({ heading: 123, thumbOverlay: 'left' })).toContain(
+      'thumb band 70° to 90° left of the nose',
+    )
+  })
+
+  // The suppression half again, and it is not cosmetic here: the drill draws the
+  // sectors only in learn mode or after the answer, so a label naming them on a
+  // graded question hands over the answer to a screen-reader user alone.
+  it('says nothing about overlays it does not draw', () => {
+    const text = label({ heading: 90, course: 340, nav: { fix: FIX, distanceNm: 8 } })
+    expect(text).not.toMatch(/sector/i)
+    expect(text).not.toMatch(/thumb/i)
+  })
 })
 
 describe('thumb overlay (entry shortcut aid)', () => {
@@ -1071,6 +1112,18 @@ describe('overlay paint (the colours palette.test.ts composites)', () => {
     }
 
     expect(paint('.hsi-bug', 'fill'), 'the bug notch rides the card').toBe(PALETTE.pfd.bug)
+
+    // ⚠️ The value boxes are painted in TWO text nodes each — the `HDG`/`CRS`
+    // caption and the digits — and only the digits were measured anywhere (see
+    // `the selected-value boxes`). The captions are what makes `pfd.bug` a
+    // `text` colour at all in TIERS: repaint them `pfd.chrome` to quieten them
+    // and two rendered LETTERS ship at 3.38:1, an SC 1.4.3 failure, with the
+    // contrast suite still reporting `chrome` compliant at its graphic tier.
+    // The claim above this test is "every mark", so the captions belong to it.
+    expect(paint('.hsi-hdg-label', 'fill'), 'the HDG caption').toBe(PALETTE.pfd.bug)
+    expect(paint('.hsi-hdg-value', 'fill'), 'the HDG digits').toBe(PALETTE.pfd.bug)
+    expect(paint('.hsi-crs-label', 'fill'), 'the CRS caption').toBe(PALETTE.pfd.course)
+    expect(paint('.hsi-crs-value', 'fill'), 'the CRS digits').toBe(PALETTE.pfd.course)
 
     // pfd.chrome — classified `null` in OVER_WEDGE (never over a tint) on the
     // strength of these sitting outside the wedges' radius
