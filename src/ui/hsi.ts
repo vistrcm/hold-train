@@ -527,11 +527,25 @@ function navStatus(nav: NavState, sense: CourseDeviation['sense']): string {
  * usual picture, and a number there would read as a measurement.
  */
 function deviationText(crossTrackNm: number): string {
-  if (crossTrackNm === 0) return 'deviation centred'
   const side = crossTrackNm > 0 ? 'left' : 'right'
+  // The peg is where the clamp fires, so this test and `pegged` above read the
+  // same threshold and the word cannot appear for a bar drawn short of the dot.
   if (Math.abs(crossTrackNm) >= FULL_SCALE_NM) return `deviation full scale ${side}`
-  const dots = Math.abs(crossTrackNm) / (FULL_SCALE_NM / DEVIATION_DOTS)
-  return `deviation ${dots.toFixed(1)} dots ${side}`
+  // Every wording below is chosen from the number this will PRINT, never from
+  // the raw cross-track, so the three of them partition the pictures the panel
+  // can actually draw. Classifying from the raw value splits at both ends:
+  // a residual too small to move the bar off centre still fails `!== 0` and
+  // gets a side, and 1.976 dots rounds to the peg's own count, "2.0 dots",
+  // for a needle measurably short of the peg. Hence the clamp to one tenth
+  // below full scale — round-to-nearest is kept (`Math.sin(30°)` is
+  // 0.49999999999999994, and flooring would turn that exact one-dot picture
+  // into "0.9 dots"), it just may not reach the count the clamp owns.
+  const tenths = Math.min(
+    Math.round((Math.abs(crossTrackNm) / (FULL_SCALE_NM / DEVIATION_DOTS)) * 10),
+    DEVIATION_DOTS * 10 - 1,
+  )
+  if (tenths === 0) return 'deviation centred'
+  return `deviation ${(tenths / 10).toFixed(1)} dots ${side}`
 }
 
 export function renderHSI(el: Element, props: HSIProps): void {

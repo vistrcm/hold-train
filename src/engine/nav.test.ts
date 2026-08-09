@@ -47,8 +47,34 @@ describe('courseDeviation goldens', () => {
     // so the aircraft sits ON the eastbound line, EAST of the fix. Flying 090
     // from there goes away from the fix.
     const d = courseDeviation(270, 90, 10)
-    expect(d.crossTrackNm).toBeCloseTo(0, 10)
+    // ⚠️ `toBe`, not `toBeCloseTo`, and that is the whole assertion: ON the line
+    // means the cross-track is zero, not nearly zero. This golden read
+    // `toBeCloseTo(0, 10)` while its `heading = course` twin above read `toBe(0)`
+    // — the same geometric claim pinned exactly at one end of the line and
+    // loosely at the other — and the slack hid a real defect. `Math.sin(PI)` is
+    // 1.2e-16, so this end returned a denormal NEGATIVE, which the HSI's
+    // `deviationText` read as a side: "deviation 0.0 dots right" announced over
+    // a bar it drew dead centre, on ~1 shipping seed in 360.
+    expect(d.crossTrackNm).toBe(0)
     expect(d.sense).toBe('from')
+  })
+
+  // The two goldens above are the two ends of one line, and a guard that names
+  // only the two of them proves nothing about the third reciprocal pair. Swept
+  // rather than sampled, because the defect was a property of Math.sin at 180
+  // and not of any one course.
+  it('is exactly zero at BOTH ends of the course line, for every course', () => {
+    for (let course = 0; course < 360; course += 1) {
+      const inbound = courseDeviation(course, course, 10)
+      const outbound = courseDeviation(normalizeDeg(course + 180), course, 10)
+      expect(Object.is(inbound.crossTrackNm, 0), `course ${course} inbound`).toBe(true)
+      expect(Object.is(outbound.crossTrackNm, 0), `course ${course} outbound`).toBe(true)
+      // Object.is, so -0 fails too: it formats as "-0.0" and a readout saying
+      // minus zero miles off course looks like a value, the same trap
+      // `distanceText` throws on.
+      expect(inbound.sense).toBe('to')
+      expect(outbound.sense).toBe('from')
+    }
   })
 
   // One case per quadrant of (heading - course), all on course 090 east at

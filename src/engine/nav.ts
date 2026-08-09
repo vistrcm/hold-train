@@ -48,11 +48,23 @@ export function courseDeviation(
     throw new RangeError(`distance to the fix must be positive NM, got ${distanceNm}`)
   }
   const offCourse = angleDiff(course, heading)
-  const crossTrackNm = -distanceNm * Math.sin(offCourse * DEG)
+  // The course line runs BOTH ways from the fix, so the aircraft sits on it at
+  // two headings, not one: the course itself (inbound, short of the fix) and
+  // its reciprocal (outbound, past it). Either way the cross-track is exactly
+  // zero, and stating that here is what an oracle is for — `Math.sin` cannot.
+  // It returns +0 at 0 degrees, so the product is -0, which formats as "-0.0"
+  // and compares unequal to 0 under Object.is; and 1.2246e-16 at 180 degrees,
+  // so the outbound end came back a denormal NEGATIVE. Only the first was
+  // handled, which left the second reading as a real displacement to the left
+  // of the line: the HSI announced "deviation 0.0 dots right" over a bar it
+  // drew dead centre, on roughly one shipping seed in 360.
+  //
+  // Exact comparisons, deliberately — no epsilon. Off the two ends the
+  // cross-track is genuinely non-zero however small, and a tolerance here
+  // would round a real displacement away.
+  const onCourseLine = offCourse === 0 || Math.abs(offCourse) === 180
   return {
-    // Math.sin(0) is +0, so on course the product is -0, which formats as
-    // "-0.0" and compares unequal to 0 under Object.is.
-    crossTrackNm: crossTrackNm === 0 ? 0 : crossTrackNm,
+    crossTrackNm: onCourseLine ? 0 : -distanceNm * Math.sin(offCourse * DEG),
     sense: Math.abs(offCourse) < 90 ? 'to' : 'from',
   }
 }

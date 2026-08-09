@@ -834,6 +834,63 @@ describe('the accessible description', () => {
     )
   })
 
+  // ⚠️ The test above exercises the "no side" claim only at `heading === course`,
+  // which is the ONE on-course picture `Math.sin` gets exactly right. The course
+  // line runs both ways from the fix, and at the reciprocal end `Math.sin(PI)` is
+  // 1.2e-16, not 0 — so the aircraft that is most unambiguously ON the course
+  // line was the one announced as displaced. Reachable in the shipping drill:
+  // seed 648 renders heading 170 / course 350 / 9.1 NM and said
+  // "deviation 0.0 dots right" over a centred bar. Drawn-against-announced, so
+  // it binds whichever layer regresses.
+  it('announces no side at the far end of the course line, where the bar is centred', () => {
+    const props: HSIProps = { heading: 170, course: 350, nav: { fix: FIX, distanceNm: 9.1 } }
+    expect(num(render(props).querySelector('.hsi-cdi-bar')!, 'x1')).toBe(LAYOUT.cx)
+    const text = label(props)
+    expect(text).toContain('deviation centred')
+    expect(text).not.toMatch(/dots/)
+    // `left`/`right` appear nowhere else in the label, so this reads as written
+    expect(text).not.toMatch(/left|right/)
+  })
+
+  // The same claim with the oracle taken away: here the cross-track is real, so
+  // the fix in `nav.ts` does not reach this case and the label's own rounding is
+  // the only thing standing. "0.0 dots right" contradicts itself — it names a
+  // side and reports no deflection in one phrase — so a displacement under the
+  // tenth of a dot the label prints is reported the way it reads: centred.
+  it('reports a deflection below its own printed resolution as centred', () => {
+    const props: HSIProps = { heading: 90.1, course: 90, nav: { fix: FIX, distanceNm: 8 } }
+    // premise: 0.1 deg off course at 8 NM is 0.014 NM, which moves the bar less
+    // than half a pixel — there is no side on screen to name.
+    const barX = num(render(props).querySelector('.hsi-cdi-bar')!, 'x1')
+    expect(barX).not.toBe(LAYOUT.cx)
+    expect(Math.abs(barX - LAYOUT.cx)).toBeLessThan(1)
+    const text = label(props)
+    expect(text).toContain('deviation centred')
+    expect(text).not.toContain('0.0 dots')
+    expect(text).not.toMatch(/left|right/)
+  })
+
+  // "Full scale" is a state, not a measurement — the docblock's "at least this
+  // far", drawn by the clamp landing the bar on the outer dot. So the peg's
+  // NUMBER must not appear under it: rounding to the nearest tenth prints
+  // "2.0 dots" from 1.976, which tells a student the needle is at a stop it is
+  // measurably short of. Also a shipping picture (seed 154).
+  it('never prints the peg count for a needle short of the peg', () => {
+    const props: HSIProps = { heading: 38, course: 30, nav: { fix: FIX, distanceNm: 7.1 } }
+    // premise, from the drawing: the bar is off centre but NOT on a dot at all,
+    // so any "full scale" or "2.0" wording below describes a picture that is not
+    // on screen. Hand-derived: 7.1 NM x sin 8 deg = 0.988 NM, inside full scale.
+    const el = render(props)
+    const barX = num(el.querySelector('.hsi-cdi-bar')!, 'x1')
+    const dots = [...el.querySelectorAll('.hsi-cdi-dot')].map((d) => num(d, 'cx'))
+    expect(barX).not.toBe(LAYOUT.cx)
+    expect(dots).not.toContain(barX)
+    const text = label(props)
+    expect(text).not.toContain('full scale')
+    expect(text).not.toContain(`${DEVIATION_DOTS.toFixed(1)} dots`)
+    expect(text).toContain('deviation 1.9 dots right')
+  })
+
   // The suppression half: a field absent from the panel must be absent here too,
   // or the label describes an instrument the student is not looking at.
   it('omits the bug when no heading is selected', () => {

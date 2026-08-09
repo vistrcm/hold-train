@@ -1667,6 +1667,53 @@ amendment note pointing here.
   `headingBug: 41` beside `heading: 41`, so `toContain(courseText(41))` was satisfied by the heading
   alone and the bug field was never asserted. `HSIProps.headingBug`'s own docblock already records
   this trap for the drawn angle; the label had the same hole one field over. Regression tests:
-  `names heading, bug, course, fix, distance and sense when it has nav data` (now at
+  `names heading, bug, course, deviation, mode, fix, distance and sense` (now at
   `headingBug: 120`, `heading: 41`, mutation-confirmed) and `omits the bug when no heading is
   selected` for the suppression half.
+
+## Post-completion review fixes — 2026-08-08 (code review iteration 3)
+
+- **Fixed: the HSI announced a deflection side for a needle it drew dead centre** (`src/engine/nav.ts`,
+  `src/ui/hsi.ts`). At the reciprocal heading the aircraft sits **on** the course line, past the fix —
+  the outbound end of the same line `heading === course` puts it on. `courseDeviation` returned
+  `-1.1e-15` NM there rather than zero, because `Math.sin(PI)` is `1.2246e-16`, not `0`, and the
+  existing guard covered only the inbound end (`Math.sin(0)` is `+0`, whose product is `-0`). The
+  residual is negative, so `deviationText` fell past its `crossTrackNm === 0` branch and rendered
+  **"deviation 0.0 dots right"** — a side on an aircraft that has none, which is the exact reading the
+  function's own docblock and its test comment claim is impossible. The bar itself was drawn correctly
+  centred (`r2` rounds the offset to `cx`), so the panel and its `aria-label` described different
+  pictures, and `role="img"` means the label is *all* a screen-reader user gets: the one reading that
+  cannot be cross-checked against the drawing was the wrong one. **Reachable in the shipping drill** —
+  headings are integers and fixture inbound courses are multiples of 10 or 45, so 15 of the first 5000
+  seeds hit it (~1 in 360, i.e. most 20-question sessions); seed 648 renders heading 170 / course 350 /
+  9.1 NM and said "0.0 dots right".
+- **Fixed at both layers, because they are two different defects.** The oracle now states the geometry —
+  `offCourse === 0 || Math.abs(offCourse) === 180` is "on the course line", exact comparisons with **no
+  epsilon**, since off those two headings the cross-track is genuinely non-zero however small and a
+  tolerance would round a real displacement away. Separately, `deviationText` now chooses its wording
+  from the number it will **print** rather than from the raw cross-track, so its three wordings
+  partition the pictures the panel can draw.
+- **Fixed: an unpegged needle printed the peg's own count** (`src/ui/hsi.ts`). Rounding to the nearest
+  tenth turned 1.976 dots into `"2.0 dots"`, the full-scale number, for a bar measurably short of the
+  outer dot (0.988 NM of cross-track draws at 29.6 px against a dot at 30). "Full scale" is a *state* —
+  the docblock's "at least this far", drawn by the clamp — so the count it owns must not appear under
+  it. The printed tenths are now clamped to `DEVIATION_DOTS * 10 - 1`. Round-to-nearest is deliberately
+  **kept** rather than floored: `Math.sin(30°)` is `0.49999999999999994`, so flooring turns the exact
+  one-dot golden into `"0.9 dots"` (mutation M4 below fails on precisely that). 29 of the first 20000
+  seeds printed the peg count unpegged.
+- **Regression tests**, each mutation-confirmed against the specific defect it names:
+  `is exactly zero at BOTH ends of the course line, for every course` (`nav.test.ts`, swept over all
+  360 courses and asserted with `Object.is`, so `-0` fails too); the sibling golden
+  `heading = course + 180` upgraded from `toBeCloseTo(0, 10)` to `toBe(0)` — **the slack was the bug's
+  hiding place**, the same claim being pinned exactly at one end of the line and loosely at the other;
+  `announces no side at the far end of the course line, where the bar is centred` and
+  `never prints the peg count for a needle short of the peg` (`hsi.test.ts`), both drawn-against-
+  announced and both built from real shipping seeds (648 and 154); and
+  `reports a deflection below its own printed resolution as centred`, which is the one guard the
+  `nav.ts` fix does **not** reach — a genuine sub-tenth displacement — so the label layer's own
+  classification is load-bearing rather than fake coverage.
+- **Fixed: a stale test cross-reference** (`docs/content-audit.md`). The 2026-08-07 `aria-label` entry
+  cited `names heading, bug, course, fix, distance and sense when it has nav data`; the test is
+  `names heading, bug, course, deviation, mode, fix, distance and sense`. That entry's own Task 9 note
+  says names were harvested from source so every cross-reference resolves, "a stale name is worse than
+  none".
