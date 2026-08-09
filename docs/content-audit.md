@@ -1393,7 +1393,11 @@ recorded here on the same terms as a wrong sentence.
   terminal (±1 NM) CDI sensitivity and the navigation routes contained in the database in order to
   fly published IFR charted departures and DPs."* ⚠️ **The value is cited; the mode is not.** No FAA
   source says a hold is flown on terminal scaling, and `1-1-17 b.5(e)` gives ±5 NM en route and
-  ±0.3 NM approach in the same sentence. ~~What makes terminal the honest choice is that the drill's
+  ±0.3 NM approach in the same sentence. **⚠️ Amended 2026-08-08 (twice wrong, both minor):** the
+  citation is one outline level too shallow — the arming sentence is `b.5(e)(3)` — and the two
+  figures are **not** in the same sentence: ±5 NM en route → ±1 NM terminal is `b.5(e)(3)`, while the
+  ±0.3 NM approach ramp is `b.5(e)(5)` and is gated on 2 NM from the FAWP, not on the 30 NM. See the
+  2026-08-08 correction entry below. ~~What makes terminal the honest choice is that the drill's
   6–10 NM window sits well inside the 30 NM at which terminal scaling arms — labelled as an
   assumption in the `FULL_SCALE_NM` docblock, and if the window is ever widened past 30 NM the
   constant becomes 5, not 1.~~
@@ -1622,7 +1626,9 @@ amendment note pointing here.
   `FULL_SCALE_NM` docblock carried the same inference plus a corollary ("widen that window past
   30 NM and this constant becomes 5, not 1"), and `entry-drill.test.ts` repeated it in a comment
   justifying the `MAX_DISTANCE_NM < 30` bound. **The inference is invalid: it compares two different
-  distances.** AIM 1-1-17 b.5(e), fetched and verified verbatim against
+  distances.** AIM 1-1-17 b.5(e) — **amended 2026-08-08 to `b.5(e)(3)`; the `<ol>` walk this entry
+  cites was run only as far as the containing list, and `(e)` is the ~10-item "Procedures for
+  Accomplishing GPS Approaches"** — fetched and verified verbatim against
   faa.gov/air_traffic/publications/atpubs/aim_html/chap1_section_1.html (outline position confirmed
   by walking the published `<ol>` nesting, not by reading the rendered text): *"When an approach has
   been loaded in the navigation system, GPS receivers will give an 'arm' annunciation 30 NM straight
@@ -1771,3 +1777,64 @@ amendment note pointing here.
   the moment a fix name becomes user-supplied — a "build your own hold" screen or an imported
   clearance makes this stored XSS with nothing else in the way, and that change must bring escaping
   or an ident whitelist with it.
+
+## Post-completion review fixes — 2026-08-08 (code review iteration 5)
+
+- **Fixed: the thumb band was painted in an entry colour** (`src/ui/hsi.ts`, `thumbBand`). The 20°
+  band was filled `PALETTE.pfd.entry.teardrop` at `OVERLAY_ALPHA.thumbBand = 0.9` — a near-opaque
+  mark in one of the three colours the whole screen uses as an entry code. The stated reason, carried
+  in the test comment, was that "teardrop is the entry the shortcut resolves". **It is not, in either
+  reading of the card**, and the module's own `THUMB_BAND_DEG` docblock says so: the band's nose-side
+  edge is the **direct/parallel** boundary. By the pointer-head rule the "entries" lesson teaches, a
+  course-pointer head inside the band's 70°–90° resolves **parallel** — converting `sectorArcs`
+  (`direct: c−70…c+110`, `teardrop: c+110…c+180`, `parallel: c+180…c+290`) from heading into
+  pointer-head angle `C − H` gives direct `(−110, 70)`, parallel `[70, 180)`, teardrop `[180, 250)`.
+  By the drawn wedges' rule it resolves nothing: the wedges are indexed by **heading** and ride the
+  card, the band is airframe-fixed, so the pair they cover drifts with the scenario. At
+  `heading === inboundCourse` — a direct entry — the band covers magnetic `[C+70, C+90]`, squarely
+  inside the **green** direct wedge, and occludes its outer rim (band radii `roseR`→`roseR−9` =
+  84→75; wedges run to `tickR` = 80, so 5 px of genuine overlap). Orange then means both "teardrop
+  sector" and "thumb marker" on one screen — the second colour code that
+  `keeps each entry colour the same hue on both instruments` exists to prevent, arriving by a route
+  that guard cannot see. Pre-existing on master; the palette split made it louder, not new (on the
+  white face the composite was a dark brown, on the near-black panel it is a bright orange at 8.83:1).
+- **The fix is a marker colour, in-palette.** The band is now `PALETTE.pfd.cardDim`: already
+  classified `graphic` in both `TIERS` and `OVER_WEDGE`, so it needs no new palette entry and no new
+  classification, and it composites to **5.47:1** against `pfd.face` at the same 0.9 — clear of SC
+  1.4.11's 3:1. `pfd.chrome`, the only other non-semantic colour, was measured and rejected at
+  **2.95:1**. No alpha changed, so nothing drawn over a wedge moves.
+- Regression test: `paints the thumb band in a marker colour, never an entry colour`
+  (`src/ui/hsi.test.ts`), mutation-confirmed by restoring the teardrop fill. The **negative** half is
+  the durable one — the band may carry no entry colour, whichever marker colour is chosen — and the
+  positive half only ties the drawn colour to the one `palette.test.ts` composites, which is the
+  drawn-vs-measured tie the `overlay paint` block exists for. `keeps the thumb band above the graphic
+  tier` (`src/ui/palette.test.ts`) now composites `cardDim`; it reads `hsi.ts` as source text only, so
+  without the DOM assertion the two would be free to describe different pictures again.
+- **Fixed: `CDI_ARMING_SOURCE` cited one outline level too shallow** (`src/modules/entry-drill.ts`).
+  It read `AIM 1-1-17 b.5(e)`, rendered in a `<cite>` on the drill's CDI footnote. Re-fetching
+  faa.gov/air_traffic/publications/atpubs/aim_html/chap1_section_1.html and walking the `<ol>`
+  nesting to the **leaf** puts the quoted sentence at path `[2, 5, 5, 3]` over levels one→four =
+  **b.5(e)(3)**. `b.5(e)` is the containing ~10-item list "Procedures for Accomplishing GPS
+  Approaches", so a student following the citation landed on the list rather than the sentence. The
+  claim was never false, only coarse — but sub-paragraph granularity is the convention the 2026-08-07
+  entry above rests on, and that entry's own `<ol>` walk stopped at the container. Amended in place.
+- **Fixed: two AIM distances folded into one cite** (`src/ui/hsi.ts`, `FULL_SCALE_NM` docblock, and
+  the 2026-08-07 ledger entry). "b.5(e) gives the other two modes **in one sentence** … and ramps to
+  ±0.3 NM approaching the FAWP" — the ±0.3 NM ramp is a *different* sub-item, **b.5(e)(5)**, and is
+  conditioned on **2 NM from the FAWP**, not on b.5(e)(3)'s 30 NM from the airport/heliport reference
+  point. Same shape as the inference withdrawn on 2026-08-07: two distances treated as one condition.
+  Docblock-only (nothing renders it), corrected rather than deleted so the next session does not
+  re-derive it.
+- Regression test: the depth assertion added to `cites the CDI scale beside the needle, with the mode
+  caveat outside the quote` (`src/modules/entry-drill.test.ts`), mutation-confirmed by flattening the
+  constant back to `b.5(e)`. It pins the **shape** — `/^AIM 1-1-17 b\.5\(e\)\(\d+\)$/` — not the
+  string, because the regression is collapsing to the container, and a `toBe` on the full literal
+  would fail for a re-verified sub-item too.
+- **Reviewed and not changed: "tracking direct to the fix" beside the panel's `OBS` annunciation**
+  (`src/modules/entry-drill.ts` scenario line vs `navStatus` in `src/ui/hsi.ts`). Raised as a fidelity
+  conflict — a G1000 Direct-To auto-slews the desired track, so a pilot reads "direct to" as
+  implying a centred CDI, yet the needle is pegged. Not a defect: "tracking direct to the fix"
+  describes the **ground track**, which is `courseDeviation`'s stated and load-bearing assumption, and
+  it is compatible with a manually selected course in OBS — that combination is exactly why the
+  annunciator says OBS rather than being decorative. The prose cannot be deleted without unstating the
+  oracle's assumption. Recorded so the wording is not "fixed" into something that stops stating it.

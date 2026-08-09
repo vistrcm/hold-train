@@ -839,6 +839,18 @@ describe('renderEntryDrill screen', () => {
       CDI_ARMING_SOURCE,
     ])
 
+    // ⚠️ Sub-paragraph granularity is the convention, and the arming sentence is
+    // one level deeper than the citation used to claim. Walking the `<ol>`
+    // nesting of the fetched AIM page puts "…'arm' annunciation 30 NM straight
+    // line distance…" at path [2, 5, 5, 3] over levels one→four = b.5(e)(3);
+    // `b.5(e)` alone is the ~10-item list "Procedures for Accomplishing GPS
+    // Approaches", so a student following the `<cite>` landed on the list. This
+    // pins the DEPTH rather than the string: flattening it back to the container
+    // is the regression, and it is exactly what the shape check catches.
+    expect(CDI_ARMING_SOURCE, 'cite the sub-item, not the list containing it').toMatch(
+      /^AIM 1-1-17 b\.5\(e\)\(\d+\)$/,
+    )
+
     // The AIM sentences cite the VALUE and the arming CONDITIONS. Terminal mode
     // for a hold is this drill's assumption — the AIM is talking about departures
     // and DPs — so it stays outside both quoted spans, exactly as

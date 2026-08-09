@@ -144,8 +144,8 @@ export const CDI_SCALE_AIM =
   'charted departures and DPs.'
 
 /**
- * What terminal scaling is actually conditioned on, verbatim (AIM 1-1-17 b.5(e),
- * verified against
+ * What terminal scaling is actually conditioned on, verbatim (AIM 1-1-17
+ * b.5(e)(3), verified against
  * faa.gov/air_traffic/publications/atpubs/aim_html/chap1_section_1.html).
  *
  * This quotation is here to **withdraw** a claim, not to add one. The screen used
@@ -169,14 +169,23 @@ export const CDI_ARMING_AIM =
   'automatically). Without arming, the receiver will not change from en route CDI and RAIM ' +
   'sensitivity of ±5 NM either side of centerline to ±1 NM terminal sensitivity.'
 
-export const CDI_ARMING_SOURCE = 'AIM 1-1-17 b.5(e)'
+/**
+ * ⚠️ Cite the **sub-item**, not the list that contains it. This read `b.5(e)`
+ * until 2026-08-08; `(e)` is the ~10-item list "Procedures for Accomplishing GPS
+ * Approaches", and a student following the rendered `<cite>` landed on the list
+ * rather than the sentence. Walking the `<ol>` nesting of the fetched AIM page
+ * puts the quotation at path `[2, 5, 5, 3]` over levels one→four = b.5(e)(3).
+ * The neighbouring `±0.3 NM` ramp is a *different* sub-item, b.5(e)(5), and is
+ * conditioned on 2 NM from the FAWP — do not fold the two into one cite.
+ */
+export const CDI_ARMING_SOURCE = 'AIM 1-1-17 b.5(e)(3)'
 
 /**
  * The caveat, and why it is a separate string.
  *
  * The AIM sentences above cite the ±1 NM *value* and the conditions terminal
  * scaling arms under, and nothing else. No FAA source says a hold is flown on
- * terminal scaling, and b.5(e) does not supply one — see `CDI_ARMING_AIM`.
+ * terminal scaling, and b.5(e)(3) does not supply one — see `CDI_ARMING_AIM`.
  * Terminal is this drill's assumption. Folding that inside either quoted span
  * would present an assumption as FAA text, which is the failure the
  * `OUTBOUND_TIMING_AIM`/`OUTBOUND_TIMING_NOTE` split exists to prevent; this is

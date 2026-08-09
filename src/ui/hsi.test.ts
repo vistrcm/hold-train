@@ -1042,12 +1042,31 @@ describe('overlay paint (the colours palette.test.ts composites)', () => {
     }
   })
 
-  // The band is the teardrop colour because that is the entry the shortcut
-  // resolves, and it is drawn at its own alpha — a solid marker, not a tint,
-  // and measured as one.
-  it('paints the thumb band in the teardrop colour at the band alpha', () => {
+  // ⚠️ The band is NOT a sector, so it may not carry a sector's colour. It used
+  // to be painted `pfd.entry.teardrop` on the stated grounds that teardrop is
+  // "the entry the shortcut resolves" — which is false in both readings of the
+  // card. By the pointer-head rule the lesson teaches, a head inside the band's
+  // 70°–90° resolves PARALLEL (direct is (−110, 70), parallel [70, 180),
+  // teardrop [180, 250)), and `THUMB_BAND_DEG`'s own docblock calls the band's
+  // nose-side edge the direct/parallel boundary. By the wedges' rule the band
+  // resolves nothing at all: the wedges are indexed by heading and ride the
+  // card, the band is airframe-fixed, so at `heading === inboundCourse` this
+  // near-opaque marker sits inside the GREEN direct wedge. On a screen whose
+  // whole teaching device is a three-colour entry code, that is the second
+  // colour code `keeps each entry colour the same hue on both instruments`
+  // exists to prevent, arriving by a different route.
+  //
+  // So the durable assertion is the negative one — no entry colour — and the
+  // positive one only says which marker colour carries it. `pfd.cardDim` is the
+  // in-palette answer: already `graphic` in TIERS and OVER_WEDGE, and 5.47:1
+  // composited at this alpha. (`pfd.chrome` is the other non-semantic colour and
+  // fails at 2.95:1 — see the composite in palette.test.ts.)
+  it('paints the thumb band in a marker colour, never an entry colour', () => {
     const band = render({ heading: 123, thumbOverlay: 'right' }).querySelector('.hsi-thumb')!
-    expect(band.getAttribute('fill')).toBe(PALETTE.pfd.entry.teardrop)
+    const fill = band.getAttribute('fill')
+    const sectorColours = Object.values(PALETTE.pfd.entry)
+    expect(sectorColours, 'the band marks a boundary, not a sector').not.toContain(fill)
+    expect(fill).toBe(PALETTE.pfd.cardDim)
     expect(Number(band.getAttribute('fill-opacity'))).toBe(OVERLAY_ALPHA.thumbBand)
     expect(band.getAttribute('stroke-opacity')).toBeNull()
   })

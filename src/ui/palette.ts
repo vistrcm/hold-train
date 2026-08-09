@@ -62,10 +62,10 @@ export const OVERLAY_ALPHA = Object.freeze({
   sectorFill: 0.25,
   /**
    * The 20° thumb-band aid — a solid marker, not a tint, so it answers for
-   * itself at the graphic tier once composited: 8.83:1 on the dark face, up
-   * from the white face's ratio at the same 0.9. It needed no re-tuning, which
-   * is the point of measuring rather than assuming: only the fill's direction
-   * of travel reversed with the face.
+   * itself at the graphic tier once composited: 5.47:1 on the dark face in
+   * `cardDim`. It needed no re-tuning through the palette split, which is the
+   * point of measuring rather than assuming: only the fill's direction of
+   * travel reversed with the face.
    *
    * At 0.9 it OCCLUDES rather than tints, which is why it gets no `OVER_WEDGE`
    * treatment in palette.test.ts: the band spans radii `roseR`→`roseR − 9` and

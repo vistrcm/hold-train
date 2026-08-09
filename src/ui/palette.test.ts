@@ -90,7 +90,9 @@ const OVER_WEDGE: Readonly<Record<string, 'text' | 'graphic' | null>> = {
   // the 30° labels; the major ticks, lubber and aircraft symbol are the same
   // colour and only need the graphic tier, so text is what binds
   'pfd.card': 'text',
-  // minor ticks and the deviation dots
+  // minor ticks and the deviation dots. It also paints the thumb band, but that
+  // is drawn at `OVERLAY_ALPHA.thumbBand` and OCCLUDES the wedge rather than
+  // sitting over it, so the band answers in its own composited assertion below.
   'pfd.cardDim': 'graphic',
   // the bug notch rides the card; its digits are in the HDG box, on bare face
   'pfd.bug': 'graphic',
@@ -395,9 +397,15 @@ describe('instrument overlays, as composited', () => {
   })
 
   // The thumb band is a solid marker rather than a tint, so it answers for
-  // itself at the graphic tier once composited.
+  // itself at the graphic tier once composited. It is painted `pfd.cardDim` —
+  // a marker colour, deliberately not one of the three entry colours, since the
+  // band is the 70° boundary and not a sector (see the ⚠️ in hsi.test.ts). That
+  // costs contrast: 5.47:1 here against the old teardrop fill's 8.83:1, still
+  // clear of the graphic tier. `pfd.chrome`, the only other non-semantic colour,
+  // would land at 2.95:1 and fail — which is why this assertion is what fixes
+  // the choice rather than taste.
   it('keeps the thumb band above the graphic tier', () => {
-    const band = blend(PALETTE.pfd.entry.teardrop, face, OVERLAY_ALPHA.thumbBand)
+    const band = blend(PALETTE.pfd.cardDim, face, OVERLAY_ALPHA.thumbBand)
     expect(contrastRatio(band, face)).toBeGreaterThanOrEqual(MINIMUM.graphic)
   })
 

@@ -85,18 +85,21 @@ export interface HSIProps {
  * faa.gov/air_traffic/publications/atpubs/aim_html/chap1_section_1.html. AIM
  * 1-1-17 b.4, verbatim: "The GPS receiver must be set to terminal (±1 NM) CDI
  * sensitivity and the navigation routes contained in the database in order to
- * fly published IFR charted departures and DPs." AIM 1-1-17 b.5(e) gives the
+ * fly published IFR charted departures and DPs." AIM 1-1-17 b.5(e)(3) gives the
  * other two modes in one sentence — the receiver changes "from en route CDI and
  * RAIM sensitivity of ±5 NM either side of centerline to ±1 NM terminal
  * sensitivity" when the approach is armed, 30 NM from the airport reference
- * point, and ramps to ±0.3 NM approaching the FAWP.
+ * point. The ±0.3 NM approach ramp is a *separate* sub-item, b.5(e)(5), and is
+ * conditioned on 2 NM from the FAWP rather than on that 30 NM — this docblock
+ * used to append it to the sentence above, which folds two distances into one
+ * cite, the same shape as the withdrawal below.
  *
  * ⚠️ The *value* is cited; the *mode* is this drill's assumption and is not.
- * No FAA source says a hold is flown on terminal scaling, and b.5(e) does not
+ * No FAA source says a hold is flown on terminal scaling, and b.5(e)(3) does not
  * supply one. This docblock used to claim it did — that the drill's 6–10 NM
  * window "sits well inside the 30 NM at which terminal scaling arms", so widening
  * it past 30 NM would make this constant 5. That inference compares two different
- * distances and is withdrawn: b.5(e)'s 30 NM is measured from the airport/heliport
+ * distances and is withdrawn: that 30 NM is measured from the airport/heliport
  * reference point with an approach loaded and armed, while the window is a
  * distance to a *holding fix*, which implies neither. A hold 8 NM from its fix can
  * sit hundreds of miles from any airport on en route ±5 NM. So the window in
@@ -383,6 +386,10 @@ function coursePointer(course: number, dev: CourseDeviation | undefined): string
  * "70 to 90" drift — the label would go on announcing a band the card had
  * stopped drawing. Mirroring to the 9 o'clock side for a nonstandard hold stays
  * in the drawing, which is the only place that needs card angles.
+ *
+ * It is a **boundary marker, not a sector**, which is why it is painted in a
+ * marker colour and never an entry colour — see the ⚠️ on `paints the thumb
+ * band in a marker colour` in hsi.test.ts.
  */
 const THUMB_BAND_DEG = Object.freeze([70, 90] as const)
 
@@ -392,7 +399,7 @@ function thumbBand(turnDirection: TurnDirection): string {
   return (
     `<path class="hsi-thumb" data-from="${from}" data-to="${to}" ` +
     `d="${bandWedge(from, to, LAYOUT.roseR, LAYOUT.roseR - 9)}" ` +
-    `fill="${PALETTE.pfd.entry.teardrop}" fill-opacity="${OVERLAY_ALPHA.thumbBand}"/>`
+    `fill="${PALETTE.pfd.cardDim}" fill-opacity="${OVERLAY_ALPHA.thumbBand}"/>`
   )
 }
 
