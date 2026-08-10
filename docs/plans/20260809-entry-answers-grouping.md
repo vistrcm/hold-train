@@ -120,22 +120,32 @@ are real; the choice of rung is ours.
 - Modify: `src/styles.test.ts`
 - Modify: `src/styles.css`
 
-- [ ] Write a failing test in `styles.test.ts`: harvest the `.entry-answers-label` and
+- [x] Write a failing test in `styles.test.ts`: harvest the `.entry-answers-label` and
       `.entry-answers` rule blocks from the stylesheet text, read `margin-top` from the label and
       `gap` from the row, and assert `margin-top >= 3 * gap`. Add a `ruleBlock(css, selector)` helper
       beside the existing `rootBlock`, and parse `rem` values with a helper that throws rather than
-      returning `NaN`
-- [ ] Make it non-vacuous, in the idiom of the file: assert **both** rule blocks were actually found
+      returning `NaN` (`remValue`; unitless `0` accepted, every other notation refused)
+- [x] Make it non-vacuous, in the idiom of the file: assert **both** rule blocks were actually found
       and **both** declarations parsed to finite numbers. A selector typo must fail the test, not
-      pass it silently — every other scan in this file guards itself the same way
-- [ ] Comment the test with *why* the rule exists: these are page controls sitting directly beneath a
+      pass it silently — every other scan in this file guards itself the same way. Done as: both
+      blocks pinned to distinct content (`margin-top:` / `display: flex`), `gap > 0` (a zero gap
+      satisfies any margin — the real vacuity hole), and both parses pinned finite *by* those
+      comparisons rather than by a `Number.isFinite` line that could not fail
+- [x] Comment the test with *why* the rule exists: these are page controls sitting directly beneath a
       filled instrument region, and at a 1:1 ratio each button is as close to the panel as to its
       neighbours. State plainly that the multiplier is a **chosen convention with no published
       basis** (see the design-decision section of this plan), so a later session does not "improve"
       it by inventing a citation
-- [ ] Implement in `styles.css`: add `margin-top: 1.5rem` to `.entry-answers-label` (24 px = 3 x the
+- [x] Implement in `styles.css`: add `margin-top: 1.5rem` to `.entry-answers-label` (24 px = 3 x the
       8 px `gap`). Keep both values in `rem` so the guard compares like with like
-- [ ] Run `npm test` and `npm run typecheck` — must pass before Task 3
+- [x] Run `npm test` and `npm run typecheck` — must pass before Task 3 (753 passed, tsc clean)
+
+> Mutation-tested before being trusted, per CLAUDE.md. `gap` 0.5rem -> 0.6rem fails it (the
+> assertion moves with the constant, unlike a `toBe(1.5)`); `margin-top: 24px` throws at the parse.
+> `ruleBlock`'s two misreads are guarded by *different* mechanisms and needed separate synthetic
+> cases: the leading boundary stops a compound `.pill.row`, while the trailing `\s*\{` — not the
+> boundary — is what stops `.entry-answers` harvesting `.entry-answers-label`. The first synthetic
+> written here passed with the boundary deleted and its comment named the wrong mechanism.
 
 ### Task 3: Verify acceptance criteria
 

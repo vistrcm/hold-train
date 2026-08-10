@@ -33,6 +33,43 @@ function rootBlock(css: string): string {
   return match[1]
 }
 
+/** The declarations of one rule, by exact selector. Comments are stripped first
+ * so prose naming a class cannot be mistaken for the rule itself.
+ *
+ * Two different ways of reading the wrong rule, guarded separately: the
+ * trailing `\s*\{` is what stops `.entry-answers` harvesting
+ * `.entry-answers-label`'s block (the brace must follow the selector, so a
+ * longer name never matches), and the leading boundary is what stops it
+ * harvesting a *compound* rule that merely ends in it, `.foo.entry-answers`.
+ * Only the second needs the boundary — don't merge the two claims, because a
+ * later reader who thinks the boundary handles the suffix case will delete the
+ * part that actually does. Both return a block silently, so a mis-read is a
+ * green test computing its ratio from some other rule's numbers. */
+function ruleBlock(css: string, selector: string): string {
+  const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const code = css.replace(/\/\*[\s\S]*?\*\//g, ' ')
+  const match = code.match(new RegExp(`(?:^|[};,\\s])${escaped}\\s*\\{([^}]*)\\}`))
+  if (match?.[1] === undefined) throw new Error(`styles.css has no ${selector} rule`)
+  return match[1]
+}
+
+/** One declaration's value as a number of `rem`. Throws rather than handing
+ * back `NaN`: both `NaN >= x` and `NaN < x` are false, so a mis-parse would
+ * leave a comparison passing for whatever the stylesheet actually said.
+ * Unitless `0` is the one length CSS lets you write without a unit; every other
+ * notation (px, em, calc) is refused, because comparing two authored lengths
+ * only means something when they share a unit. */
+function remValue(block: string, prop: string): number {
+  const match = block.match(new RegExp(`(?:^|[;{\\s])${prop}\\s*:\\s*([^;}]+)`))
+  const raw = match?.[1]?.trim()
+  if (raw === undefined) throw new Error(`no ${prop} declared in {${block.trim()}}`)
+  if (raw === '0') return 0
+  const rem = raw.match(/^([\d.]+)rem$/)
+  const value = Number(rem?.[1])
+  if (!Number.isFinite(value)) throw new Error(`${prop}: ${raw} is not a rem length`)
+  return value
+}
+
 /** Every `--name: value` pair declared in `:root`, colour or not — the type
  * scale and `--touch` live there too. Harvested generically rather than by
  * matching `#`: a regex that only sees hex silently drops `--warn: orange` from
@@ -225,5 +262,61 @@ describe('styles.css', () => {
     expect(CSS).toMatch(/button,\s*\.module-link\s*\{[^}]*border:\s*1px solid var\(--border\)/)
     // `border: none` here would outrank the shared rule by source order.
     expect(CSS).not.toMatch(/\bbutton\s*\{[^}]*border:\s*none/)
+  })
+
+  // The whole spacing guard below rests on `ruleBlock` reading the rule it was
+  // asked for: every wrong read returns a block rather than throwing, so the
+  // ratio would be computed from some other rule's numbers and the failure
+  // would look like a stylesheet defect. Both misreads are exercised — the
+  // compound `.pill.row` (killed by the leading boundary) and the longer
+  // `.row-label` (killed by requiring the brace to follow). Pinned against a
+  // synthetic sheet so it keeps holding after styles.css is tidied.
+  it('reads a rule by exact selector, not by substring', () => {
+    const synthetic =
+      '.pill.row {\n  gap: 9rem;\n}\n.row-label {\n  margin-top: 1rem;\n}\n.row {\n  gap: 0.5rem;\n}\n'
+    expect(remValue(ruleBlock(synthetic, '.row'), 'gap')).toBe(0.5)
+    expect(remValue(ruleBlock(synthetic, '.row-label'), 'margin-top')).toBe(1)
+    expect(remValue(ruleBlock(synthetic, '.pill.row'), 'gap')).toBe(9)
+    expect(() => ruleBlock(synthetic, '.missing')).toThrow()
+    // Unitless zero is a length; px is not one this guard may compare.
+    expect(remValue('margin-top: 0;', 'margin-top')).toBe(0)
+    expect(() => remValue('gap: 8px;', 'gap')).toThrow(/not a rem length/)
+  })
+
+  // The answer buttons are page controls sitting directly beneath a filled,
+  // hard-edged instrument region — the HSI panel rect fills its whole viewBox,
+  // so the whitespace that used to be page is now panel. Without a separating
+  // margin the row is 0 px from that edge and 8 px from itself: each button is
+  // strictly closer to the instrument than to its neighbours, and the row reads
+  // as attached hardware (a bezel, a softkey strip) rather than as the answer
+  // input. The label carries the margin, not the row, so the gap opens above
+  // the group instead of between the label and the buttons it names.
+  //
+  // The 3x multiplier is a CHOSEN CONVENTION with no published basis, and is to
+  // be treated like `PARALLEL_INTERCEPT_DEG`: a legibility choice, never
+  // justified by a source. A search of the Gestalt primary sources, Carbon,
+  // Atlassian, MIL-STD-1472G, HF-STD-001B and WCAG 2.2 found no inter-group :
+  // intra-group ratio to cite — Palmer's common-region work is
+  // demonstration-only and says outright that when grouping factors oppose
+  // there is "no way to predict the outcome", and the case here (an element
+  // flush against but *outside* a filled region) is unmeasured in all of it.
+  // Do not "improve" this number by attaching a citation to it.
+  it('separates the answer group from the instrument above it', () => {
+    const label = ruleBlock(CSS, '.entry-answers-label')
+    const row = ruleBlock(CSS, '.entry-answers')
+    // Non-vacuous: `ruleBlock` throws on a selector typo, and these pin that it
+    // found two *different* rules rather than the same block twice.
+    expect(label, 'the label rule carries the separating margin').toMatch(/margin-top:/)
+    expect(row, 'the answer row is the flex container').toMatch(/display:\s*flex/)
+    expect(label).not.toBe(row)
+
+    // A `gap` of 0 would satisfy any margin at all, so the ratio is only
+    // meaningful once the intra-group spacing is known positive. Both parses
+    // are pinned finite by these two comparisons: `remValue` throws on a
+    // notation it cannot read, and NaN fails both of them.
+    const between = remValue(row, 'gap')
+    const separation = remValue(label, 'margin-top')
+    expect(between, 'inter-button gap must be a real distance').toBeGreaterThan(0)
+    expect(separation, 'answer group reads as part of the panel').toBeGreaterThanOrEqual(3 * between)
   })
 })
