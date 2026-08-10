@@ -164,6 +164,17 @@ button {
   margin: 0.35rem 0;
 }
 
+/* Names the answer row in the page's voice so it stops reading as a softkey
+   strip on the instrument above it. Its bottom margin is deliberately tighter
+   than the row's own 0.5rem inter-button gap, so the label binds to the buttons
+   it names rather than floating between panel and row. */
+.entry-answers-label {
+  font-size: var(--fs-sm);
+  color: var(--text-dim);
+  margin-top: 0;
+  margin-bottom: 0.35rem;
+}
+
 .entry-answers {
   display: flex;
   gap: 0.5rem;

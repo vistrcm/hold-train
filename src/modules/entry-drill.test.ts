@@ -527,6 +527,52 @@ describe('renderEntryDrill screen', () => {
     }
   })
 
+  // The answer row sits directly under the G1000 panel, which is a filled rect
+  // that fills its whole viewBox — flush against it, the buttons read as part of
+  // the instrument (a softkey strip) rather than as the answer input. The label
+  // is the first half of the separation: it gives the row a page voice, and it
+  // is what the detaching margin hangs on in styles.css (on the label, not on
+  // .entry-answers, so the gap opens above the group and not inside it).
+  it('names the answer row in the page’s voice, immediately above the buttons', () => {
+    const { el } = setup('learn')
+    const answers = el.querySelector<HTMLElement>('.entry-answers')!
+    const label = el.querySelector<HTMLElement>('.entry-answers-label')!
+    expect(label).not.toBeNull()
+    expect(label.textContent!.trim().length).toBeGreaterThan(0)
+    expect(label.hidden, 'the label is visible, not a screen-reader-only name').toBe(false)
+    // Immediately before: any element between them would take the margin's gap
+    // and be read as the thing the label names.
+    expect(answers.previousElementSibling).toBe(label)
+  })
+
+  // .entry-modes has carried role/aria-label since it shipped; .entry-answers
+  // carried neither, so a screen reader met three ungrouped, unexplained
+  // buttons. The visible label doubles as the accessible name.
+  it('groups the answer buttons and names them by the visible label', () => {
+    const { el } = setup('learn')
+    const answers = el.querySelector<HTMLElement>('.entry-answers')!
+    const label = el.querySelector<HTMLElement>('.entry-answers-label')!
+    expect(answers.getAttribute('role')).toBe('group')
+    const named = answers.getAttribute('aria-labelledby')
+    expect(named).not.toBeNull()
+    // The id must actually resolve, and to *that* label — an aria-labelledby
+    // pointing at nothing leaves the group anonymous with the markup looking right.
+    expect(el.querySelector(`#${named}`)).toBe(label)
+  })
+
+  // One template serves both modes, so this is a regression guard rather than a
+  // second behaviour: a future mode-specific branch must not drop the label from
+  // the timed view, where the row is the only thing the student touches.
+  it('labels and groups the row in cockpit mode too', () => {
+    const { el } = setup('cockpit')
+    const answers = el.querySelector<HTMLElement>('.entry-answers')!
+    const label = el.querySelector<HTMLElement>('.entry-answers-label')!
+    expect(label.textContent!.trim().length).toBeGreaterThan(0)
+    expect(answers.previousElementSibling).toBe(label)
+    expect(answers.getAttribute('role')).toBe('group')
+    expect(el.querySelector(`#${answers.getAttribute('aria-labelledby')}`)).toBe(label)
+  })
+
   // The plan-view picture of the entry is the thing an HSI cannot show — you
   // cannot see a teardrop's 30° offset or a parallel's >180° reintercept on a
   // compass rose. mapview builds and tests it; until it is rendered here the

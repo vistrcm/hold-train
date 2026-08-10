@@ -459,7 +459,15 @@ export function renderEntryDrill(el: HTMLElement, options: EntryDrillOptions = {
       <p class="entry-chart" hidden></p>
       <p class="entry-scenario"></p>
       <div class="entry-hsi"></div>
-      <div class="entry-answers">
+      <!-- The label is what tells the row apart from the panel above it: the
+           G1000 rect fills its viewBox, so buttons flush against it read as
+           attached hardware. It speaks in the page's voice, not the panel's, and
+           doubles as the group's accessible name (.entry-modes has had one since
+           it shipped; this row had neither role nor name). The detaching margin
+           lives on the label in styles.css — putting it on .entry-answers would
+           split the label from the buttons it names. -->
+      <p class="entry-answers-label" id="entry-answers-label">Which entry?</p>
+      <div class="entry-answers" role="group" aria-labelledby="entry-answers-label">
         ${ENTRIES.map(
           (e) => `<button class="entry-answer" data-entry="${e}">${ENTRY_LABELS[e]}</button>`,
         ).join('')}
