@@ -149,18 +149,25 @@ are real; the choice of rung is ours.
 
 ### Task 3: Verify acceptance criteria
 
-- [ ] Run the full suite: `npm test` — all green, no skipped files
-- [ ] Run `npm run typecheck` (`tsc --noEmit`) — clean
-- [ ] Confirm `main.test.ts`'s default-path test still passes (real registry, real localStorage, real
+- [x] Run the full suite: `npm test` — all green, no skipped files (29 files, 753 tests passed)
+- [x] Run `npm run typecheck` (`tsc --noEmit`) — clean
+- [x] Confirm `main.test.ts`'s default-path test still passes (real registry, real localStorage, real
       clock — the only test exercising the no-argument render path the browser actually takes)
-- [ ] Confirm `written-test.test.ts` is still green: it renders the *no-nav* HSI figure and shares the
-      `.hsi` rule and viewBox, so it is the regression surface for anything near that panel
-- [ ] **Manual, in-product** (not automatable — the research found no published blur-radius threshold
-      and no automated visual-grouping check exists): run the app, open `#/entry`, and confirm (a) the
+      (`every registered screen renders from the real default path`, 5/5 in that file)
+- [x] Confirm `written-test.test.ts` is still green: it renders the *no-nav* HSI figure and shares the
+      `.hsi` rule and viewBox, so it is the regression surface for anything near that panel (22/22)
+- [x] **Manual, in-product** (skipped — not automatable in this environment; needs a human eye at a
+      rendered screen, and the research found no published blur-radius threshold and no automated
+      visual-grouping check exists): run the app, open `#/entry`, and confirm (a) the
       answer row reads as a control group at a glance; (b) it survives an 8 px Gaussian blur as an
       object distinct from the panel; (c) it holds in both `learn` and `cockpit` mode; (d) it holds at
       a narrow mobile width, where the panel's 420 px cap no longer applies and the row and panel
-      widths converge — the worst case for this defect
+      widths converge — the worst case for this defect.
+      Partial mechanical coverage of the sub-points, so a later session knows what is and is not
+      actually verified: (c) is pinned by `entry-drill.test.ts` (the label renders in both modes);
+      (d)'s *spacing* half holds because `styles.css` carries no `@media` rule at all, so the 24 px
+      separation is width-independent — but whether it still reads as detached once the widths
+      converge is unverified. (a) and (b) are entirely unverified.
 
 ### Task 4: Update documentation
 
