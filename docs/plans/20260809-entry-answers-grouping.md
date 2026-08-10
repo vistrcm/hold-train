@@ -171,11 +171,16 @@ are real; the choice of rung is ours.
 
 ### Task 4: Update documentation
 
-- [ ] `CLAUDE.md`: extend the TDD bullet listing what `styles.test.ts` guards (currently `[hidden]`
+- [x] `CLAUDE.md`: extend the TDD bullet listing what `styles.test.ts` guards (currently `[hidden]`
       and `var(--x)` definedness) with the answer-group spacing ratio, stating that the multiplier is
-      a chosen convention and that no published source supplies one
-- [ ] **No README change**: no route is added or renamed and `PHASE_PREP` is untouched, so the
+      a chosen convention and that no published source supplies one. Done as a one-clause extension to
+      the existing bullet naming the invariant and its test, plus a following bullet carrying the
+      *why*: the viewBox-filling panel rect, the margin riding on the label rather than the row, the
+      refuted-sources list, and the three things that keep the guard non-vacuous (`rem`-only parsing,
+      `gap > 0`, and `ruleBlock`'s two separately-caused misreads)
+- [x] **No README change**: no route is added or renamed and `PHASE_PREP` is untouched, so the
       asserted module -> exam-phase table stays as-is. Do not reflow it
-- [ ] **No `docs/content-audit.md` entry**: the ledger records *content* corrections — user-visible
+      (verified: this plan's commits touch neither `README.md` nor `src/modules/dashboard.ts`)
+- [x] **No `docs/content-audit.md` entry**: the ledger records *content* corrections — user-visible
       aviation facts and their regression tests. This is a layout defect and teaches nothing wrong
-      about holding entries. Do not manufacture an entry to look thorough
+      about holding entries. Do not manufacture an entry to look thorough (verified untouched)
