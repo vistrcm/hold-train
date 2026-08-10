@@ -278,7 +278,13 @@ function ticks(): string {
 function labels(): string {
   return LABELS.map((label, i) => {
     const deg = i * 30
-    const cardinal = label.length === 1
+    // A letter, not a short string. `label.length === 1` reads '3' and '6' as
+    // cardinals and sets 030° and 060° in the bold 14 px letter treatment while
+    // the other six numbers stay 12 px/400 — two of the eight numerics styled
+    // unlike their siblings, on the card this instrument exists to make
+    // faithful. Pinned by `sets the eight numerics alike and the four letters
+    // apart`, which is what stops the length test coming back.
+    const cardinal = /^[A-Z]$/.test(label)
     return (
       `<text class="hsi-label" x="${LAYOUT.cx}" y="${LAYOUT.cy - LAYOUT.labelR}" ` +
       `transform="rotate(${deg} ${LAYOUT.cx} ${LAYOUT.cy})" text-anchor="middle" ` +

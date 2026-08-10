@@ -409,6 +409,44 @@ describe('instrument overlays, as composited', () => {
     expect(contrastRatio(band, face)).toBeGreaterThanOrEqual(MINIMUM.graphic)
   })
 
+  // The band's exemption from OVER_WEDGE rests on a premise nothing asserted:
+  // at 0.9 it OCCLUDES the marks in its 20° arc rather than tinting them, so
+  // measuring those marks over it would be measuring marks it deliberately
+  // hides. Lower the alpha and that stops being true — the marks come back as
+  // half-visible ghosts nothing measures, because the band is excluded from the
+  // only map that would measure them. The assertion above is a floor on the
+  // BAND, and the band gets *more* contrast as the alpha rises, so it passes
+  // all the way down to 0.6: the two constraints pull opposite ways and only
+  // this one bounds the alpha from below.
+  //
+  // Stated as a ceiling on what still shows through, which is the claim itself.
+  // Deliberately NOT an SC threshold — nothing here is required to be legible;
+  // the opposite. Like `TINT_FLOOR`, it is a chosen number that the values it
+  // must reject fail: 1.5 passes today (the white major ticks are the loosest
+  // at 1.36:1) and fails at 0.8, which is what "lower this materially" means.
+  const OCCLUSION_CEILING = 1.5
+
+  it('hides the card marks it covers rather than half-tinting them', () => {
+    const band = PALETTE.pfd.cardDim
+    const a = OVERLAY_ALPHA.thumbBand
+    // What the band's own arc looks like where no mark is under it.
+    const overFace = blend(band, face, a)
+    const showing: string[] = []
+    // Every mark the band's radii cross: the outer half of both tick weights
+    // and the inner half of the card ring.
+    for (const mark of ['card', 'cardDim', 'chrome'] as const) {
+      const ratio = contrastRatio(blend(band, PALETTE.pfd[mark], a), overFace)
+      if (ratio > OCCLUSION_CEILING) {
+        showing.push(`pfd.${mark} under the band: ${ratio.toFixed(2)} > ${OCCLUSION_CEILING}`)
+      }
+    }
+    expect(showing, 'the band is tinting these, so they need measuring').toEqual([])
+    // Non-vacuous: the same arithmetic at an alpha that does tint must report
+    // them, or the loop above would pass for a band painted at any strength.
+    const tinting = contrastRatio(blend(band, PALETTE.pfd.card, 0.5), blend(band, face, 0.5))
+    expect(tinting).toBeGreaterThan(OCCLUSION_CEILING)
+  })
+
   // Non-vacuous: if `blend` ever returned its foreground unchanged, every
   // assertion above would silently revert to measuring the opaque palette.
   // Stated without naming an alpha, so tuning one above fails the assertion it

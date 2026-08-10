@@ -543,6 +543,14 @@ describe('renderEntryDrill screen', () => {
     // Immediately before: any element between them would take the margin's gap
     // and be read as the thing the label names.
     expect(answers.previousElementSibling).toBe(label)
+    // And the other side of the same adjacency, which the whole spacing guard
+    // rests on and nothing asserted: the margin in styles.css detaches the group
+    // from whatever precedes the label, so it only closes this defect while that
+    // is the instrument. Move the panel below the row, or slip a hint line
+    // between them, and the buttons are flush against the G1000 rect again with
+    // both the DOM test above and the stylesheet ratio still green.
+    const above = label.previousElementSibling
+    expect(above?.className, 'the separating margin must land against the HSI').toBe('entry-hsi')
   })
 
   // .entry-modes has carried role/aria-label since it shipped; .entry-answers

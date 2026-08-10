@@ -53,12 +53,20 @@ function ruleBlock(css: string, selector: string): string {
   return match[1]
 }
 
-/** One declaration's value as a number of `rem`. Throws rather than handing
- * back `NaN`: both `NaN >= x` and `NaN < x` are false, so a mis-parse would
- * leave a comparison passing for whatever the stylesheet actually said.
- * Unitless `0` is the one length CSS lets you write without a unit; every other
- * notation (px, em, calc) is refused, because comparing two authored lengths
- * only means something when they share a unit. */
+/** One declaration's value as a number of `rem`.
+ *
+ * The refusal is the point, and it is a refusal of the *unit*, not of `NaN`:
+ * comparing two authored lengths only means something when they share one, and
+ * a lenient parse is what would pass a wrong ratio silently — `margin-top: 24px`
+ * against `gap: 0.5rem` compares 24 to 1.5 and clears `3 × gap` by a factor of
+ * 16 while the rendered gap is *smaller* than the buttons' own. Unitless `0` is
+ * the one length CSS lets you write without a unit, so it is the one exemption.
+ *
+ * Throwing rather than returning `NaN` buys a legible failure, not a caught
+ * one: `toBeGreaterThan`/`toBeGreaterThanOrEqual` both fail on `NaN`, so a NaN
+ * return would already red the suite — just with a message about spacing rather
+ * than about notation. Don't restate that as "NaN would leave the test green".
+ */
 function remValue(block: string, prop: string): number {
   const match = block.match(new RegExp(`(?:^|[;{\\s])${prop}\\s*:\\s*([^;}]+)`))
   const raw = match?.[1]?.trim()
@@ -318,5 +326,15 @@ describe('styles.css', () => {
     const separation = remValue(label, 'margin-top')
     expect(between, 'inter-button gap must be a real distance').toBeGreaterThan(0)
     expect(separation, 'answer group reads as part of the panel').toBeGreaterThanOrEqual(3 * between)
+
+    // The invariant has two sides and only one of them was guarded. The design
+    // is "the gap above the group exceeds the gaps inside it", so the label's
+    // own bottom margin is as load-bearing as its top one: raise it to the
+    // separation above and the label stops naming the row and becomes a third
+    // free-floating element between panel and buttons — the same grouping
+    // defect arriving from the other side, with the ratio above still passing.
+    // It is stated in the stylesheet's comment; this is what makes it hold.
+    const binding = remValue(label, 'margin-bottom')
+    expect(binding, 'the label must bind to the buttons it names').toBeLessThan(between)
   })
 })

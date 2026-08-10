@@ -1838,3 +1838,94 @@ amendment note pointing here.
   it is compatible with a manually selected course in OBS — that combination is exactly why the
   annunciator says OBS rather than being decorative. The prose cannot be deleted without unstating the
   oracle's assumption. Recorded so the wording is not "fixed" into something that stops stating it.
+
+## Post-completion review fixes — 2026-08-09 (code review iteration 6, entry answer-group branch)
+
+- **Fixed: two of the eight compass-card numerals were set as cardinals** (`src/ui/hsi.ts`, `labels`).
+  The treatment was chosen by `label.length === 1`, which is true of `'3'` and `'6'` as well as of
+  `N`/`E`/`S`/`W` — so 030° and 060° rendered at the bold 14 px letter face while `12`/`15`/`21`/`24`/
+  `30`/`33` rendered 12 px/400. The docblock two lines up states the intent ("cardinal letters,
+  numbers without the trailing zero elsewhere") and a real G1000 card sets all eight numerics alike.
+  Pre-existing on master (at the old 13/11 sizes), but inside the rewritten `labels()` and both
+  constants moved on this branch. Now `/^[A-Z]$/.test(label)`. Depiction fidelity, not an aviation
+  fact, so no `source` field — same class as the `GPS`/`OBS` annunciators.
+  Regression test: `sets the eight numerics alike and the four letters apart` (`src/ui/hsi.test.ts`),
+  mutation-confirmed by restoring the length test. Asserted as "the eight agree and differ from the
+  four" rather than against retyped px values, because the sizes have already changed once; the
+  third assertion is the non-vacuity half, since making *every* label identical also satisfies the
+  first two.
+- **Fixed: the plan-view instrument had no drawn-vs-measured paint tie** (`src/ui/mapview.test.ts`).
+  `hsi.test.ts`'s `paints every mark in the colour palette.test.ts measures it as` closed this hole
+  for the `pfd` half on 2026-08-08 and the `plate` half was left open. `palette.test.ts` reads
+  `mapview.ts` as **source text only**, so its scans are satisfied by any interpolated `PALETTE`
+  value: repainting the fix label or the north `N` with `plate.inkDim` ships two rendered letters at
+  **3.61:1** — an SC 1.4.3 failure — while the contrast suite goes on reporting `inkDim` compliant at
+  its 3:1 graphic tier. This branch also re-tiered `plate.readout` from `text` down to `graphic` on
+  the strength of a comment ("it drew the HSI's heading digits until the palette split"), so the
+  claim that it now draws only the flown polyline was load-bearing and unasserted.
+  Regression tests: three, under `paint (every mark in the colour palette.test.ts measures it as)`.
+  Mutation-confirmed twice — the north `N` repainted `plate.inkDim`, and the flown track repainted
+  `plate.ink` — each reds exactly one.
+- **Fixed: the `OVER_WEDGE` "`pfd.chrome` is never over a tint" premise was pinned to a constant that
+  moves with it** (`src/ui/hsi.test.ts`). The guard was `expect(Number(r)).toBeCloseTo(LAYOUT.tickR)`,
+  but the wedge is *drawn at* `LAYOUT.tickR`, so raising that constant to `roseR` moves both sides
+  together: the card ring then renders over a tint at **1.96:1**, SC 1.4.11, with the assertion that
+  exists to prevent it still passing. This is the documented trap — "guarding a constant needs an
+  assertion whose value moves with it" — reappearing in the guard written to close a different half
+  of it. The premise is a relation between two *rendered* radii, so both now come off the DOM
+  (`.hsi-card-ring`'s `r` vs the wedge path's). Mutation-confirmed at `tickR: 84`.
+- **Fixed: `OVERLAY_ALPHA.thumbBand`'s "occludes rather than tints" premise had no floor**
+  (`src/ui/palette.test.ts`, `src/ui/palette.ts`). The band is excluded from `OVER_WEDGE` because at
+  0.9 it *hides* the marks in its 20° arc, and its docblock warns "lower this materially and that
+  stops being true". Nothing asserted it, and the existing `keeps the thumb band above the graphic
+  tier` cannot: the band gains contrast as the alpha **rises**, so that assertion passes all the way
+  down to 0.6 while the ticks and card ring under the band come back as half-visible ghosts nothing
+  measures. At 0.7 the major ticks read **2.52:1** through it. New guard `hides the card marks it
+  covers rather than half-tinting them` states the claim as a ceiling on what still shows through
+  (`OCCLUSION_CEILING = 1.5`): deliberately **not** an SC threshold — the requirement here is the
+  opposite of legibility — and, like `TINT_FLOOR`, a chosen number the values it must reject fail.
+  Passes today at 1.36:1 (the white major ticks are the loosest), reds at 0.8. Mutation-confirmed.
+  The docblock's "washing them to ~1.15:1" was also wrong for the brightest mark and now gives the
+  measured range, 1.12:1 (chrome) – 1.36:1 (white major ticks).
+- **Fixed: the answer-group invariant was guarded on one side only** (`src/styles.test.ts`,
+  `src/modules/entry-drill.test.ts`, CLAUDE.md). The design is "the gap above the group exceeds the
+  gaps inside it", and only `margin-top >= 3 × gap` was asserted. Raising `.entry-answers-label`'s
+  `margin-bottom` to the separation re-attaches the label to the panel and splits it from the row it
+  names — the same grouping defect arriving from below, with the ratio still passing. Separately,
+  the ratio only closes the defect while the element above the label *is* the instrument, which is a
+  DOM fact no stylesheet assertion can see: slipping a hint line between them, or moving the panel,
+  puts the buttons flush against the G1000 rect again with both guards green. Now
+  `margin-bottom < gap` in the stylesheet guard and `label.previousElementSibling === .entry-hsi` in
+  the DOM one. Both mutation-confirmed.
+- **Amended: the stated reason `remValue` throws was inverted** (`src/styles.test.ts` docblock and
+  CLAUDE.md). Both said a `NaN` return "would leave both comparisons false and the test green". It
+  would not: `toBeGreaterThan`/`toBeGreaterThanOrEqual` **fail** on `NaN`, so a NaN parse reds the
+  suite — and the same file said so correctly 250 lines further down. The throw's real value is
+  refusing a foreign **unit**: a *lenient* parse is the green-test hazard, since `margin-top: 24px`
+  against `gap: 0.5rem` compares 24 to 1.5 and clears `3 × gap` sixteenfold while the drawn gap is
+  smaller than the buttons' own. Recorded because CLAUDE.md's own rule is that a comment
+  misattributing which assertion catches which failure mode argues the next session into deleting
+  the part that works — here, the rem-only regex.
+- **Amended: CLAUDE.md's `renderHSI` prop inventory undercounted the entry drill** (CLAUDE.md). It
+  listed `heading`, `course`, `headingBug`, `nav` and stopped; `drawHSI` also passes `thumbOverlay`
+  in learn mode and `sectorOverlay` in learn mode or once an answer is graded. Read as the definitive
+  contract inventory the bullet is written to be, that says the two overlays have no production
+  caller — they are the whole learn-mode teaching aid and the reason `OVERLAY_ALPHA`'s ceiling/floor
+  tuning and `OVER_WEDGE` exist. Same class of under-count the bullet itself was written to correct.
+- **Fixed: the answer-group plan's manual step named a route that does not exist**
+  (`docs/plans/20260809-entry-answers-grouping.md`). It said "open `#/entry`"; the registered path is
+  `entry-drill` and `entry` is the drill's **store id** — the two-namespaces-one-string confusion
+  CLAUDE.md flags for drill ids. That step carries the sub-points explicitly recorded as unverified,
+  so it is the instruction a later session actually follows, and it landed on the router's
+  unknown-route path.
+- Also corrected: CLAUDE.md cited `leaves the pointer’s centre empty…` with an ASCII apostrophe while
+  the test title uses a typographic one, so a literal grep of the name returned nothing.
+- **Considered and not changed.** (a) The dot loop's `(i / DEVIATION_DOTS) * FULL_SCALE_NM *
+  PX_PER_NM` is algebraically `i * DOT_SPACING`, but the round trip is what keeps the dots on the
+  same NM scale as the bar rather than on `DOT_SPACING` alone; the redundancy is the coupling.
+  (b) `hueOf`'s two inner modulo guards are identities over the reachable range — it is the canonical
+  HSL formula and re-deriving a tested numeric oracle for cosmetics is churn. (c) `written-test.ts`'s
+  figure sits above `.written-options` with the same 0 px-to-panel geometry; the plan scoped other
+  screens out deliberately, so it stays a follow-up decision rather than a silent scope widening.
+  (d) The completed plan was **not** moved to `docs/plans/completed/` — the review loop reads it at
+  its current path, so archiving is the step after review closes, not part of it.

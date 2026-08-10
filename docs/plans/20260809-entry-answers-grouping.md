@@ -158,7 +158,8 @@ are real; the choice of rung is ours.
       `.hsi` rule and viewBox, so it is the regression surface for anything near that panel (22/22)
 - [x] **Manual, in-product** (skipped — not automatable in this environment; needs a human eye at a
       rendered screen, and the research found no published blur-radius threshold and no automated
-      visual-grouping check exists): run the app, open `#/entry`, and confirm (a) the
+      visual-grouping check exists): run the app, open `#/entry-drill` — that is the route; `entry` is
+      the drill's *store id*, not a path, and the router has no such screen — and confirm (a) the
       answer row reads as a control group at a glance; (b) it survives an 8 px Gaussian blur as an
       object distinct from the panel; (c) it holds in both `learn` and `cockpit` mode; (d) it holds at
       a narrow mobile width, where the panel's 420 px cap no longer applies and the row and panel

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { ENTRIES, entryGuidance } from '../engine/entry'
 import { renderMap, type MapProps } from './mapview'
+import { PALETTE } from './palette'
 
 const MIN_LEG = { unit: 'min', value: 1 } as const // 1.5 NM at ~90 kt
 
@@ -300,6 +301,77 @@ describe('entry-path illustration (engine is the oracle)', () => {
 
   it('is absent when not requested', () => {
     expect(render({ holdSpec: hold() }).querySelector('.map-entry')).toBeNull()
+  })
+})
+
+// The mirror of `paints every mark in the colour palette.test.ts measures it as`
+// in hsi.test.ts, for the other instrument. That hole was closed for the `pfd`
+// half and left open for `plate`: palette.test.ts's `TIERS` is a map from a
+// PALETTE key to what that colour draws ("plate.ink: the fix name, the north
+// letter, the racetrack and ownship symbols"), and the tier it names is what
+// fixes the threshold each colour is measured at — but palette.test.ts reads
+// this module only as source text, so its scans are satisfied by *any*
+// interpolated PALETTE value. Repaint the fix label or the north "N" with
+// `plate.inkDim` and two rendered LETTERS ship at 3.61:1, an SC 1.4.3 failure,
+// with the contrast suite still reporting `inkDim` compliant at its graphic
+// tier — the premise it measured and the picture that renders are two pictures.
+//
+// This branch also re-tiered `plate.readout` from `text` down to `graphic` on
+// the strength of a comment ("it drew the HSI's heading digits until the
+// palette split"), so the claim that it now draws only the flown polyline is
+// load-bearing and, until here, unasserted.
+describe('paint (every mark in the colour palette.test.ts measures it as)', () => {
+  const el = render({
+    holdSpec: hold({ fix: 'HAIRE' }),
+    ownship: { position: { e: 1, n: -2 }, heading: 45 },
+    track: [
+      { e: 0, n: -1 },
+      { e: 0.5, n: 0 },
+    ],
+    ghostTrack: [
+      { e: 0, n: -1 },
+      { e: 0.4, n: 0 },
+    ],
+    entryPath: 'teardrop',
+  })
+
+  function paint(selector: string, attr: 'fill' | 'stroke'): string {
+    const node = el.querySelector(selector)
+    expect(node, selector).not.toBeNull()
+    return node!.getAttribute(attr) ?? ''
+  }
+
+  it('draws the letters in the full-contrast ink, never the dim tier', () => {
+    expect(paint('.map-fix-label', 'fill'), 'the fix name').toBe(PALETTE.plate.ink)
+    expect(paint('.map-north text', 'fill'), 'the north letter').toBe(PALETTE.plate.ink)
+    // The arrow beside it is a graphic and may sit at the dim tier — the split
+    // inside one group is the whole reason `plate.ink` is `text` in TIERS while
+    // `plate.inkDim` is `graphic`, so both halves are pinned together.
+    expect(paint('.map-north line', 'stroke'), 'the arrow shaft').toBe(PALETTE.plate.inkDim)
+    expect(paint('.map-north polygon', 'fill'), 'the arrow head').toBe(PALETTE.plate.inkDim)
+  })
+
+  it('draws each line and shape in its classified colour', () => {
+    expect(paint('.mapview > rect', 'fill'), 'plate.face is the backdrop').toBe(PALETTE.plate.face)
+    expect(paint('.mapview > rect', 'stroke'), 'the plate frame').toBe(PALETTE.plate.bezel)
+    expect(paint('.map-racetrack', 'stroke'), 'the pattern').toBe(PALETTE.plate.ink)
+    expect(paint('.map-course-arrow', 'fill'), 'direction of flight').toBe(PALETTE.plate.ink)
+    expect(paint('.map-fix', 'stroke'), 'the fix triangle').toBe(PALETTE.plate.ink)
+    expect(paint('.map-ownship path', 'stroke'), 'ownship').toBe(PALETTE.plate.ink)
+    expect(paint('.map-ghost-track', 'stroke'), 'the ghost track').toBe(PALETTE.plate.inkDim)
+    // The whole of what `plate.readout` draws, which is what its graphic tier
+    // now rests on: one polyline, no letters.
+    expect(paint('.map-track', 'stroke'), 'the flown track').toBe(PALETTE.plate.readout)
+  })
+
+  it('draws each entry path in that entry’s colour, on both instruments’ code', () => {
+    for (const entry of ENTRIES) {
+      const path = render({ holdSpec: hold(), entryPath: entry }).querySelector(
+        `.map-entry-${entry} path`,
+      )
+      expect(path, entry).not.toBeNull()
+      expect(path!.getAttribute('stroke'), entry).toBe(PALETTE.plate.entry[entry])
+    }
   })
 })
 

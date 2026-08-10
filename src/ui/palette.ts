@@ -71,10 +71,15 @@ export const OVERLAY_ALPHA = Object.freeze({
    * treatment in palette.test.ts: the band spans radii `roseR`→`roseR − 9` and
    * is painted after the card, so in its 20° arc it covers the outer half of
    * every tick (`tickR` inward) and the inner half of the card ring, washing
-   * them to ~1.15:1 against itself. Measuring those marks over it would be
-   * measuring marks the band is deliberately hiding. Lower this materially and
-   * that stops being true — the band becomes a tint, and every card mark under
-   * it then needs the ceiling/floor treatment `sectorFill` gets.
+   * them to 1.12:1 (chrome) — 1.36:1 (the white major ticks) against itself.
+   * Measuring those marks over it would be measuring marks the band is
+   * deliberately hiding. Lower this materially and that stops being true — the
+   * band becomes a tint, and every card mark under it then needs the
+   * ceiling/floor treatment `sectorFill` gets. That is a floor on this value,
+   * and it is a *different* floor from the band's own 3:1: the band gains
+   * contrast as the alpha rises, so the graphic-tier assertion passes all the
+   * way down to 0.6 and bounds nothing here. `hides the card marks it covers
+   * rather than half-tinting them` is the one that does.
    */
   thumbBand: 0.9,
 })

@@ -179,6 +179,32 @@ describe('the compass card', () => {
     expect(east.textContent).toBe('E')
     expect(east.getAttribute('transform')).toBe(`rotate(90 ${LAYOUT.cx} ${LAYOUT.cy})`)
   })
+
+  // The card's two typographic treatments are decided by a predicate over the
+  // label string, and the obvious predicate is wrong: `label.length === 1` is
+  // true of '3' and '6' as well as of the four letters, so 030° and 060° set in
+  // the bold cardinal face while 12/15/21/24/30/33 set in the smaller numeral
+  // one. Nothing else here sees it — the assertions above pin text, radius and
+  // rotation, and the paint map pins `fill` — so the whole card renders with
+  // two of its eight numbers styled unlike their siblings, with the suite green.
+  //
+  // Asserted as "the eight agree with each other and differ from the letters",
+  // not against retyped px values: the sizes changed once already when the white
+  // rose became a dark panel, and a golden would have had to be re-derived
+  // alongside the very change it is meant to check.
+  it('sets the eight numerics alike and the four letters apart', () => {
+    const labels = [...render({ heading: 0 }).querySelectorAll('.hsi-label')]
+    const face = (t: Element): string =>
+      `${t.getAttribute('font-size')}/${t.getAttribute('font-weight')}`
+    const byText = new Map(labels.map((t) => [t.textContent ?? '', face(t)]))
+    const numerals = ['3', '6', '12', '15', '21', '24', '30', '33']
+    const letters = ['N', 'E', 'S', 'W']
+    expect(new Set(numerals.map((n) => byText.get(n))).size, 'one numeral treatment').toBe(1)
+    expect(new Set(letters.map((l) => byText.get(l))).size, 'one cardinal treatment').toBe(1)
+    // Non-vacuous: both sets would also be size 1 if every label were identical,
+    // which is the other way to lose the distinction.
+    expect(byText.get('3'), 'a numeral is not set as a cardinal').not.toBe(byText.get('N'))
+  })
 })
 
 describe('rose rotation (heading up)', () => {
@@ -1188,7 +1214,19 @@ describe('overlay geometry (drawn arcs, not just their data attributes)', () => 
     // on the strength of the card ring at `roseR` sitting outside where the
     // wedges stop. At `roseR` the ring would be over one, at 1.96:1, with the
     // whole contrast suite still green.
+    //
+    // ⚠️ Drawn-vs-drawn, not drawn-vs-constant. `toBeCloseTo(LAYOUT.tickR)` was
+    // the whole of this guard and it cannot fail: the wedge is drawn AT
+    // `LAYOUT.tickR`, so raising that constant to `roseR` moves both sides of
+    // the comparison together and the OVER_WEDGE premise breaks with the
+    // assertion that exists to protect it still passing. The premise is a
+    // relation between two rendered radii, so both come off the DOM.
     expect(Number(r)).toBeCloseTo(LAYOUT.tickR, 6)
+    const ringR = Number(
+      render({ heading: 0 }).querySelector('.hsi-card-ring')!.getAttribute('r'),
+    )
+    expect(ringR, 'the card ring is drawn').toBeGreaterThan(0)
+    expect(Number(r), 'the wedges must stop inside the card ring').toBeLessThan(ringR)
   })
 
   // The other half of the same OVER_WEDGE premise: "over a wedge" is a claim
