@@ -480,10 +480,30 @@ describe('instrument overlays, as composited', () => {
     // What the band's own arc looks like where no mark is under it.
     const overFace = blend(band, face, a)
     const showing: string[] = []
-    // Every mark the band's radii cross: the outer half of both tick weights
-    // and the inner half of the card ring.
-    for (const mark of ['card', 'cardDim', 'chrome'] as const) {
-      const ratio = contrastRatio(blend(band, PALETTE.pfd[mark], a), overFace)
+    // What the band's annulus (roseR → roseR − 9, i.e. 75–84) is drawn over.
+    // Both tick weights run inward from tickR = 80 and the card ring sits at
+    // roseR, so their outer/inner halves are under it — and so are the sector
+    // wedges, whose opaque boundary strokes run out to tickR along two radial
+    // edges and around the arc, and which the band is painted *over* (asserted
+    // by `is painted over the sector wedges, not under them` in hsi.test.ts).
+    //
+    // The wedge colours are the group an earlier version of this list left out
+    // while its comment called itself exhaustive — the same over-claim this
+    // ledger records against `ruleBlock`'s docblock. They are spread from the
+    // group rather than named, so a fourth entry colour is measured by default;
+    // hand-listing is what let the first three go unmeasured.
+    //
+    // What no assertion here can carry: this is a claim about `hsi.ts`'s LAYOUT
+    // radii, and a radius change moves what lies under the band without
+    // touching a line of this file.
+    const covered: readonly (readonly [string, string])[] = [
+      ['card', PALETTE.pfd.card],
+      ['cardDim', PALETTE.pfd.cardDim],
+      ['chrome', PALETTE.pfd.chrome],
+      ...Object.entries(PALETTE.pfd.entry).map(([name, hex]) => [`entry.${name}`, hex] as const),
+    ]
+    for (const [mark, hex] of covered) {
+      const ratio = contrastRatio(blend(band, hex, a), overFace)
       if (ratio > OCCLUSION_CEILING) {
         showing.push(`pfd.${mark} under the band: ${ratio.toFixed(2)} > ${OCCLUSION_CEILING}`)
       }

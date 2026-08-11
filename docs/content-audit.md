@@ -2225,3 +2225,72 @@ CLAUDE.md rule.
   its `aria-label`. Every caller passes a value from a static fixture list, so it is not reachable
   today; escaping only this one interpolation while the rest of the app builds `innerHTML` the same
   way would be inconsistent rather than safer.
+
+## Post-completion review fixes — 2026-08-11 (code review iteration 10, entry answer-group branch)
+
+- **Fixed: `ruleBlock`'s new `context` resolved *names*, and read a non-name token as proof of a
+  non-match** (`src/styles.test.ts`). Iteration 9 closed the "reaches the element without naming its
+  class" hole by resolving each compound against a set of names the DOM test asserts exhaustively.
+  `reaches` was `parts.every(part => part === '*' || names.has(part))`, and its comment called that
+  "sound only because `context` is asserted complete against the DOM". Completeness is a claim about
+  **names** — a tag, an id, a class. A compound may instead carry a **condition**: `:nth-of-type(4)`,
+  `:not(.x)`, `[id]`, `:first-child`. A set of names cannot decide a condition, so its absence from
+  `context` proved nothing, yet it was read as "cannot match" — the compound was neither collected nor
+  refused, i.e. the same fail-open one level in, reached by one more spelling. Five escapes were
+  reproduced against the real `styles.css`, each leaving `separates the answer group from the
+  instrument above it` reporting `margin-top: 1.5rem` against `gap: 0.5rem` at 16/16 green with the
+  answer buttons rendered flush against the G1000 panel:
+
+  ```css
+  .entry-drill p:nth-of-type(4) { margin-top: 0 }  /* (0,2,1); the label is the 4th <p> */
+  .entry-drill p:not(.nope)     { margin-top: 0 }  /* (0,2,1); matches every <p> there */
+  .entry-drill > *:first-child  { margin: 0 }      /* (0,2,0) */
+  p[id]                         { margin-top: 0 }  /* (0,1,1); the id exists for aria-labelledby */
+  .entry-drill div:last-of-type { gap: 0 }         /* the row's half of the ratio */
+  ```
+
+  The first two are not hypothetical: `:nth-of-type`/`:not` are the ordinary way to reach one `<p>` in
+  a stack of them, and this section is exactly a stack of them (`.entry-clearance`, `.entry-chart`,
+  `.entry-scenario`, then the label).
+- Fix: `reaches` now splits its tokens. A **name** (`/^[.#]?[\w-]+$/`) is decidable and an unlisted one
+  still proves a non-match; `*` matches anything; every other token is undecidable and **does not
+  block**, so the compound counts as reaching the element and the existing specificity throw refuses
+  it. Over-refusal is the accepted direction and the staleness is loud — the next bare pseudo-class
+  rule added to this sheet throws here until someone answers it. `Context.denies` is that answer, for
+  the two bare-condition subjects the sheet already has (`:root`, `[hidden]`), and it is a **DOM
+  assertion** rather than a convenience: `carries only the names the stylesheet guard is told about`
+  in `entry-drill.test.ts` now also asserts `!label.matches(sel)` and `!answers.matches(sel)` for
+  each. Without that pin, `denies` is the old fail-open with a list in front of it. It answers the
+  **subject** only — an ancestor's conditions are facts about *other* elements, and `:root p`
+  genuinely reaches the label (`html` is an ancestor of everything), so a denial must not silence it.
+- Regression test: `refuses a rule that reaches the element through a condition, not a name` — four
+  refusals (structural pseudo, negation, universal + pseudo, attribute) and four non-vacuity cases (a
+  `denies`-answered `:root`/`[hidden]` pair reading 1.5rem, the *unanswered* form of the same pair
+  throwing, a condition on a name the element does not carry staying invisible, and `:root p` still
+  throwing under a denial). Mutation-confirmed: restoring the one-line name-set read reds **only** the
+  new test, and each of the five CSS escapes above, appended to the real `styles.css`, now reds the
+  ratio with a message naming the offending prelude.
+- **Fixed: the band's occlusion list omitted the sector wedges under a comment claiming to be
+  exhaustive** (`src/ui/palette.test.ts`). `hides the card marks it covers rather than half-tinting
+  them` is the whole justification for `thumbBand` being exempt from `OVER_WEDGE` — at 0.9 it occludes
+  rather than tints, so the marks under it need no measuring. It looped over
+  `['card', 'cardDim', 'chrome']` under the comment "Every mark the band's radii cross". The band's
+  annulus is `roseR → roseR − 9` (75–84) and `sectorOverlay` strokes each wedge **opaque** in
+  `PALETTE.pfd.entry.*` out to `tickR = 80` along two radial edges and around the arc, with the band
+  painted over it (`is painted over the sector wedges, not under them`) — so the wedge boundaries are
+  under the band exactly as the ticks are, and were the one covered group nothing measured. No live
+  defect: at 0.9 the loosest entry colour reads 1.25:1 against `OCCLUSION_CEILING = 1.5`. The exposure
+  was a brighter entry colour or a lowered `thumbBand` half-tinting a boundary with the suite green,
+  and — as this ledger has now recorded four times against `ruleBlock` — the over-claiming comment is
+  the dangerous half. The entry colours are **spread from `PALETTE.pfd.entry`**, not hand-listed, so a
+  fourth is measured by default; hand-listing is what let the first three go unmeasured. What no
+  assertion in that file can carry is stated instead of implied: the list is a claim about `hsi.ts`'s
+  `LAYOUT` radii, and a radius change moves what lies under the band without touching a line there.
+- Regression test: the same test, now reporting six marks. Mutation-confirmed by lowering
+  `OVERLAY_ALPHA.thumbBand` to 0.55, where the failure message names
+  `pfd.entry.direct` (2.97), `pfd.entry.teardrop` (2.94) and `pfd.entry.parallel` (2.49) alongside the
+  three it always measured — before the fix those three could not appear at any alpha.
+- Reviewed and **not** changed: the plan's Task 3 manual step is boxed `[x]` while its own text says
+  "(a) and (b) are entirely unverified". The box records that the step was *dispositioned*, and the
+  text beside it states exactly which sub-points have evidence and which do not — which is the
+  honest form. Left as is rather than unticking a step whose remaining half is not automatable here.

@@ -586,6 +586,18 @@ describe('renderEntryDrill screen', () => {
     expect(label.parentElement).toBe(answers.parentElement)
     expect(label.parentElement!.tagName).toBe('SECTION')
     expect([...label.parentElement!.classList]).toEqual(['entry-drill'])
+    // The other half of that claim, and the half a name list cannot carry. A
+    // compound may select on a *condition* rather than a name, and the guard
+    // refuses every condition it is not told about — `:root` and `[hidden]` are
+    // live rule subjects in styles.css, so its `DENIES` answers those two, and
+    // an answer is only sound while the real elements match neither. Mark the
+    // label hidden (or move either element to the document root) and the
+    // stylesheet guard would wave through a rule that genuinely applies.
+    for (const el of [label, answers]) {
+      for (const condition of [':root', '[hidden]']) {
+        expect(el.matches(condition), `${el.className} must not match ${condition}`).toBe(false)
+      }
+    }
   })
 
   // .entry-modes has carried role/aria-label since it shipped; .entry-answers

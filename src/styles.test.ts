@@ -79,7 +79,11 @@ function rootBlock(css: string): string {
  *    the likeliest future edit to this section, and the id exists only because
  *    `aria-labelledby` needs one. Deciding this needs facts the stylesheet does
  *    not carry — the element's tag, its id, its ancestors — so `context`
- *    supplies them and `entry-drill.test.ts` pins them against the DOM.
+ *    supplies them and `entry-drill.test.ts` pins them against the DOM. What
+ *    `context` can supply is *names*; a compound may also carry a **condition**
+ *    (`:nth-of-type(4)`, `:not(.x)`, `[data-mode]`), and a set of names cannot
+ *    decide one. See `reaches` — an undecidable token refuses rather than
+ *    exempts, and `denies` is the DOM-pinned way to answer one.
  *
  * The comparison is against a single class's (0,1,0), which is all this helper
  * is ever asked for: a member carrying any id, class, attribute or pseudo-class
@@ -121,12 +125,14 @@ function rootBlock(css: string): string {
  * red is a minute's work; a false green is the defect this whole helper exists
  * to prevent.
  *
- * ⚠️ Three earlier versions of this docblock each claimed a coverage this code
+ * ⚠️ Four earlier versions of this docblock each claimed a coverage this code
  * did not have — first that at-rules were concatenated "unconditionally" and the
  * guard "errs toward failing rather than passing" (false in both directions),
  * then that a conditional group rule was "the only fail-open one" (nesting walks
  * straight through a name list), then that "every way of leaving it is loud"
- * while any rule reaching the element by tag, id or `*` left silently. That
+ * while any rule reaching the element by tag, id or `*` left silently, then that
+ * the name-set read was "sound only because `context` is asserted complete
+ * against the DOM" — true of names, and `:nth-of-type(4)` is not a name. That
  * claim is the more dangerous half of the bug every time: it tells the next
  * session the one edit that reaches the defect is already covered. Note the
  * shape of the recurring miss, too — each version enumerated the *spellings* it
@@ -136,19 +142,62 @@ interface Context {
   readonly also?: readonly string[]
   /** Simple selectors carried by any of its ancestors. */
   readonly within?: readonly string[]
+  /** Non-name tokens — a pseudo-class, an attribute — the element is asserted
+   * against the real DOM *not* to match. Answers a condition `also` cannot: a
+   * name-set says nothing about `:root` or `[hidden]`, and both are live
+   * subjects in this sheet. */
+  readonly denies?: readonly string[]
 }
 
 /** One compound's simple selectors. The alternation is ordered so an attribute
  * or a pseudo is one token rather than being shredded into bare words. */
 const SIMPLE = /\*|::?[\w-]+(?:\([^)]*\))?|\[[^\]]*\]|[.#]?[\w-]+/g
 
-/** Could this compound select an element carrying exactly `names`? `*` selects
- * anything; every other token has to be a name the element is known to carry,
- * so an unlisted one (`:first-child`, `[hidden]`) reads as "cannot match" —
- * sound only because `context` is asserted complete against the DOM. */
-function reaches(compound: string, names: ReadonlySet<string>): boolean {
+/** A token `context` can answer: a tag, an id or a class. Everything else a
+ * compound may carry — a pseudo-class, an attribute, a functional selector — is
+ * a *condition* on the element rather than a name for it. */
+const NAME = /^[.#]?[\w-]+$/
+
+/** Nothing denied: what an ancestor compound is resolved against. */
+const NONE: ReadonlySet<string> = new Set<string>()
+
+/** Could this compound select this element?
+ *
+ * Two kinds of token, and `context` can only answer one of them. A **name** is
+ * decidable, because `context` is asserted complete against the DOM
+ * (`carries only the names the stylesheet guard is told about` in
+ * `entry-drill.test.ts`), so a name the element does not carry proves the
+ * compound cannot match. `*` matches anything. A **condition** is not decidable
+ * from a set of names, so it does not block: the compound counts as reaching the
+ * element and `OUTRANKS` refuses it. Over-refusing is the direction to err in,
+ * and staleness is loud — the next bare pseudo-class rule added to this sheet
+ * throws here until someone answers it.
+ *
+ * `denied` is that answer, and it is a DOM assertion rather than a convenience:
+ * `:root` and `[hidden]` are live subjects here and cannot match a `<p>` in
+ * `.entry-drill`, so the caller states that and pins it against the real
+ * element. It applies to the *subject* only — an ancestor's conditions are facts
+ * about other elements, which this model does not carry, so `:root p` must stay
+ * unresolved (it genuinely reaches the label, `html` being an ancestor).
+ *
+ * ⚠️ This was `parts.every(part => part === '*' || names.has(part))`, i.e. an
+ * unlisted token read as "cannot match" — justified in a comment by the very
+ * DOM-completeness claim that does not extend past names. `.entry-drill p:not(.x)`
+ * and `.entry-drill p:nth-of-type(4)` each outrank the flat class rule and each
+ * zero the label's `margin-top`; appended to the real `styles.css`, both left
+ * `separates the answer group from the instrument above it` reporting 1.5rem
+ * against 0.5rem, 16/16 green, with the buttons rendered flush against the panel.
+ * `denies` is a list, so what makes it sound is the DOM assertion behind it, not
+ * its contents — do not restate this as "`:root` and `[hidden]` are handled". */
+function reaches(
+  compound: string,
+  names: ReadonlySet<string>,
+  denied: ReadonlySet<string>,
+): boolean {
   const parts = compound.match(SIMPLE) ?? []
-  return parts.length > 0 && parts.every((part) => part === '*' || names.has(part))
+  if (parts.length === 0) return false
+  if (parts.some((part) => denied.has(part))) return false
+  return parts.every((part) => part === '*' || !NAME.test(part) || names.has(part))
 }
 
 /** Carries an id, class, attribute or pseudo-class anywhere, so its specificity
@@ -162,6 +211,7 @@ function ruleBlock(css: string, selector: string, context: Context = {}): string
   const mentions = new RegExp(`${escaped}(?![\\w-])`)
   const own = new Set([selector, ...(context.also ?? [])])
   const anywhere = new Set([...own, ...(context.within ?? [])])
+  const denied = new Set(context.denies ?? [])
   const code = css.replace(/\/\*[\s\S]*?\*\//g, ' ')
   // The boundary is a lookbehind rather than a consumed character: one rule's
   // closing `}` is the next rule's boundary, and a match that eats it leaves the
@@ -194,7 +244,8 @@ function ruleBlock(css: string, selector: string, context: Context = {}): string
       // self-named ancestor is assumed to match, which over-refuses and never
       // under-refuses.
       const claimed =
-        reaches(subject, own) && compounds.slice(0, -1).every((part) => reaches(part, anywhere))
+        reaches(subject, own, denied) &&
+        compounds.slice(0, -1).every((part) => reaches(part, anywhere, NONE))
       if (claimed && OUTRANKS.test(member)) {
         throw new Error(`${member} reaches ${selector}: this guard cannot resolve specificity`)
       }
@@ -591,6 +642,57 @@ describe('styles.css', () => {
     expect(remValue(ruleBlock(unnamed, '.row-label'), 'margin-top')).toBe(1.5)
   })
 
+  // The same fail-OPEN one level in. The fix above resolves a compound against a
+  // set of NAMES, and the version that shipped it read any token missing from
+  // that set as "cannot match" — sound for a tag, an id or a class, because the
+  // DOM test asserts those exhaustively, and unsound for everything else a
+  // compound can carry. A pseudo-class or an attribute is a *condition*, not a
+  // name, so `context` cannot be complete over it and its absence proves
+  // nothing. Both selectors below outrank the flat class rule, both zero the
+  // label's margin, and both were neither collected nor refused: appended
+  // verbatim to the real styles.css, each left `separates the answer group…`
+  // reporting 1.5rem against 0.5rem at 16/16 green with the buttons flush
+  // against the panel.
+  it('refuses a rule that reaches the element through a condition, not a name', () => {
+    const label = '.row-label {\n  margin-top: 1.5rem;\n}\n'
+    const ctx = { also: ['p', '#row-label'], within: ['.panel'] } as const
+    for (const [name, rule] of [
+      // Positional: the label is a <p> among siblings, and this needs no class.
+      ['structural pseudo', '.panel p:nth-of-type(4) {\n  margin-top: 0;\n}\n'],
+      // Functional, and it matches every <p> that is not something else.
+      ['negation', '.panel p:not(.other) {\n  margin-top: 0;\n}\n'],
+      // The universal case, which the name-set read let through for the same
+      // reason even though `*` is explicitly resolvable.
+      ['universal + pseudo', '.panel > *:first-child {\n  margin: 0;\n}\n'],
+      // An attribute is a condition too — the id is one this element has.
+      ['attribute', 'p[id] {\n  margin-top: 0;\n}\n'],
+    ] as const) {
+      expect(() => ruleBlock(`${label}${rule}`, '.row-label', ctx), name).toThrow(
+        /reaches \.row-label/,
+      )
+    }
+    // Non-vacuous the other way, and this is why `denies` exists rather than a
+    // blanket refusal: `:root` and `[hidden]` are live subjects in styles.css,
+    // and refusing them would make the real sheet unreadable over two rules that
+    // cannot touch a <p> in .entry-drill. The denial is the caller's DOM claim.
+    const bare = `${label}:root {\n  --x: 1;\n}\n[hidden] {\n  display: none;\n}\n`
+    const answered = { ...ctx, denies: [':root', '[hidden]'] }
+    expect(remValue(ruleBlock(bare, '.row-label', answered), 'margin-top')).toBe(1.5)
+    // …and an *unanswered* condition is loud rather than silent, which is what
+    // keeps `denies` from going stale as the sheet grows. This is the accepted
+    // over-refusal: a rule that cannot reach the label still has to be declared.
+    expect(() => ruleBlock(bare, '.row-label', ctx)).toThrow(/reaches \.row-label/)
+    // A condition on a name the element does not carry is still excluded by the
+    // name, so ordinary state rules elsewhere in the sheet stay invisible here.
+    const elsewhere = `${label}button:disabled {\n  margin: 0;\n}\n`
+    expect(remValue(ruleBlock(elsewhere, '.row-label', ctx), 'margin-top')).toBe(1.5)
+    // A denial answers the subject only. An ancestor's conditions are facts
+    // about *other* elements, so `:root p` must stay unresolved — it genuinely
+    // reaches the label, `html` being an ancestor of everything.
+    const rooted = `${label}:root p {\n  margin-top: 0;\n}\n`
+    expect(() => ruleBlock(rooted, '.row-label', answered)).toThrow(/reaches \.row-label/)
+  })
+
   // The misread no boundary can catch, because the rule it reads is the right
   // one: a browser resolves the LAST declaration and a first-match read reports
   // a length that never renders. Three ordinary edits reach it — a second rule
@@ -661,11 +763,23 @@ describe('styles.css', () => {
     // guard is told about` in entry-drill.test.ts. Add a second class here and
     // forget it, and the guard resumes refusing the wrong set.
     const WITHIN = ['.entry-drill', 'section', 'div', '#app', 'body', 'html']
+    // The conditions `also` cannot answer, and the two this sheet actually uses
+    // as a rule subject. Neither can match a <p> or a <div> inside .entry-drill,
+    // and saying so is what keeps them from reding the suite now that an
+    // undecidable token refuses instead of exempting. Pinned against the real
+    // elements alongside the names, in the same entry-drill.test.ts test — an
+    // unpinned denial is just the old fail-open with a list in front of it.
+    const DENIES = [':root', '[hidden]']
     const label = ruleBlock(CSS, '.entry-answers-label', {
       also: ['p', '#entry-answers-label'],
       within: WITHIN,
+      denies: DENIES,
     })
-    const row = ruleBlock(CSS, '.entry-answers', { also: ['div'], within: WITHIN })
+    const row = ruleBlock(CSS, '.entry-answers', {
+      also: ['div'],
+      within: WITHIN,
+      denies: DENIES,
+    })
     // Non-vacuous: `ruleBlock` throws on a selector typo, and these pin that it
     // found two *different* rules rather than the same block twice.
     expect(label, 'the label rule carries the separating margin').toMatch(/margin-top:/)
