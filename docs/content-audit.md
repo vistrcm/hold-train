@@ -1507,6 +1507,9 @@ recorded here on the same terms as a wrong sentence.
   on near-black — a wedge that is not there — while every existing assertion passed, because all of
   them were *ceilings*. It is now 0.25, held between a floor (`tints the wedge enough to be seen at
   all`) and the ceiling (`keeps every card mark legible over a tinted sector`).
+  ⚠️ **Amended 2026-08-11:** that last clause named the wrong ceiling. The binding case is the
+  **thumb band over a wedge** at 3.38:1, not the dim minor ticks at 3.79:1 — see the correction entry
+  at the foot of this ledger. `sectorFill` stays 0.25; only what bounds it above has changed.
 - **Deliberately unchanged** (verified, not overlooked): `determineEntry` and the whole answer key —
   distance and deviation are **display state only**, and the AIM 5-3-8 j3 sector is decided by
   heading alone; the plan-view map, which stays a light chart-like plate and gains no aircraft
@@ -2022,3 +2025,60 @@ CLAUDE.md rule.
   silently stops meaning what it says. Left as a stated assumption in the test comment rather than a
   conditional assertion that is vacuous today, which is the fake-coverage shape this ledger has
   rejected before.
+- **Fixed: the tightest composite on the PFD was measured nowhere, and the docblock named a ceiling
+  that would have shipped an SC 1.4.11 failure** (`src/ui/palette.ts`, `src/ui/palette.test.ts`,
+  `src/ui/hsi.test.ts`). Learn mode draws **both** overlays: `thumbBand()` is emitted after `</g>`
+  closes `.hsi-rose`, so it paints *over* the sector wedges, and its annulus `roseR`→`roseR − 9`
+  (84→75) overlaps the wedges' `tickR` (80) across 75–80. The sectors sum to 360°, so there is no
+  heading at which the nose sits over bare face — the composite renders on every learn-mode scenario.
+  Measured: 3.38 / 3.41 / 3.77:1 on the direct / teardrop / parallel tints, against the 3.79:1 minor
+  ticks that `OVERLAY_ALPHA.sectorFill`'s docblock called "the tightest of them … what fixes the
+  ceiling". It is not: 3:1 falls at `sectorFill` ≈ 0.29, not the documented 0.32. The values shipping
+  today are legal (3.38 > 3), so nothing renders wrong — the defect is that the **bound** was wrong
+  and the case that sets it was invisible. Confirmed by mutation: at the docblock's own 0.32 the band
+  renders at 2.79:1, and before this fix the whole suite stayed green, because
+  `keeps the thumb band above the graphic tier` composites against the **bare face** (5.47:1) and
+  `OVER_WEDGE` excludes `pfd.cardDim`'s band role on grounds argued only about the marks *under* the
+  band. Two assertions, not one, because they bound different constants and neither implies the
+  other: the bare-face reading *gains* contrast as `thumbBand` rises, the over-a-tint reading *loses*
+  it as `sectorFill` rises.
+- Regression test: `keeps the thumb band above the graphic tier over a tinted sector`
+  (`palette.test.ts`), which also asserts the over-tint reading is the tighter of the two so it
+  cannot degrade into a restatement of the bare-face one; plus
+  `is painted over the sector wedges, not under them` (`hsi.test.ts`), the drawn-vs-measured tie —
+  SVG has no z-index and the band's paint order is a **cross-group** fact, so moving `thumbBand()` in
+  among `.hsi-rose`'s children inverts the picture with every ratio `palette.test.ts` prints
+  unchanged. The radial-overlap half of the premise was already pinned by `is thick enough to cover
+  the card marks palette.test.ts says it hides`. Mutation-confirmed: `sectorFill: 0.32` reds only the
+  new palette test; relocating `thumbBand()` inside the rose group reds only the new HSI test.
+- **Fixed: `ruleBlock`'s at-rule handling was fail-open, and its docblock promised the opposite**
+  (`src/styles.test.ts`). The scan's body group is `[^}]*`, which cannot cross a `}` but happily
+  crosses a `{`, so an `@media` match runs to the **first** inner `}` and swallows the rule nested
+  there into the at-rule's own body — never matched, never collected, silently dropped. A
+  narrow-width `@media` override of `.entry-answers-label`'s `margin-top` therefore left
+  `separates the answer group from the instrument above it` green on a length that no longer renders,
+  and a narrow width is exactly where the row and the panel converge: the plan's own Task 3(d) names
+  it "the worst case for this defect" and leaves it manually unverified. Position-dependent as well —
+  a *second* nested rule for the same selector **is** matched, and is then read as though it applied
+  at every width — so which line of the media block someone typed on decided which way the guard was
+  wrong. The docblock claimed at-rules were concatenated "unconditionally" and that the guard "errs
+  toward failing rather than passing"; false in both directions, and the more dangerous half, since it
+  told the next session that the one edit reaching the defect was already covered. Now refused rather
+  than parsed — `@media`/`@supports`/`@container`/`@layer` throw — which is the rule this helper
+  already applies to specificity conflicts: what the model cannot resolve, it throws on. `styles.css`
+  carries no at-rule today, so nothing else moves.
+- Regression test: `refuses a conditional group rule rather than reading past it`, covering both the
+  swallowed-first-rule and harvested-later-rule shapes, and non-vacuous in both directions (a flat
+  sheet still reads 1.5rem; a comment merely *naming* `@media` does not red the suite, since the
+  refusal is tested against comment-stripped text). Mutation-confirmed: deleting the refusal reds
+  only this test.
+- **Amended: the trailing-boundary comment in `ruleBlock` named the wrong failure mode**
+  (`src/styles.test.ts`). It read that `(?![\w-])` "stops `.entry-answers` claiming
+  `.entry-answers-label`'s block". It does not — block collection is `member === selector`, exact
+  string equality, so the longer name was never a candidate with or without the lookahead. What the
+  lookahead actually bounds is the specificity **throw**: without it every `-label` sibling is read as
+  an unresolvable conflict and the guard refuses a sheet it could have read. The mechanism is real and
+  mutation-reds the test, which is why this is an amendment and not a removal — but by this ledger's
+  own standard a comment that misattributes which mechanism catches which failure argues the next
+  session into deleting the one that works, and here it would have sent a reader hunting a substring
+  bug that exact match already precludes.

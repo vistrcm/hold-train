@@ -46,11 +46,18 @@ function rootBlock(css: string): string {
  *    `<selector> {` sees the target only when it happens to be written *last*,
  *    so which side of a comma someone types on decided whether an override was
  *    visible;
- *  - the trailing `(?![\w-])` stops `.entry-answers` claiming
- *    `.entry-answers-label`'s block. There is no *leading* boundary and none is
- *    wanted: a class selector's own `.` already delimits it, and a leading
- *    boundary would hide the compound `.pill.entry-answers` — which is why this
- *    helper takes a class selector and nothing else;
+ *  - the trailing `(?![\w-])` stops `.entry-answers` *refusing to read at all*
+ *    because `.entry-answers-label` exists. It does not decide which block is
+ *    read — collection is `member === selector`, exact, so the longer name was
+ *    never a candidate — it bounds the specificity **throw** below, which
+ *    without it fires on every `-label` sibling and turns a readable sheet into
+ *    an unresolvable one. Don't reword this as "stops the wrong block being
+ *    read": a reader who believes that goes looking for a substring bug that
+ *    exact match already precludes, and relaxes the lookahead. There is no
+ *    *leading* boundary and none is wanted: a class selector's own `.` already
+ *    delimits it, and a leading boundary would hide the compound
+ *    `.pill.entry-answers` — which is why this helper takes a class selector and
+ *    nothing else;
  *  - a member the model cannot resolve **throws** rather than being skipped. A
  *    rule whose subject (its rightmost compound) merely contains the selector —
  *    `.pill.entry-answers`, `.entry-drill .entry-answers-label` — outranks the
@@ -65,13 +72,41 @@ function rootBlock(css: string): string {
  *
  * The blocks are concatenated in source order, which is the order the cascade
  * resolves them in for one repeated selector; `remValue` then takes the last
- * declaration. Rules nested in an at-rule are concatenated too, unconditionally:
- * `styles.css` carries no `@media`, and if one appears the guard errs toward
- * reading the *narrowest* value, i.e. toward failing rather than passing. */
+ * declaration.
+ *
+ * A conditional group rule (`@media`, `@supports`, `@container`, `@layer`) is
+ * **refused**, not resolved — same rule as the specificity conflict above: what
+ * this model cannot answer, it throws on. It does not degrade gracefully into a
+ * flat read. The body group is `[^}]*`, so an at-rule's match runs only to the
+ * *first* inner `}` and swallows the rule nested there whole: that rule is never
+ * matched and its declarations are dropped silently, which is fail-OPEN. A
+ * narrow-width `@media` override of `.entry-answers-label`'s `margin-top` would
+ * leave `separates the answer group from the instrument above it` green on a
+ * length that no longer renders — and a narrow width is precisely where the row
+ * and the panel converge, i.e. the worst case for the defect that guard exists
+ * to catch. A *later* nested rule is matched, and then read as though it applied
+ * at every width, so which line of the media block someone typed on decides
+ * which way the guard is wrong.
+ *
+ * ⚠️ This docblock used to claim the opposite — that at-rules were concatenated
+ * "unconditionally" and the guard "errs toward failing rather than passing".
+ * That was false in both directions and is the more dangerous half of the bug:
+ * it told the next session the one edit that reaches the defect was already
+ * covered. */
 function ruleBlock(css: string, selector: string): string {
   const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   const mentions = new RegExp(`${escaped}(?![\\w-])`)
   const code = css.replace(/\/\*[\s\S]*?\*\//g, ' ')
+  // Refused rather than parsed — see the docblock. Tested against the
+  // comment-stripped text, so prose *naming* `@media` cannot trip it, and
+  // before the scan rather than inside it, because the fail-open case never
+  // produces a match to inspect.
+  const conditional = code.match(/@(?:media|supports|container|layer)\b/)
+  if (conditional) {
+    throw new Error(
+      `${conditional[0]} nests style rules conditionally; this guard reads flat rules only`,
+    )
+  }
   // The boundary is a lookbehind rather than a consumed character: one rule's
   // closing `}` is the next rule's boundary, and a match that eats it leaves the
   // rule right after it unmatchable — which is exactly the repeated-selector
@@ -379,6 +414,37 @@ describe('styles.css', () => {
     // Unitless zero is a length; px is not one this guard may compare.
     expect(remValue('margin-top: 0;', 'margin-top')).toBe(0)
     expect(() => remValue('gap: 8px;', 'gap')).toThrow(/not a rem length/)
+  })
+
+  // The fifth mechanism, and the only fail-OPEN one the others could not reach:
+  // the body group is `[^}]*`, so an at-rule's match stops at the first inner
+  // `}` and the rule nested there is swallowed into the at-rule's *body* — never
+  // matched, never collected, silently gone. Both synthetics below returned the
+  // unconditional 1.5rem before this refusal existed, i.e. the margin the media
+  // block has just cancelled at exactly the width where the row and the panel
+  // converge. Position-dependent, too, which is why the second case exists: a
+  // *later* nested rule IS matched, and is then read as if it applied at every
+  // width.
+  it('refuses a conditional group rule rather than reading past it', () => {
+    const label = '.row-label {\n  margin-top: 1.5rem;\n}\n'
+    const swallowed = `${label}@media (max-width: 400px) {\n  .row-label {\n    margin-top: 0;\n  }\n}\n`
+    const harvested =
+      `${label}@media (max-width: 400px) {\n  .other {\n    gap: 0;\n  }\n` +
+      '  .row-label {\n    margin-top: 0;\n  }\n}\n'
+    expect(() => ruleBlock(swallowed, '.row-label')).toThrow(/flat rules only/)
+    expect(() => ruleBlock(harvested, '.row-label')).toThrow(/flat rules only/)
+    expect(() => ruleBlock(`${label}@supports (display: grid) {\n  .row-label {\n  }\n}\n`, '.row-label')).toThrow(
+      /flat rules only/,
+    )
+    // Non-vacuous in the other direction: the refusal is of the at-rule, not of
+    // every sheet, and `styles.css` carries none today — the spacing guard below
+    // reads the real file and would throw here if that changed.
+    expect(remValue(ruleBlock(label, '.row-label'), 'margin-top')).toBe(1.5)
+    // …and prose is not an at-rule: comments are stripped before the test, so a
+    // docblock discussing `@media` cannot red the suite.
+    expect(remValue(ruleBlock(`/* no @media here */\n${label}`, '.row-label'), 'margin-top')).toBe(
+      1.5,
+    )
   })
 
   // The misread no boundary can catch, because the rule it reads is the right

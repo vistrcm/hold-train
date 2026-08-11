@@ -90,9 +90,11 @@ const OVER_WEDGE: Readonly<Record<string, 'text' | 'graphic' | null>> = {
   // the 30° labels; the major ticks, lubber and aircraft symbol are the same
   // colour and only need the graphic tier, so text is what binds
   'pfd.card': 'text',
-  // minor ticks and the deviation dots. It also paints the thumb band, but that
-  // is drawn at `OVERLAY_ALPHA.thumbBand` and OCCLUDES the wedge rather than
-  // sitting over it, so the band answers in its own composited assertion below.
+  // minor ticks and the deviation dots. It also paints the thumb band, which
+  // this tier does NOT cover: the band is drawn at `OVERLAY_ALPHA.thumbBand`,
+  // so measuring it here at full strength would certify a colour that never
+  // reaches the eye. It answers over a wedge in its own composited assertion
+  // below — and that one, not the ticks, is what binds `sectorFill`.
   'pfd.cardDim': 'graphic',
   // the notch rides the card's OUTER edge, from `roseR` outward, so it is
   // outside `tickR` where the wedges stop — same as the card ring below, not
@@ -412,6 +414,47 @@ describe('instrument overlays, as composited', () => {
   it('keeps the thumb band above the graphic tier', () => {
     const band = blend(PALETTE.pfd.cardDim, face, OVERLAY_ALPHA.thumbBand)
     expect(contrastRatio(band, face)).toBeGreaterThanOrEqual(MINIMUM.graphic)
+  })
+
+  // …and the backdrop the band actually has in learn mode, which is not the
+  // bare face. Learn mode draws BOTH overlays, `thumbBand()` is emitted after
+  // `</g>` closes `.hsi-rose` (so it paints over the wedges, pinned by `is
+  // painted over the sector wedges, not under them` in hsi.test.ts), and its
+  // annulus `roseR`→`roseR − 9` overlaps the wedges' `tickR` across 75–80
+  // (pinned by `is thick enough to cover the card marks palette.test.ts says it
+  // hides`). The sectors sum to 360°, so there is no heading at which the nose
+  // is over bare face — this composite renders on every learn-mode scenario.
+  //
+  // It is the TIGHTEST composite on the panel at 3.38:1, below the 3.79:1 dim
+  // ticks the `sectorFill` docblock used to name as binding, and it is what
+  // fixes that ceiling: 3:1 falls at `sectorFill` ≈ 0.29, not 0.32. Both band
+  // assertions are needed and neither implies the other — the bare-face one
+  // gains contrast as `thumbBand` rises, this one loses it as `sectorFill`
+  // rises, so they bound different constants.
+  //
+  // Not folded into `keeps every card mark legible over a tinted sector`: that
+  // loop measures OPAQUE marks over a tint, and `pfd.cardDim` enters it as the
+  // minor ticks. The band is the same colour at a different alpha, so it needs
+  // its own composite or the suite measures the ticks twice and the band never.
+  it('keeps the thumb band above the graphic tier over a tinted sector', () => {
+    const failures: string[] = []
+    for (const [name, tint] of tints()) {
+      const band = blend(PALETTE.pfd.cardDim, tint, OVERLAY_ALPHA.thumbBand)
+      const ratio = contrastRatio(band, tint)
+      if (ratio < MINIMUM.graphic) {
+        failures.push(`the band on the ${name} tint: ${ratio.toFixed(2)} < ${MINIMUM.graphic}`)
+      }
+    }
+    expect(failures).toEqual([])
+    // Non-vacuous: this must be the tighter of the two readings, or the
+    // bare-face assertion above already covered it and this one bounds nothing.
+    const overFace = contrastRatio(blend(PALETTE.pfd.cardDim, face, OVERLAY_ALPHA.thumbBand), face)
+    const overTint = Math.min(
+      ...tints().map(([, tint]) =>
+        contrastRatio(blend(PALETTE.pfd.cardDim, tint, OVERLAY_ALPHA.thumbBand), tint),
+      ),
+    )
+    expect(overTint, 'the tint is what costs the band contrast').toBeLessThan(overFace)
   })
 
   // The band's exemption from OVER_WEDGE rests on a premise nothing asserted:

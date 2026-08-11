@@ -1331,6 +1331,31 @@ describe('overlay geometry (drawn arcs, not just their data attributes)', () => 
     expect(wedge, 'wedges must precede the course pointer').toBeLessThan(first('.hsi-course'))
   })
 
+  // The premise behind `keeps the thumb band above the graphic tier over a
+  // tinted sector` in palette.test.ts, and a paint-order claim like the one
+  // above — except across the group boundary, which is what made it easy to
+  // miss. The band is airframe-fixed, so it is emitted after `</g>` closes the
+  // rotating `.hsi-rose`; the wedges are inside it. Move `thumbBand()` in among
+  // the rose's children and the wedge tints over the band instead, so the
+  // composite that file measures (band over tint, 3.38:1 — the number fixing
+  // `sectorFill`'s ceiling) stops being the one that renders, with every ratio
+  // it prints unchanged.
+  it('is painted over the sector wedges, not under them', () => {
+    const sectors = determineEntry(340, { inboundCourse: 340, turnDirection: 'right' }).sectors
+    const svg = render({ heading: 123, sectorOverlay: sectors, thumbOverlay: 'right' })
+      .querySelector('svg')!
+    const order = [...svg.children]
+    const band = order.findIndex((node) => node.matches('.hsi-thumb'))
+    const rose = order.findIndex((node) => node.matches('.hsi-rose'))
+    expect(band, 'the band is a direct child of the svg, outside the rose').toBeGreaterThanOrEqual(0)
+    expect(rose, 'the rose group carries the wedges').toBeGreaterThanOrEqual(0)
+    expect(band, 'the band must paint after the wedges it covers').toBeGreaterThan(rose)
+    expect(
+      svg.querySelector('.hsi-rose .hsi-sector'),
+      'the wedges ride the card, so they are inside the group being compared',
+    ).not.toBeNull()
+  })
+
   it('the thumb band starts on the 70° line, right of the nose, for a standard hold', () => {
     const path = render({ heading: 123, thumbOverlay: 'right' })
       .querySelector('.hsi-thumb')!

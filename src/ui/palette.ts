@@ -53,11 +53,20 @@ export const OVERLAY_ALPHA = Object.freeze({
    * Entry-sector wedge fill (the boundary stroke is opaque).
    *
    * Bounded on both sides, and the two bounds are what fixes the value rather
-   * than taste. Ceiling: the tint *lightens* the near-black face, so every card
-   * mark crossing a wedge loses contrast — the dim minor ticks are the tightest
-   * at 3.79:1 here and reach SC 1.4.11's 3:1 at about 0.32. Floor: this was 0.1
-   * when the face was white, and 0.1 over near-black renders at 1.15:1 against
-   * the bare panel, a wedge that is not there.
+   * than taste. Ceiling: the tint *lightens* the near-black face, so everything
+   * drawn over a wedge loses contrast — the tightest is the **thumb band over a
+   * wedge** at 3.38:1 here, which reaches SC 1.4.11's 3:1 at about 0.29. Floor:
+   * this was 0.1 when the face was white, and 0.1 over near-black renders at
+   * 1.15:1 against the bare panel, a wedge that is not there.
+   *
+   * ⚠️ The ceiling used to be quoted as the dim minor ticks, 3.79:1 and 0.32.
+   * The ticks are real but they are not the binding case: in learn mode both
+   * overlays draw, and the band is emitted *after* `.hsi-rose` closes while the
+   * wedges fill to `tickR` — so 75–80 of the band's annulus is over a tint at
+   * every heading (the sectors sum to 360°, so the nose is never over bare
+   * face). Tuning to the old 0.32 would have shipped the band at 2.79:1 with
+   * `keeps the thumb band above the graphic tier` — which composites against
+   * the *bare* face — still green. Measured by its over-a-tint twin now.
    */
   sectorFill: 0.25,
   /**
@@ -66,6 +75,12 @@ export const OVERLAY_ALPHA = Object.freeze({
    * `cardDim`. It needed no re-tuning through the palette split, which is the
    * point of measuring rather than assuming: only the fill's direction of
    * travel reversed with the face.
+   *
+   * That 5.47:1 is its *bare-face* figure and is not the binding one. In learn
+   * mode the band paints over the sector wedges, where it reads 3.38:1 — the
+   * tightest composite on the panel, and the number that actually fixes
+   * `sectorFill`'s ceiling. Both are asserted; neither implies the other, since
+   * they move with different alphas.
    *
    * At 0.9 it OCCLUDES rather than tints, which is why it gets no `OVER_WEDGE`
    * treatment in palette.test.ts: the band spans radii `roseR`→`roseR − 9` and
