@@ -508,6 +508,25 @@ function remValue(block: string, prop: string): number {
   return value
 }
 
+/** Whether anything in `block` sets `prop`, under any of its names.
+ *
+ * `remValue` throws on a property that is absent, which is right when the value
+ * is required — but the cascade also has lengths whose *default* is meaningful.
+ * An adjacent sibling's margins collapse to the max of the two, so "the row
+ * declares no top margin" and "the row declares 0" are the same picture, and a
+ * read that cannot tell absence from a bad parse cannot ask the question at all.
+ *
+ * It shares `remValue`'s family — the property's own name, its shorthands and
+ * logical spellings, plus `all` — for the `COLOUR_LITERAL` reason: a second
+ * hand-written list of "what else sets this" drifts, and the half nobody edits
+ * reports absent for a property the browser has already been given. So an
+ * `all: unset` or a `margin: 0` counts as declared here and `remValue` then
+ * refuses it out loud, rather than being silently read as zero. */
+function declares(block: string, prop: string): boolean {
+  const family = [prop, ...(OVERRIDES[prop] ?? []), 'all']
+  return [...block.matchAll(/(?:^|[;{\s])([\w-]+)\s*:/g)].some(([, name]) => family.includes(name!))
+}
+
 /** Every `--name: value` pair declared in `:root`, colour or not — the type
  * scale and `--touch` live there too. Harvested generically rather than by
  * matching `#`: a regex that only sees hex silently drops `--warn: orange` from
@@ -1064,6 +1083,27 @@ describe('styles.css', () => {
     )
   })
 
+  // `declares` answers the question `remValue` cannot: absent or zero, which for
+  // a collapsing margin is one picture. It has to be exactly as suspicious as
+  // `remValue` about the other names for the property, or the collapsed-max read
+  // below reports 0 for a row the browser has already been given a top margin —
+  // fail-open by way of a helper that looked like a convenience.
+  it('sees a property under every name that sets it, not just its own', () => {
+    expect(declares('gap: 0.5rem;', 'margin-top')).toBe(false)
+    expect(declares('margin-bottom: 0.35rem;', 'margin-top')).toBe(false)
+    // Present at all, including the value that changes nothing.
+    expect(declares('margin-top: 0;', 'margin-top')).toBe(true)
+    // The shorthand, the logical spelling and the everything-reset all count as
+    // declared, so `remValue` gets the chance to refuse them out loud rather
+    // than the caller reading absence and substituting 0.
+    for (const other of ['margin: 0', 'margin-block: 0', 'margin-block-start: 1rem', 'all: unset']) {
+      expect(declares(`display: flex; ${other};`, 'margin-top'), other).toBe(true)
+      expect(() => remValue(`display: flex; ${other};`, 'margin-top'), other).toThrow()
+    }
+    // Its family is `remValue`'s, so the `gap` aliases it learned are here too.
+    expect(declares('grid-column-gap: 2rem;', 'gap')).toBe(true)
+  })
+
   // The answer buttons are page controls sitting directly beneath a filled,
   // hard-edged instrument region — the HSI panel rect fills its whole viewBox,
   // so the whitespace that used to be page is now panel. Without a separating
@@ -1097,9 +1137,22 @@ describe('styles.css', () => {
     // can refuse an override that never writes the class. `<p id=…>` and `<div>`
     // inside `section.entry-drill`, inside the fresh `<div>` the router hands
     // each screen, inside `#app` in `<body>`. A claim about the DOM, not about
-    // this sheet, so it is pinned there: `carries only the names the stylesheet
-    // guard is told about` in entry-drill.test.ts. Add a second class here and
-    // forget it, and the guard resumes refusing the wrong set.
+    // this sheet. Add a second class here and forget it, and the guard resumes
+    // refusing the wrong set.
+    //
+    // ⚠️ Read what the pin actually covers, because this comment used to claim
+    // the whole list: `carries only the names the stylesheet guard is told
+    // about` in entry-drill.test.ts renders into a **detached** div, so it pins
+    // the subjects' own names and their immediate parent (`section.entry-drill`)
+    // and nothing above that. `div`, `#app`, `body` and `html` are facts about
+    // `router.ts` (a fresh child `<div>` per screen) and `index.html`, asserted
+    // in neither place as ancestors of *this* label. A name missing from this
+    // list is the fail-OPEN direction — `reaches` reads an unlisted ancestor
+    // token as "cannot match", so the member is neither collected nor refused —
+    // so wrap the screens in a `<main>`, or give the router's container a class,
+    // and `main .entry-answers-label { margin-top: 0 }` walks past this guard
+    // with both DOM tests still green. Correct today; re-derive it, don't
+    // assume it, if the chrome around a screen ever changes.
     const WITHIN = ['.entry-drill', 'section', 'div', '#app', 'body', 'html']
     // The conditions `also` cannot answer, and the two this sheet actually uses
     // as a rule subject. Neither can match a <p> or a <div> inside .entry-drill,
@@ -1138,13 +1191,26 @@ describe('styles.css', () => {
     // and `display: contents` — which keeps the text and drops the box, so the
     // margin vanishes with nothing on screen to show for it — walked straight
     // through. Which values still generate an in-flow box is a question this
-    // guard would have to model, and the label needs neither property, so both
-    // are refused outright. A `display: block` that changes nothing reds here;
-    // that costs a minute, and the alternative is the defect shipping green.
+    // guard would have to model, and the label needs none of these properties,
+    // so all are refused outright. A `display: block` that changes nothing reds
+    // here; that costs a minute, and the alternative is the defect shipping green.
+    //
+    // State the mechanism rather than the enumeration, because the enumeration
+    // is what was short: CSS has *three* properties that can stop an element
+    // laying out as an in-flow box on this page — `display` (no box at all, or
+    // no box of its own), `position` (absolute/fixed take it out of flow), and
+    // `float`, which was the missing one. A float's own margin still applies,
+    // but `.entry-answers` is a block-level flex container and therefore a BFC
+    // root, so it does not flow *under* the float — it is placed beside it,
+    // starting at the block position the label vacated. `.entry-answers-label
+    // { float: left }` is thus the same defect from the third direction: the
+    // buttons render flush against the G1000 rect while every number below
+    // still reads 1.5rem against 0.5rem. Ask whether these are the only
+    // mechanisms, not merely whether each is spelled correctly.
     expect(
       label,
-      'the label must generate a box in normal flow: no display or position here',
-    ).not.toMatch(/(?:^|[;{\s])(?:display|position)\s*:/)
+      'the label must generate a box in normal flow: no display, position or float here',
+    ).not.toMatch(/(?:^|[;{\s])(?:display|position|float)\s*:/)
 
     // A `gap` of 0 would satisfy any margin at all, so the ratio is only
     // meaningful once the intra-group spacing is known positive. Both parses
@@ -1162,7 +1228,21 @@ describe('styles.css', () => {
     // free-floating element between panel and buttons — the same grouping
     // defect arriving from the other side, with the ratio above still passing.
     // It is stated in the stylesheet's comment; this is what makes it hold.
-    const binding = remValue(label, 'margin-bottom')
+    //
+    // But label-to-row is ONE distance authored from TWO sides. The label and
+    // the row are adjacent in-flow siblings, so their facing margins collapse to
+    // the **max** of the pair — and a read of the label's side alone is the
+    // familiar fail-open: `.entry-answers { margin-top: 1.5rem }` renders 24 px
+    // between the label and the buttons it names while this goes on reporting
+    // the label's 0.35 and passing. That is the exact edit the stylesheet's own
+    // comment and this test's preamble warn against ("the margin rides on the
+    // label, not on the row"), which is what makes it a likely one: a reader
+    // moving the separation to the row hits it from the wrong element. A flex
+    // container's margins collapse with its *siblings* normally — it is only
+    // collapsing with its own children that a BFC root suppresses — so being a
+    // flex container exempts `.entry-answers` from nothing here.
+    const rowTop = declares(row, 'margin-top') ? remValue(row, 'margin-top') : 0
+    const binding = Math.max(remValue(label, 'margin-bottom'), rowTop)
     expect(binding, 'the label must bind to the buttons it names').toBeLessThan(between)
   })
 })

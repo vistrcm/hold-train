@@ -568,6 +568,13 @@ describe('renderEntryDrill screen', () => {
   // no stylesheet assertion can check. Give the label a second class, or move
   // the row out of section.entry-drill, and the guard goes on refusing the old
   // set while an override for the new one walks past it.
+  //
+  // Scope, since the guard's list is longer than this: the drill renders into a
+  // detached element here, so this pins the two subjects' own names and their
+  // immediate parent. The rest of that list (`div`, `#app`, `body`, `html`) is
+  // the router's per-screen container and index.html, above this element and
+  // outside what this test can see — the ⚠️ in styles.test.ts says so, and a
+  // missing ancestor name there is fail-open.
   it('carries only the names the stylesheet guard is told about', () => {
     const { el } = setup('learn')
     const label = el.querySelector<HTMLElement>('.entry-answers-label')!
