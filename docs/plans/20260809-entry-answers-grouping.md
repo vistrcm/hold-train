@@ -81,6 +81,14 @@ are real; the choice of rung is ours.
 - **CRITICAL: all tests must pass before starting next task**
 - Scope is this defect only. Do not restyle the panel, do not touch `hsi.ts`, do not adjust any other
   screen's spacing, and do not "fix" the `.entry-feedback` gap below the buttons.
+- **Amended 2026-08-11, after the fact:** the review loop breached this line and the breach is
+  recorded rather than hidden. Commits on this branch after Task 4 also changed `src/ui/hsi.ts`
+  (the card-label predicate: `label.length === 1` set `'3'` and `'6'` as cardinals), `src/ui/palette.ts`,
+  `src/ui/hsi.test.ts`, `src/ui/palette.test.ts` and `src/ui/mapview.test.ts`, and wrote a
+  `docs/content-audit.md` entry. Those fixes belong to the G1000 work this branch also carries, not to
+  the answer-group defect; they are legitimate and logged in the ledger under the review iterations,
+  but a reader auditing *this* plan should expect them in the diff and should not read the checkboxes
+  below as evidence that the file list at the top was respected.
 
 ## Implementation Steps
 
@@ -149,7 +157,8 @@ are real; the choice of rung is ours.
 
 ### Task 3: Verify acceptance criteria
 
-- [x] Run the full suite: `npm test` — all green, no skipped files (29 files, 753 tests passed)
+- [x] Run the full suite: `npm test` — all green, no skipped files (29 files, 753 tests passed at the
+      time of this task; 762 after the review iterations that followed it)
 - [x] Run `npm run typecheck` (`tsc --noEmit`) — clean
 - [x] Confirm `main.test.ts`'s default-path test still passes (real registry, real localStorage, real
       clock — the only test exercising the no-argument render path the browser actually takes)
@@ -182,6 +191,11 @@ are real; the choice of rung is ours.
 - [x] **No README change**: no route is added or renamed and `PHASE_PREP` is untouched, so the
       asserted module -> exam-phase table stays as-is. Do not reflow it
       (verified: this plan's commits touch neither `README.md` nor `src/modules/dashboard.ts`)
-- [x] **No `docs/content-audit.md` entry**: the ledger records *content* corrections — user-visible
-      aviation facts and their regression tests. This is a layout defect and teaches nothing wrong
-      about holding entries. Do not manufacture an entry to look thorough (verified untouched)
+- [x] **No `docs/content-audit.md` entry** *for this defect*: the ledger records *content*
+      corrections — user-visible aviation facts and their regression tests. This is a layout defect and
+      teaches nothing wrong about holding entries. Do not manufacture an entry to look thorough.
+      ⚠️ **Amended 2026-08-11:** the "(verified untouched)" this line used to carry was falsified by
+      the branch's own review loop, which added a 91-line ledger entry for the *review* findings (the
+      card-label predicate, the unasserted guard premises). The claim above is still the right rule for
+      the answer-group change; it was never a claim about the whole branch, and stating it as one is
+      what made it read false. See the amendment under Development Approach

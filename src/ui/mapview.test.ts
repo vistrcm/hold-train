@@ -321,47 +321,58 @@ describe('entry-path illustration (engine is the oracle)', () => {
 // palette split"), so the claim that it now draws only the flown polyline is
 // load-bearing and, until here, unasserted.
 describe('paint (every mark in the colour palette.test.ts measures it as)', () => {
-  const el = render({
-    holdSpec: hold({ fix: 'HAIRE' }),
-    ownship: { position: { e: 1, n: -2 }, heading: 45 },
-    track: [
-      { e: 0, n: -1 },
-      { e: 0.5, n: 0 },
-    ],
-    ghostTrack: [
-      { e: 0, n: -1 },
-      { e: 0.4, n: 0 },
-    ],
-    entryPath: 'teardrop',
-  })
+  // A function, not a describe-scope const, for the reason `tints()` is one in
+  // palette.test.ts: `renderMap` validates its input and throws, and at describe
+  // scope that throw lands during COLLECTION — the file then reports "no tests"
+  // and every guard in it goes silent, the parallel-entry oracle checks
+  // included, under an error message naming none of them.
+  function everyMark(): HTMLElement {
+    return render({
+      holdSpec: hold({ fix: 'HAIRE' }),
+      ownship: { position: { e: 1, n: -2 }, heading: 45 },
+      track: [
+        { e: 0, n: -1 },
+        { e: 0.5, n: 0 },
+      ],
+      ghostTrack: [
+        { e: 0, n: -1 },
+        { e: 0.4, n: 0 },
+      ],
+      entryPath: 'teardrop',
+    })
+  }
 
-  function paint(selector: string, attr: 'fill' | 'stroke'): string {
+  function paint(el: HTMLElement, selector: string, attr: 'fill' | 'stroke'): string {
     const node = el.querySelector(selector)
     expect(node, selector).not.toBeNull()
     return node!.getAttribute(attr) ?? ''
   }
 
   it('draws the letters in the full-contrast ink, never the dim tier', () => {
-    expect(paint('.map-fix-label', 'fill'), 'the fix name').toBe(PALETTE.plate.ink)
-    expect(paint('.map-north text', 'fill'), 'the north letter').toBe(PALETTE.plate.ink)
+    const el = everyMark()
+    expect(paint(el, '.map-fix-label', 'fill'), 'the fix name').toBe(PALETTE.plate.ink)
+    expect(paint(el, '.map-north text', 'fill'), 'the north letter').toBe(PALETTE.plate.ink)
     // The arrow beside it is a graphic and may sit at the dim tier — the split
     // inside one group is the whole reason `plate.ink` is `text` in TIERS while
     // `plate.inkDim` is `graphic`, so both halves are pinned together.
-    expect(paint('.map-north line', 'stroke'), 'the arrow shaft').toBe(PALETTE.plate.inkDim)
-    expect(paint('.map-north polygon', 'fill'), 'the arrow head').toBe(PALETTE.plate.inkDim)
+    expect(paint(el, '.map-north line', 'stroke'), 'the arrow shaft').toBe(PALETTE.plate.inkDim)
+    expect(paint(el, '.map-north polygon', 'fill'), 'the arrow head').toBe(PALETTE.plate.inkDim)
   })
 
   it('draws each line and shape in its classified colour', () => {
-    expect(paint('.mapview > rect', 'fill'), 'plate.face is the backdrop').toBe(PALETTE.plate.face)
-    expect(paint('.mapview > rect', 'stroke'), 'the plate frame').toBe(PALETTE.plate.bezel)
-    expect(paint('.map-racetrack', 'stroke'), 'the pattern').toBe(PALETTE.plate.ink)
-    expect(paint('.map-course-arrow', 'fill'), 'direction of flight').toBe(PALETTE.plate.ink)
-    expect(paint('.map-fix', 'stroke'), 'the fix triangle').toBe(PALETTE.plate.ink)
-    expect(paint('.map-ownship path', 'stroke'), 'ownship').toBe(PALETTE.plate.ink)
-    expect(paint('.map-ghost-track', 'stroke'), 'the ghost track').toBe(PALETTE.plate.inkDim)
+    const el = everyMark()
+    expect(paint(el, '.mapview > rect', 'fill'), 'plate.face is the backdrop').toBe(
+      PALETTE.plate.face,
+    )
+    expect(paint(el, '.mapview > rect', 'stroke'), 'the plate frame').toBe(PALETTE.plate.bezel)
+    expect(paint(el, '.map-racetrack', 'stroke'), 'the pattern').toBe(PALETTE.plate.ink)
+    expect(paint(el, '.map-course-arrow', 'fill'), 'direction of flight').toBe(PALETTE.plate.ink)
+    expect(paint(el, '.map-fix', 'stroke'), 'the fix triangle').toBe(PALETTE.plate.ink)
+    expect(paint(el, '.map-ownship path', 'stroke'), 'ownship').toBe(PALETTE.plate.ink)
+    expect(paint(el, '.map-ghost-track', 'stroke'), 'the ghost track').toBe(PALETTE.plate.inkDim)
     // The whole of what `plate.readout` draws, which is what its graphic tier
     // now rests on: one polyline, no letters.
-    expect(paint('.map-track', 'stroke'), 'the flown track').toBe(PALETTE.plate.readout)
+    expect(paint(el, '.map-track', 'stroke'), 'the flown track').toBe(PALETTE.plate.readout)
   })
 
   it('draws each entry path in that entry’s colour, on both instruments’ code', () => {

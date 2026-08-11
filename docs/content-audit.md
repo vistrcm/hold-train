@@ -1929,3 +1929,96 @@ amendment note pointing here.
   screens out deliberately, so it stays a follow-up decision rather than a silent scope widening.
   (d) The completed plan was **not** moved to `docs/plans/completed/` — the review loop reads it at
   its current path, so archiving is the step after review closes, not part of it.
+
+## Post-completion review fixes — 2026-08-11 (code review iteration 7, entry answer-group branch)
+
+Five-agent review of `master..HEAD`. Nothing user-visible was wrong this round; every finding is a
+guard whose premise was unasserted, a comment that misattributed which assertion catches which
+failure, or a doc claim the branch had outgrown. All mutation-confirmed before being trusted, per the
+CLAUDE.md rule.
+
+- **Fixed: the answer-group spacing guard could not see the cascade** (`src/styles.test.ts`). This is
+  the branch's headline invariant and it is asserted against stylesheet *text* precisely because
+  jsdom cannot compute the cascade — but `ruleBlock` returned the **first** rule matching a selector
+  and `remValue` the **first** declaration of a property, while a browser resolves the **last** of
+  each. Three ordinary edits therefore changed the rendered spacing with the named guard green and
+  the buttons back flush against the G1000 rect: a second `.entry-answers-label` rule appended lower
+  in the sheet, a `margin: 0` written after `margin-bottom` inside the existing rule, and a
+  `column-gap: 0` after `gap` in `.entry-answers`. Fixed by collecting **every** matching rule in
+  source order, reading the last declaration, and refusing outright when the last member of a
+  property's family is a shorthand (`margin`/`margin-block`/`margin-block-start` for `margin-top`,
+  `row-gap`/`column-gap` for `gap`) — expanding shorthands is a CSS parser's job and one more thing
+  to get quietly wrong, so the guard fails loudly instead. The rule boundary is now a **lookbehind**:
+  one rule's closing `}` is the next rule's boundary, and a match that consumes it leaves the rule
+  right after it unmatchable, which is the repeated-selector case itself. That boundary also closes a
+  fourth, pre-existing misread the docblock never named — a *descendant* rule (`.foo .entry-answers`)
+  whose declarations apply only inside `.foo` was harvested as if it were the rule itself. All four
+  mutations now red the suite; each passed before.
+- **Fixed: `mapview.test.ts`'s new paint block rendered at describe scope.** `renderMap` validates its
+  input and throws, so a future tightening lands during **collection**: the file reports
+  `(0 test)` and all 31 guards in it — the parallel-entry oracle checks included — go silent under an
+  error naming none of them. This is verbatim the hazard recorded for `tints()` in `palette.test.ts`
+  on 2026-08-08 ("a red suite that names nothing is not a guard"). Moved into a function.
+- **Fixed: `OVER_WEDGE` claimed the heading bug is drawn over a sector wedge** (`src/ui/palette.test.ts`).
+  The notch rides the card's *outer* edge (radii 84.1–91.4) and the wedges stop at `LAYOUT.tickR` = 80,
+  so by the map's own rule it belongs at `null`, like `pfd.chrome`. Over-strict rather than unsafe, but
+  the map is documented as exhaustive claims about the drawing, and a false premise in it is what the
+  next tuning session reasons from. Re-classified, and the premise is now pinned to the picture:
+  `sits on the outer edge of the card, where the lubber reads` measures the notch against a **rendered**
+  wedge radius, not against the constant the wedge is drawn from.
+- **Fixed: every drawn instrument dimension was pinned only against zero.** `draws the bar as a
+  visible needle` asserted `bottom - top > 0`, which a 4-unit stub on a 168-unit card satisfies;
+  `BAR_HALF_LEN 30 → 2` passed the whole suite. Now measured against the aircraft symbol's own span,
+  which is the claim that symbol's docblock makes ("the deviation bar reads across it"), drawn-vs-drawn
+  so rescaling the panel moves both sides together. Same hole closed for two more marks whose scale is
+  teaching content, not decoration: the 10°/5° tick distinction (`MINOR_TICK → MAJOR_TICK` and a single
+  stroke-width both passed 758/758, erasing the card's two readings), and the thumb band's **radial
+  span** — `palette.test.ts` exempts the band from `OVER_WEDGE` on the grounds that it occludes "the
+  outer half of both tick weights", and a band thinned to `roseR - 1` crosses no tick at all, leaving
+  that whole premise measuring a picture the panel does not draw.
+- **Fixed: the nav status line's "below the card" bound was on the text baseline.** SVG text grows
+  upward from `y`, so `STATUS_Y = 208` — glyph tops at ~200, through the bottom compass ticks at 202 —
+  passed a bare `y > cy + roseR`. Now the glyph box clears the card, with the font size read off the
+  rendered node.
+- **Fixed: `deviationText`'s lower boundary was unpinned.** The nearest cases print `tenths` of 0, 10
+  and 19; nothing exercised 1, so widening the guard to `tenths <= 1` announced a real, drawn
+  deflection as "centred" with the suite green — the same class as the `1.976 → "2.0 dots"` defect the
+  upper clamp exists for. Added `names the smallest deflection it can print, one tenth of a dot`
+  (1 NM, 2.87° off course → 0.0501 NM), which also asserts the bar is visibly off centre.
+- **Amended: `hsi.test.ts`'s far-end-of-the-course-line comment claimed it binds both layers.** It
+  said "drawn-against-announced, so it binds whichever layer regresses". It does not: deleting
+  `Math.abs(offCourse) === 180` from `courseDeviation` leaves the whole HSI file green, because the
+  1.1e-15 NM residual is rounded onto the centreline by `r2` and into "centred" by the label's tenths.
+  The engine-side guard is `is exactly zero at BOTH ends of the course line, for every course` in
+  `nav.test.ts` (verified: the only two failures on that mutation). Recorded because a comment that
+  misattributes which assertion catches which failure argues the next session into deleting the one
+  that works.
+- **Amended: CLAUDE.md had outgrown three of its own claims.** (a) The `aria-label` inventory listed
+  the deviation reading and `GPS OBS` but not the two learn-mode overlays, which `overlayText` now
+  appends — the same under-count the bullet corrected one clause earlier for the prop list. (b) "So
+  overlays need a **floor**" over-generalised from `sectorFill` to `thumbBand`, whose binding bound
+  runs the *other* way: it gains contrast as its alpha rises and passes down to 0.6, so what holds it
+  up is `OCCLUSION_CEILING`, not a floor. A session lowering the band for legibility would have found
+  only "raise it" advice. (c) The drawn-vs-measured tie was credited to `hsi.test.ts` alone, after
+  iteration 6 added the `plate` half in `mapview.test.ts` — and by this repo's own "guarding two of
+  three leaves the third free to go stale" rule, naming one carrier invites the other's deletion.
+- **Amended: the plan's Task 4 recorded a verification its own branch falsified.**
+  `docs/plans/20260809-entry-answers-grouping.md` carried "**No `docs/content-audit.md` entry** …
+  (verified untouched)" and a scope line reading "do not touch `hsi.ts`"; iteration 6 did both. The
+  rule remains right *for the answer-group defect* — this is a layout change and teaches nothing wrong
+  about holding entries — but it was written as a claim about the whole branch. Amended in place with
+  the counter-fact and a scope note listing the five files the review loop added, rather than edited
+  past.
+- **Considered and not changed.** (a) The `nav.fix` interpolation into the HSI `aria-label` is
+  unescaped, but every call site passes an ident from a fixture list and no user input reaches it —
+  escaping it now would be guarding a path that does not exist. (b) The dot loop's cancelling
+  constants, declined again for the reason recorded in iteration 6: the round trip states that a dot
+  marks a fraction of *full scale*, which is the aviation meaning, where `i * DOT_SPACING` states only
+  a layout. (c) The course-pointer radii written as `LAYOUT.tickR - k`: the one with a real constraint
+  (`POINTER_STEM` vs `BAR_HALF_LEN`) is already guarded by `leaves the pointer’s centre empty…`, which
+  reds if the gap ever closes on the bar, so the finding is a readability preference on a file this
+  plan scoped out. (d) The spacing guard cannot see its containing block — if `.entry-drill` ever
+  becomes a flex column with a `gap`, margins stop collapsing and the `margin-bottom < gap` half
+  silently stops meaning what it says. Left as a stated assumption in the test comment rather than a
+  conditional assertion that is vacuous today, which is the fake-coverage shape this ledger has
+  rejected before.

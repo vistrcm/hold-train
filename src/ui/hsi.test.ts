@@ -167,6 +167,27 @@ describe('the compass card', () => {
     expect(num(north, 'y1')).toBeCloseTo(LAYOUT.cy - LAYOUT.tickR, 6)
   })
 
+  // The 10° marks and the 5° marks are two readings, and the card teaches the
+  // difference by drawing them unlike: a long bright tick every 10°, a short dim
+  // one between. Nothing measured that — the ring test above pins where every
+  // tick *starts*, and both weights start at `tickR` — so collapsing
+  // MAJOR_TICK/MINOR_TICK to one length, or the two stroke widths to one, erased
+  // the distinction with the suite green. Asserted as "major exceeds minor", not
+  // against retyped lengths, so re-tuning the card keeps it binding.
+  it('draws the 10° ticks longer and heavier than the 5° ones', () => {
+    const ticks = [...render({ heading: 0 }).querySelectorAll('.hsi-tick')]
+    // generated from 0° in 5° steps, so index 0 is a 10° mark and index 1 a 5°
+    const [major, minor] = [ticks[0]!, ticks[1]!]
+    const length = (t: Element): number =>
+      Math.hypot(num(t, 'x1') - num(t, 'x2'), num(t, 'y1') - num(t, 'y2'))
+    expect(minor.getAttribute('stroke'), 'the two weights are different colours').not.toBe(
+      major.getAttribute('stroke'),
+    )
+    expect(length(minor), 'a tick has length').toBeGreaterThan(0)
+    expect(length(major)).toBeGreaterThan(length(minor))
+    expect(num(major, 'stroke-width')).toBeGreaterThan(num(minor, 'stroke-width'))
+  })
+
   it('sets the 30° labels on the card at the exported label radius', () => {
     const labels = [...render({ heading: 0 }).querySelectorAll('.hsi-label')]
     const north = labels[0]!
@@ -492,16 +513,23 @@ describe('deviation bar', () => {
   // with `y1 === y2` is an invisible needle and every deflection golden above
   // still passes on it. Symmetry as well as length: the bar reads across the
   // aircraft symbol, which is itself centred on the rose.
+  //
+  // Length against the aircraft symbol rather than against zero: `> 0` is
+  // satisfied by a 4-unit stub on a 168-unit card, and "the bar reads across the
+  // aircraft" is the claim the symbol's own docblock makes. Drawn-vs-drawn, so
+  // rescaling the panel moves both sides together and only a bar that stopped
+  // spanning the symbol reds it.
   it('draws the bar as a visible needle, symmetric about the rose centre', () => {
-    const bar = render({
-      heading: 120,
-      course: 90,
-      nav: { fix: FIX, distanceNm: 1 },
-    }).querySelector('.hsi-cdi-bar')!
+    const el = render({ heading: 120, course: 90, nav: { fix: FIX, distanceNm: 1 } })
+    const bar = el.querySelector('.hsi-cdi-bar')!
     const top = num(bar, 'y1')
     const bottom = num(bar, 'y2')
     expect(LAYOUT.cy - top).toBeCloseTo(bottom - LAYOUT.cy, 6)
-    expect(bottom - top).toBeGreaterThan(0)
+    const symbol = coordsOf(el.querySelector('.hsi-aircraft')!).map((p) => p.y)
+    expect(symbol.length, 'the aircraft symbol is drawn').toBeGreaterThan(2)
+    const span = Math.max(...symbol) - Math.min(...symbol)
+    expect(span, 'the aircraft symbol has height').toBeGreaterThan(0)
+    expect(bottom - top, 'the bar must read across the aircraft symbol').toBeGreaterThanOrEqual(span)
   })
 
   // Bar and dots are two readings of one scale, so this is drawn-against-drawn
@@ -675,6 +703,22 @@ describe('the heading bug', () => {
     expect(Math.min(...radii)).toBeLessThan(LAYOUT.roseR + 1)
     // …and it does not reach out across the value boxes
     expect(Math.max(...radii)).toBeLessThan(LAYOUT.roseR + 12)
+    // …and it clears the sector wedges entirely, which is what lets
+    // palette.test.ts classify `pfd.bug` as `null` in OVER_WEDGE — never over a
+    // tint. Read off a rendered wedge, not off `LAYOUT.tickR`: the claim is a
+    // relation between two drawn radii, and comparing the notch to the constant
+    // the wedge happens to be drawn from moves both sides together.
+    const wedgeR = Number(
+      render({
+        heading: 0,
+        sectorOverlay: determineEntry(340, { inboundCourse: 340, turnDirection: 'right' }).sectors,
+      })
+        .querySelector('.hsi-sector-direct')!
+        .getAttribute('d')!
+        .match(/A (\S+) /)![1],
+    )
+    expect(wedgeR, 'the wedge is drawn').toBeGreaterThan(0)
+    expect(Math.min(...radii), 'the bug notch must clear the wedges').toBeGreaterThan(wedgeR)
   })
 
   it('is absent when no heading is selected', () => {
@@ -770,7 +814,13 @@ describe('the nav status line', () => {
     expect(fields).toHaveLength(5)
     for (const node of fields) {
       const where = node.getAttribute('class') ?? ''
-      expect(num(node, 'y'), where).toBeGreaterThan(LAYOUT.cy + LAYOUT.roseR)
+      // The glyph box, not the baseline: SVG text grows *upward* from `y`, so a
+      // baseline a hair below the card still sets the letters inside it, across
+      // the bottom ticks. A bare `y > cy + roseR` accepts `STATUS_Y = 208`,
+      // which renders the whole status line through the card.
+      const size = num(node, 'font-size')
+      expect(size, `${where} font-size`).toBeGreaterThan(0)
+      expect(num(node, 'y') - size, where).toBeGreaterThan(LAYOUT.cy + LAYOUT.roseR)
       expect(num(node, 'y'), where).toBeLessThanOrEqual(LAYOUT.height)
       expect(num(node, 'x'), where).toBeGreaterThanOrEqual(0)
       expect(num(node, 'x'), where).toBeLessThanOrEqual(LAYOUT.width)
@@ -866,8 +916,16 @@ describe('the accessible description', () => {
   // 1.2e-16, not 0 — so the aircraft that is most unambiguously ON the course
   // line was the one announced as displaced. Reachable in the shipping drill:
   // seed 648 renders heading 170 / course 350 / 9.1 NM and said
-  // "deviation 0.0 dots right" over a centred bar. Drawn-against-announced, so
-  // it binds whichever layer regresses.
+  // "deviation 0.0 dots right" over a centred bar.
+  //
+  // ⚠️ What this pins is the PANEL, not the engine underneath it. Delete
+  // `Math.abs(offCourse) === 180` from `courseDeviation` and this test still
+  // passes: the residual is 1.1e-15 NM, which `r2` rounds onto the centreline
+  // and `deviationText`'s tenths round to "centred", so both layers here absorb
+  // it. The engine-side guard is `is exactly zero at BOTH ends of the course
+  // line, for every course` in nav.test.ts, which compares exactly and is the
+  // only thing that reds on that mutation (checked, not assumed). Two claims,
+  // two tests — do not retire either on the strength of the other.
   it('announces no side at the far end of the course line, where the bar is centred', () => {
     const props: HSIProps = { heading: 170, course: 350, nav: { fix: FIX, distanceNm: 9.1 } }
     expect(num(render(props).querySelector('.hsi-cdi-bar')!, 'x1')).toBe(LAYOUT.cx)
@@ -894,6 +952,26 @@ describe('the accessible description', () => {
     expect(text).toContain('deviation centred')
     expect(text).not.toContain('0.0 dots')
     expect(text).not.toMatch(/left|right/)
+  })
+
+  // The other end of the same partition. "Centred" and "0.1 dots" are adjacent
+  // wordings and only one test stood between them: the case above prints
+  // `tenths === 0` and the goldens further up print 10 and 19, so widening the
+  // guard to `tenths <= 1` announced a real, drawn deflection as centred with
+  // the suite green. This is the smallest deflection the label may still name.
+  it('names the smallest deflection it can print, one tenth of a dot', () => {
+    // Hand-derived: 1 NM from the fix, 2.87° off course → 1 × sin 2.87° =
+    // 0.0501 NM of cross-track, and a dot is worth FULL_SCALE_NM / 2 = 0.5 NM,
+    // so the needle is one tenth of a dot out. Left of course, so the course —
+    // and the bar — lie to the right.
+    const props: HSIProps = { heading: 92.87, course: 90, nav: { fix: FIX, distanceNm: 1 } }
+    // premise from the drawing: the bar is off centre by a visible amount, not
+    // by the sub-pixel residual the "centred" case above turns on.
+    const barX = num(render(props).querySelector('.hsi-cdi-bar')!, 'x1')
+    expect(barX - LAYOUT.cx).toBeGreaterThan(1)
+    const text = label(props)
+    expect(text).toContain('deviation 0.1 dots right')
+    expect(text).not.toContain('centred')
   })
 
   // "Full scale" is a state, not a measurement — the docblock's "at least this
@@ -1264,5 +1342,30 @@ describe('overlay geometry (drawn arcs, not just their data attributes)', () => 
     expect(Number(ax)).toBeCloseTo(start.x, 1)
     expect(Number(ay)).toBeCloseTo(start.y, 1)
     expect(Number(ax)).toBeGreaterThan(LAYOUT.cx) // right of the nose, not left
+  })
+
+  // The band's radial *span*, which nothing measured: the assertion above reads
+  // its outer radius out of the path and then places the endpoint at that same
+  // radius, so a band thinned to a hairline satisfies it. That span is a premise
+  // elsewhere — palette.test.ts exempts `thumbBand` from OVER_WEDGE on the
+  // grounds that at 0.9 it OCCLUDES "the outer half of both tick weights and the
+  // inner half of the card ring". Thin the band until it crosses no tick and
+  // that sentence measures a picture the panel does not draw, with every ratio
+  // in that file unchanged. Both radii come off the path; the ticks' own outer
+  // radius comes off a rendered tick.
+  it('is thick enough to cover the card marks palette.test.ts says it hides', () => {
+    const el = render({ heading: 123, thumbOverlay: 'right' })
+    const radii = [...el.querySelector('.hsi-thumb')!.getAttribute('d')!.matchAll(/A (\S+) /g)].map(
+      (m) => Number(m[1]),
+    )
+    expect(radii, 'a ring segment is drawn with two arcs').toHaveLength(2)
+    const [outer, inner] = [Math.max(...radii), Math.min(...radii)]
+    const tick = el.querySelector('.hsi-tick')!
+    const tickOuter = radiusFromCentre(num(tick, 'x1'), num(tick, 'y1'))
+    const tickInner = radiusFromCentre(num(tick, 'x2'), num(tick, 'y2'))
+    expect(tickOuter, 'a tick has length').toBeGreaterThan(tickInner)
+    // the band reaches past where the ticks end, and down over part of them
+    expect(outer).toBeGreaterThanOrEqual(tickOuter)
+    expect(inner).toBeLessThan(tickOuter)
   })
 })

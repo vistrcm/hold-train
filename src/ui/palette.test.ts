@@ -94,8 +94,13 @@ const OVER_WEDGE: Readonly<Record<string, 'text' | 'graphic' | null>> = {
   // is drawn at `OVERLAY_ALPHA.thumbBand` and OCCLUDES the wedge rather than
   // sitting over it, so the band answers in its own composited assertion below.
   'pfd.cardDim': 'graphic',
-  // the bug notch rides the card; its digits are in the HDG box, on bare face
-  'pfd.bug': 'graphic',
+  // the notch rides the card's OUTER edge, from `roseR` outward, so it is
+  // outside `tickR` where the wedges stop — same as the card ring below, not
+  // over a tint at all; its digits are in the HDG box, on bare face. Pinned to
+  // the drawing by `sits on the outer edge of the card, where the lubber reads`,
+  // which measures the notch against a rendered wedge rather than against this
+  // comment.
+  'pfd.bug': null,
   // course pointer, deviation bar and TO/FROM flag — the CRS digits, likewise,
   // are on bare face
   'pfd.course': 'graphic',

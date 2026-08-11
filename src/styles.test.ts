@@ -36,24 +36,62 @@ function rootBlock(css: string): string {
 /** The declarations of one rule, by exact selector. Comments are stripped first
  * so prose naming a class cannot be mistaken for the rule itself.
  *
- * Two different ways of reading the wrong rule, guarded separately: the
- * trailing `\s*\{` is what stops `.entry-answers` harvesting
- * `.entry-answers-label`'s block (the brace must follow the selector, so a
- * longer name never matches), and the leading boundary is what stops it
- * harvesting a *compound* rule that merely ends in it, `.foo.entry-answers`.
- * Only the second needs the boundary — don't merge the two claims, because a
- * later reader who thinks the boundary handles the suffix case will delete the
- * part that actually does. Both return a block silently, so a mis-read is a
- * green test computing its ratio from some other rule's numbers. */
+ * Three different ways of reading the wrong rule, guarded separately, because a
+ * reader who thinks one mechanism covers all three will delete the parts that
+ * actually work. Every one of them returns a block silently, so a mis-read is a
+ * green test computing its ratio from some other rule's numbers.
+ *  - the trailing `\s*\{` stops `.entry-answers` harvesting
+ *    `.entry-answers-label`'s block: the brace must follow the selector, so a
+ *    longer name never matches;
+ *  - the leading boundary — one of `}{;,` then whitespace, never whitespace
+ *    alone — stops a *compound* rule that merely ends in the selector
+ *    (`.foo.entry-answers`) and a *descendant* one that merely contains it
+ *    (`.foo .entry-answers`, whose declarations only apply inside `.foo`);
+ *  - collecting **every** matching rule rather than the first is what keeps the
+ *    read in step with the cascade. A second `.entry-answers-label { margin-top:
+ *    0.2rem }` appended anywhere below wins in a browser, and a first-match read
+ *    goes on reporting the value further up the file.
+ *
+ * The blocks are concatenated in source order, which is the order the cascade
+ * resolves them in for one repeated selector; `remValue` then takes the last
+ * declaration. Rules nested in an at-rule are concatenated too, unconditionally:
+ * `styles.css` carries no `@media`, and if one appears the guard errs toward
+ * reading the *narrowest* value, i.e. toward failing rather than passing. */
 function ruleBlock(css: string, selector: string): string {
   const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   const code = css.replace(/\/\*[\s\S]*?\*\//g, ' ')
-  const match = code.match(new RegExp(`(?:^|[};,\\s])${escaped}\\s*\\{([^}]*)\\}`))
-  if (match?.[1] === undefined) throw new Error(`styles.css has no ${selector} rule`)
-  return match[1]
+  // The boundary is a lookbehind rather than a consumed character: one rule's
+  // closing `}` is the next rule's boundary, and a match that eats it leaves the
+  // rule right after it unmatchable — which is exactly the repeated-selector
+  // case this scan was widened to catch.
+  const rule = new RegExp(`(?:^|(?<=[};{,]))\\s*${escaped}\\s*\\{([^}]*)\\}`, 'g')
+  const blocks = [...code.matchAll(rule)].map((match) => match[1]!)
+  if (blocks.length === 0) throw new Error(`styles.css has no ${selector} rule`)
+  return blocks.join(';')
+}
+
+/** What else can set the property being read.
+ *
+ * A longhand's name is not the only way to set it, and the cascade does not care
+ * which name was used — so a `margin: 0` written after `margin-top: 1.5rem`
+ * renders 0 while a read that searches for `margin-top` still finds 1.5. Rather
+ * than teach `remValue` to expand shorthands (a CSS parser's job, and one more
+ * thing to get subtly wrong), it refuses: whichever of these is declared last
+ * must be the property asked for. */
+const OVERRIDES: Readonly<Record<string, readonly string[]>> = {
+  'margin-top': ['margin', 'margin-block', 'margin-block-start'],
+  'margin-bottom': ['margin', 'margin-block', 'margin-block-end'],
+  gap: ['row-gap', 'column-gap'],
 }
 
 /** One declaration's value as a number of `rem`.
+ *
+ * The **last** declaration of the property, not the first: two declarations in
+ * one block are legal CSS and the later one wins, so a first-match read reports
+ * a length the browser has already discarded. Same reason `ruleBlock` returns
+ * every matching rule — between them they are this file's whole model of the
+ * cascade, which is the thing jsdom cannot answer and this file exists to
+ * replace.
  *
  * The refusal is the point, and it is a refusal of the *unit*, not of `NaN`:
  * comparing two authored lengths only means something when they share one, and
@@ -68,9 +106,16 @@ function ruleBlock(css: string, selector: string): string {
  * than about notation. Don't restate that as "NaN would leave the test green".
  */
 function remValue(block: string, prop: string): number {
-  const match = block.match(new RegExp(`(?:^|[;{\\s])${prop}\\s*:\\s*([^;}]+)`))
-  const raw = match?.[1]?.trim()
-  if (raw === undefined) throw new Error(`no ${prop} declared in {${block.trim()}}`)
+  const family = [prop, ...(OVERRIDES[prop] ?? [])]
+  const declared = [...block.matchAll(/(?:^|[;{\s])([\w-]+)\s*:\s*([^;}]+)/g)]
+    .map(([, name, value]) => [name!, value!.trim()] as const)
+    .filter(([name]) => family.includes(name))
+  const last = declared.at(-1)
+  if (last === undefined) throw new Error(`no ${prop} declared in {${block.trim()}}`)
+  const [name, raw] = last
+  if (name !== prop) {
+    throw new Error(`${prop} is set by a later ${name}: ${raw} — declare the longhand instead`)
+  }
   if (raw === '0') return 0
   const rem = raw.match(/^([\d.]+)rem$/)
   const value = Number(rem?.[1])
@@ -275,13 +320,15 @@ describe('styles.css', () => {
   // The whole spacing guard below rests on `ruleBlock` reading the rule it was
   // asked for: every wrong read returns a block rather than throwing, so the
   // ratio would be computed from some other rule's numbers and the failure
-  // would look like a stylesheet defect. Both misreads are exercised — the
-  // compound `.pill.row` (killed by the leading boundary) and the longer
-  // `.row-label` (killed by requiring the brace to follow). Pinned against a
-  // synthetic sheet so it keeps holding after styles.css is tidied.
+  // would look like a stylesheet defect. Three misreads are exercised, each
+  // killed by a different part of the pattern — the compound `.pill.row` and the
+  // descendant `.panel .row` (leading boundary) and the longer `.row-label`
+  // (requiring the brace to follow the selector). Pinned against a synthetic
+  // sheet so it keeps holding after styles.css is tidied.
   it('reads a rule by exact selector, not by substring', () => {
     const synthetic =
-      '.pill.row {\n  gap: 9rem;\n}\n.row-label {\n  margin-top: 1rem;\n}\n.row {\n  gap: 0.5rem;\n}\n'
+      '.pill.row {\n  gap: 9rem;\n}\n.row-label {\n  margin-top: 1rem;\n}\n' +
+      '.panel .row {\n  gap: 7rem;\n}\n.row {\n  gap: 0.5rem;\n}\n'
     expect(remValue(ruleBlock(synthetic, '.row'), 'gap')).toBe(0.5)
     expect(remValue(ruleBlock(synthetic, '.row-label'), 'margin-top')).toBe(1)
     expect(remValue(ruleBlock(synthetic, '.pill.row'), 'gap')).toBe(9)
@@ -289,6 +336,28 @@ describe('styles.css', () => {
     // Unitless zero is a length; px is not one this guard may compare.
     expect(remValue('margin-top: 0;', 'margin-top')).toBe(0)
     expect(() => remValue('gap: 8px;', 'gap')).toThrow(/not a rem length/)
+  })
+
+  // The misread no boundary can catch, because the rule it reads is the right
+  // one: a browser resolves the LAST declaration and a first-match read reports
+  // a length that never renders. Three ordinary edits reach it — a second rule
+  // for the same selector further down the sheet, a second declaration inside
+  // the rule, and a shorthand that sets the same edge under another name — and
+  // all three put the answer buttons back flush against the panel with the
+  // spacing guard below still green.
+  it('resolves a property the way the cascade does: last declaration wins', () => {
+    const repeated = '.row {\n  margin-top: 1.5rem;\n}\n.row {\n  margin-top: 0.2rem;\n}\n'
+    expect(remValue(ruleBlock(repeated, '.row'), 'margin-top')).toBe(0.2)
+    expect(remValue('margin-top: 1.5rem; margin-top: 0.2rem;', 'margin-top')).toBe(0.2)
+    // A shorthand is not expanded — that is a CSS parser's job — but it may not
+    // be read past either, so the guard refuses rather than reporting a stale
+    // longhand. `margin` and its logical spelling both reach `margin-top`.
+    for (const later of ['margin: 0', 'margin-block: 0', 'margin-block-start: 0']) {
+      expect(() => remValue(`margin-top: 1.5rem; ${later};`, 'margin-top'), later).toThrow(
+        /set by a later/,
+      )
+    }
+    expect(() => remValue('gap: 0.5rem; column-gap: 0;', 'gap')).toThrow(/set by a later/)
   })
 
   // The answer buttons are page controls sitting directly beneath a filled,
@@ -309,6 +378,16 @@ describe('styles.css', () => {
   // there is "no way to predict the outcome", and the case here (an element
   // flush against but *outside* a filled region) is unmeasured in all of it.
   // Do not "improve" this number by attaching a citation to it.
+  //
+  // Scope, so the next reader knows what this does NOT see: it compares the two
+  // authored lengths and cannot know the containing block. That is sound while
+  // `.entry-drill` contributes no spacing of its own — it carries no rule at all
+  // today — but flex-column-with-gap is this stylesheet's idiom for stacked
+  // groups (`.written-options`, `.copy-form`, `.dash-cards`), and under one of
+  // those the margins stop collapsing and *both* distances gain the container's
+  // gap. The bottom half is the one that breaks: label-to-row becomes
+  // `gap + 0.35rem` while this still reads 0.35. Style that section and this
+  // guard needs re-deriving, not just re-running.
   it('separates the answer group from the instrument above it', () => {
     const label = ruleBlock(CSS, '.entry-answers-label')
     const row = ruleBlock(CSS, '.entry-answers')
