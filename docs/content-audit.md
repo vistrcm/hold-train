@@ -2148,3 +2148,80 @@ CLAUDE.md rule.
   visible: `separates the answer group from the instrument above it` refuses a `.entry-answers-label`
   rule declaring `display: none` or `position: absolute|fixed`. Mutation-confirmed: adding
   `position: absolute` to that rule reds it.
+  - ⚠️ **Amended 2026-08-11 (iteration 9):** that refusal was a *value* list and the list was not
+    closed. `display: contents` generates no box — the text stays, the margin goes — so it takes the
+    label out of flow through a declaration this guard permitted, and `display: contents` appended to
+    `.entry-answers-label` left the ratio green with the buttons flush against the panel. The refusal
+    is now on the **property**: no `display` and no `position` on that rule at all. See the correction
+    entry below.
+
+## Post-completion review fixes — 2026-08-11 (code review iteration 9, entry answer-group branch)
+
+- **Fixed: `ruleBlock` matched selector *text* where the cascade matches *elements*, so any rule
+  reaching the label without naming its class was invisible** (`src/styles.test.ts`). Every mechanism
+  the helper had — exact-member collection, the `(?![\w-])` boundary, the subject-contains-the-selector
+  throw, all-matching-rules, the nested-rule refusal — asks a question about the string
+  `.entry-answers-label`. A rule that never writes that string was neither collected (so its
+  declarations were not read) nor refused (so nothing said the guard could not resolve it): silently
+  absent, i.e. fail-open. Four vectors were reproduced against the real `styles.css`, each leaving
+  `separates the answer group from the instrument above it` reporting `margin-top: 1.5rem` against
+  `gap: 0.5rem` while a browser renders something smaller:
+
+  ```css
+  .entry-drill p    { margin: 0.35rem 0 }   /* (0,1,1) beats (0,1,0) — 5.6 px vs an 8 px gap */
+  #entry-answers-label { margin-top: 0 }    /* (1,0,0) */
+  .entry-drill > *  { margin: 0 }           /* (0,1,0) tie, later in source order */
+  .entry-drill div  { gap: 0 }              /* the row's half of the ratio */
+  ```
+
+  The first is not hypothetical: `.foo p { margin }` is this stylesheet's own idiom for `<p>` margins
+  (`.entry-feedback p`, `.written-report p`, `.tofrom-feedback p`, and `.lab-debrief li` alongside),
+  so it is the likeliest future edit to this section. The second is reachable only because this branch
+  added the id — `aria-labelledby` needs one — and `#app` shows the sheet already selects on ids. That
+  is the 0-ish : 1 spacing defect the whole branch exists to close, restored with the suite green.
+- Fix: `ruleBlock` now takes a `context` naming the *other* ways a rule can reach the element — the
+  simple selectors it carries itself (`also`: `p`, `#entry-answers-label`) and the ones its ancestors
+  carry (`within`: `.entry-drill`, `section`, `div`, `#app`, `body`, `html`) — and refuses any member
+  whose subject is drawn from `also` (or `*`), whose ancestor compounds are drawn from the union, and
+  whose specificity ties or beats a single class's (0,1,0). Those are DOM facts no stylesheet
+  assertion can check, so they are pinned in `entry-drill.test.ts` by
+  `carries only the names the stylesheet guard is told about` (tag, id, exact class list, and the
+  parent being `section.entry-drill`) — a context that drifts from the markup would re-open the hole
+  silently. Specificity is compared, not ignored, and the comparison is load-bearing in **both**
+  directions: refusing everything that *could* match reds the live `p { color: var(--text-dim) }`
+  (0,0,1, which genuinely loses), and ignoring the ancestor compounds reds `.entry-feedback p`, which
+  cannot reach the label at all. Ancestors are matched loosely — any ancestor, any combinator, any
+  order — because the tight version is a selector engine; looseness only ever over-refuses.
+- Regression test: `refuses a rule that reaches the element without naming its class`, three refusals
+  (descendant type, id, universal child) and three non-vacuity cases (a losing bare type rule, a
+  descendant rule under an ancestor the element does not have, and the empty-context default where
+  only `*` can reach). Mutation-confirmed: deleting the refusal reds only the new test; making it
+  specificity-blind and dropping the ancestor check each red **both** it and the real-stylesheet
+  ratio; and each of the four CSS overrides above, appended to `styles.css`, now reds the ratio with
+  a message naming the offending prelude.
+- **Fixed: the in-flow refusal was a value list, and `display: contents` was not on it**
+  (`src/styles.test.ts`). Iteration 6 refused `display: none` and `position: absolute|fixed` — the two
+  spellings it had thought of. `display: contents` keeps the label's text and generates no box, so its
+  `margin-top` renders nothing and `.entry-answers` returns flush against the G1000 rect, with every
+  number in the ratio still reading 1.5rem against 0.5rem. Which `display` values still generate an
+  in-flow box is a question this guard would have to model, and the label needs neither property, so
+  both are now refused outright: no `display`, no `position`, on that rule. Same trade as the nested
+  rule's shape refusal — a harmless `display: block` now reds, which costs a minute, against a false
+  green that ships the defect. Mutation-confirmed: `display: contents` on `.entry-answers-label` reds
+  the ratio.
+- Amends the 2026-08-09 entry above (iteration 6) in place; the "refuses `display: none` or
+  `position: absolute|fixed`" wording there is superseded, not deleted.
+- **Recurring pattern, recorded because it is now three for three:** each version of this helper's
+  docblock enumerated the spellings it knew and called the list closed — at-rules "err toward failing
+  rather than passing", then the conditional group rule as "the only fail-open one", then "every way
+  of leaving it is loud". The over-claim is the more dangerous half of each bug: it tells the next
+  session the one edit that reaches the defect is already covered. State the mechanism, not the
+  enumeration.
+- Reviewed and **not** changed: `.written-figure` in `src/modules/written-test.ts` renders the same
+  viewBox-filling panel directly above `.written-options` (`gap: 0.5rem`, no separating margin) — the
+  identical 0 px-to-panel defect, on the panel's second consumer. Out of this plan's scope, already
+  recorded as a deferral, and left as an open item rather than fixed here.
+- Reviewed and **not** changed: `nav.fix` is interpolated unescaped into `renderHSI`'s markup and into
+  its `aria-label`. Every caller passes a value from a static fixture list, so it is not reachable
+  today; escaping only this one interpolation while the rest of the app builds `innerHTML` the same
+  way would be inconsistent rather than safer.

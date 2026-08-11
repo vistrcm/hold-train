@@ -37,7 +37,7 @@ function rootBlock(css: string): string {
  * stripped first so prose naming a class cannot be mistaken for the rule itself.
  *
  * The model is deliberately small — flat rules, source order, last declaration
- * wins — and every way of leaving it is loud. Four mechanisms, guarded
+ * wins — and every way of leaving it is loud. Each mechanism is guarded
  * separately, because a reader who thinks one covers the rest will delete the
  * parts that actually work. A silent mis-read is a green test computing its
  * ratio from some other rule's numbers.
@@ -68,7 +68,28 @@ function rootBlock(css: string): string {
  *  - collecting **every** matching rule rather than the first is what keeps the
  *    read in step with the cascade. A second `.entry-answers-label { margin-top:
  *    0.2rem }` appended anywhere below wins in a browser, and a first-match read
- *    goes on reporting the value further up the file.
+ *    goes on reporting the value further up the file;
+ *  - a rule that **reaches the element without naming its class** is refused on
+ *    the same terms. `mentions` tests selector *text*, but the cascade matches
+ *    *elements*: `.entry-drill p`, `#entry-answers-label` and `.entry-drill > *`
+ *    write the class nowhere, so they were neither collected nor refused —
+ *    invisible — while each of them ties or outranks a flat class rule, i.e.
+ *    renders. `.foo p { margin }` is this sheet's own idiom for `<p>` margins
+ *    (`.entry-feedback p`, `.written-report p`, `.tofrom-feedback p`), so it is
+ *    the likeliest future edit to this section, and the id exists only because
+ *    `aria-labelledby` needs one. Deciding this needs facts the stylesheet does
+ *    not carry — the element's tag, its id, its ancestors — so `context`
+ *    supplies them and `entry-drill.test.ts` pins them against the DOM.
+ *
+ * The comparison is against a single class's (0,1,0), which is all this helper
+ * is ever asked for: a member carrying any id, class, attribute or pseudo-class
+ * ties or wins and is refused, while one built only from type selectors loses
+ * and is ignored — that split is what keeps the live `p { color: … }` from
+ * reding the suite. Ancestor compounds are matched loosely (any ancestor,
+ * whatever the combinator, in any order) because a tighter model is a selector
+ * engine; the looseness only ever over-refuses, which is the direction to err
+ * in. An empty `context` claims the element has no other name, so only `*` can
+ * reach it — the safe default for a synthetic sheet.
  *
  * The blocks are concatenated in source order, which is the order the cascade
  * resolves them in for one repeated selector; `remValue` then takes the last
@@ -100,16 +121,47 @@ function rootBlock(css: string): string {
  * red is a minute's work; a false green is the defect this whole helper exists
  * to prevent.
  *
- * ⚠️ Two earlier versions of this docblock each claimed a coverage this code did
- * not have — first that at-rules were concatenated "unconditionally" and the
+ * ⚠️ Three earlier versions of this docblock each claimed a coverage this code
+ * did not have — first that at-rules were concatenated "unconditionally" and the
  * guard "errs toward failing rather than passing" (false in both directions),
  * then that a conditional group rule was "the only fail-open one" (nesting walks
- * straight through a name list). That claim is the more dangerous half of the
- * bug both times: it tells the next session the one edit that reaches the defect
- * is already covered. State the mechanism, not the enumeration. */
-function ruleBlock(css: string, selector: string): string {
+ * straight through a name list), then that "every way of leaving it is loud"
+ * while any rule reaching the element by tag, id or `*` left silently. That
+ * claim is the more dangerous half of the bug every time: it tells the next
+ * session the one edit that reaches the defect is already covered. Note the
+ * shape of the recurring miss, too — each version enumerated the *spellings* it
+ * knew and called the list closed. State the mechanism, not the enumeration. */
+interface Context {
+  /** Simple selectors the element itself carries besides the queried class. */
+  readonly also?: readonly string[]
+  /** Simple selectors carried by any of its ancestors. */
+  readonly within?: readonly string[]
+}
+
+/** One compound's simple selectors. The alternation is ordered so an attribute
+ * or a pseudo is one token rather than being shredded into bare words. */
+const SIMPLE = /\*|::?[\w-]+(?:\([^)]*\))?|\[[^\]]*\]|[.#]?[\w-]+/g
+
+/** Could this compound select an element carrying exactly `names`? `*` selects
+ * anything; every other token has to be a name the element is known to carry,
+ * so an unlisted one (`:first-child`, `[hidden]`) reads as "cannot match" —
+ * sound only because `context` is asserted complete against the DOM. */
+function reaches(compound: string, names: ReadonlySet<string>): boolean {
+  const parts = compound.match(SIMPLE) ?? []
+  return parts.length > 0 && parts.every((part) => part === '*' || names.has(part))
+}
+
+/** Carries an id, class, attribute or pseudo-class anywhere, so its specificity
+ * is at least (0,1,0) — a tie with the queried class, which source order then
+ * decides, or a win. Ties are refused with the wins: a tie added below the
+ * class rule renders. */
+const OUTRANKS = /[#.[:]/
+
+function ruleBlock(css: string, selector: string, context: Context = {}): string {
   const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   const mentions = new RegExp(`${escaped}(?![\\w-])`)
+  const own = new Set([selector, ...(context.also ?? [])])
+  const anywhere = new Set([...own, ...(context.within ?? [])])
   const code = css.replace(/\/\*[\s\S]*?\*\//g, ' ')
   // The boundary is a lookbehind rather than a consumed character: one rule's
   // closing `}` is the next rule's boundary, and a match that eats it leaves the
@@ -130,9 +182,21 @@ function ruleBlock(css: string, selector: string): string {
         blocks.push(rule[2]!)
         continue
       }
-      const subject = member.split(/[\s>+~]+/).filter(Boolean).at(-1) ?? ''
+      const compounds = member.split(/[\s>+~]+/).filter(Boolean)
+      const subject = compounds.at(-1) ?? ''
       if (mentions.test(subject)) {
         throw new Error(`${member} also styles ${selector}: this guard cannot resolve specificity`)
+      }
+      // The same refusal, reached from the DOM rather than from the selector
+      // text — see the docblock. A member can only match if its subject names
+      // this element and every compound above it names something on the path to
+      // it; `anywhere` is the union rather than `within` alone so that a
+      // self-named ancestor is assumed to match, which over-refuses and never
+      // under-refuses.
+      const claimed =
+        reaches(subject, own) && compounds.slice(0, -1).every((part) => reaches(part, anywhere))
+      if (claimed && OUTRANKS.test(member)) {
+        throw new Error(`${member} reaches ${selector}: this guard cannot resolve specificity`)
       }
     }
   }
@@ -402,8 +466,8 @@ describe('styles.css', () => {
   // The whole spacing guard below rests on `ruleBlock` reading the rule it was
   // asked for: every wrong read returns a block rather than throwing, so the
   // ratio would be computed from some other rule's numbers and the failure
-  // would look like a stylesheet defect. Each of the four mechanisms therefore
-  // gets an assertion that fails when that mechanism *alone* is removed —
+  // would look like a stylesheet defect. Each mechanism therefore gets an
+  // assertion that fails when that mechanism *alone* is removed —
   // mutation-checked, not assumed. The synthetic this replaces put all of its
   // decoys *before* the target rule, so the last-declaration read masked every
   // leak: all four of its expectations passed with the leading boundary deleted
@@ -440,7 +504,7 @@ describe('styles.css', () => {
     expect(() => remValue('gap: 8px;', 'gap')).toThrow(/not a rem length/)
   })
 
-  // The fifth mechanism, and the only fail-OPEN one the others could not reach:
+  // A fail-OPEN mechanism (not the only one — see the test after this):
   // the body group is `[^}]*`, so a match stops at the first inner `}` and the
   // rule nested there is swallowed into the outer *body* — never matched, never
   // collected, silently gone. Every synthetic below returned the unconditional
@@ -481,6 +545,50 @@ describe('styles.css', () => {
     expect(
       remValue(ruleBlock(`/* .panel { & .row-label {} } */\n${label}`, '.row-label'), 'margin-top'),
     ).toBe(1.5)
+  })
+
+  // The other fail-OPEN one, and the one every earlier version was blind to: a
+  // rule does not have to *name* the class to set the property. `mentions` tests
+  // selector text, so a subject reaching the element by tag, by id or by `*` was
+  // neither collected nor refused — invisible. Each of the three below, appended
+  // verbatim to the real styles.css, left `separates the answer group…` still
+  // reporting `margin-top: 1.5rem` against `gap: 0.5rem` while a browser renders
+  // 5.6 px of separation against an 8 px inter-button gap: the exact 0-ish : 1
+  // defect this branch exists to close, restored, suite green.
+  it('refuses a rule that reaches the element without naming its class', () => {
+    const label = '.row-label {\n  margin-top: 1.5rem;\n}\n'
+    // The live shape: a <p id> inside .panel. `also` is what the element is,
+    // `within` is what it sits in.
+    const ctx = { also: ['p', '#row-label'], within: ['.panel'] } as const
+    for (const [name, rule] of [
+      // The sheet's own idiom for <p> margins, four rules of it already.
+      ['descendant type', '.panel p {\n  margin: 0.35rem 0;\n}\n'],
+      // The id exists only because `aria-labelledby` needs one, and `#app`
+      // shows this sheet already selects on one.
+      ['id', '#row-label {\n  margin-top: 0;\n}\n'],
+      // A tie, not a win — refused with the wins, because a tie below the class
+      // rule renders.
+      ['universal child', '.panel > * {\n  margin: 0;\n}\n'],
+    ] as const) {
+      expect(() => ruleBlock(`${label}${rule}`, '.row-label', ctx), name).toThrow(
+        /reaches \.row-label/,
+      )
+    }
+    // Non-vacuous in the other direction, and this half is why the refusal is
+    // specificity-aware rather than a blanket "could it match": both of these
+    // are live in styles.css (`p { color: … }`, `.entry-feedback p { margin }`)
+    // and neither changes what renders — a bare type rule is (0,0,1) against the
+    // class's (0,1,0), and a descendant rule under an ancestor this element does
+    // not have cannot match it at all. Refusing either would red the suite over
+    // a rule the browser already discards.
+    const loses = `${label}p {\n  margin: 0;\n}\n`
+    const elsewhere = `${label}.other p {\n  margin: 0;\n}\n`
+    expect(remValue(ruleBlock(loses, '.row-label', ctx), 'margin-top')).toBe(1.5)
+    expect(remValue(ruleBlock(elsewhere, '.row-label', ctx), 'margin-top')).toBe(1.5)
+    // An unnamed context claims no other name, so only `*` reaches — which is
+    // what makes the three refusals above turn on the context and not on luck.
+    const unnamed = `${label}#row-label {\n  margin-top: 0;\n}\n`
+    expect(remValue(ruleBlock(unnamed, '.row-label'), 'margin-top')).toBe(1.5)
   })
 
   // The misread no boundary can catch, because the rule it reads is the right
@@ -545,24 +653,46 @@ describe('styles.css', () => {
   // `gap + 0.35rem` while this still reads 0.35. Style that section and this
   // guard needs re-deriving, not just re-running.
   it('separates the answer group from the instrument above it', () => {
-    const label = ruleBlock(CSS, '.entry-answers-label')
-    const row = ruleBlock(CSS, '.entry-answers')
+    // Every other name a rule could reach these two elements by, so `ruleBlock`
+    // can refuse an override that never writes the class. `<p id=…>` and `<div>`
+    // inside `section.entry-drill`, inside the fresh `<div>` the router hands
+    // each screen, inside `#app` in `<body>`. A claim about the DOM, not about
+    // this sheet, so it is pinned there: `carries only the names the stylesheet
+    // guard is told about` in entry-drill.test.ts. Add a second class here and
+    // forget it, and the guard resumes refusing the wrong set.
+    const WITHIN = ['.entry-drill', 'section', 'div', '#app', 'body', 'html']
+    const label = ruleBlock(CSS, '.entry-answers-label', {
+      also: ['p', '#entry-answers-label'],
+      within: WITHIN,
+    })
+    const row = ruleBlock(CSS, '.entry-answers', { also: ['div'], within: WITHIN })
     // Non-vacuous: `ruleBlock` throws on a selector typo, and these pin that it
     // found two *different* rules rather than the same block twice.
     expect(label, 'the label rule carries the separating margin').toMatch(/margin-top:/)
     expect(row, 'the answer row is the flex container').toMatch(/display:\s*flex/)
     expect(label).not.toBe(row)
 
-    // A margin separates nothing on an element that is not in flow, and this is
-    // the only place that is visible: the DOM half in entry-drill.test.ts reads
-    // `label.hidden`, which reflects the HTML attribute and sees no CSS. Make the
-    // label screen-reader-only — `display: none`, or the `position: absolute` +
-    // `clip` idiom — and `.entry-answers` follows `.entry-hsi` with nothing
-    // between them, i.e. the buttons flush against the G1000 rect again, while
-    // every number below still reads 1.5rem against 0.5rem and passes.
-    expect(label, 'the label must stay in flow, or its margin separates nothing').not.toMatch(
-      /display:\s*none|position:\s*(?:absolute|fixed)/,
-    )
+    // A margin separates nothing on an element that generates no box, or one
+    // taken out of flow, and this is the only place that is visible: the DOM
+    // half in entry-drill.test.ts reads `label.hidden`, which reflects the HTML
+    // attribute and sees no CSS. Make the label screen-reader-only — `display:
+    // none`, `display: contents`, the `position: absolute` + `clip` idiom — and
+    // `.entry-answers` follows `.entry-hsi` with nothing between them, i.e. the
+    // buttons flush against the G1000 rect again, while every number below still
+    // reads 1.5rem against 0.5rem and passes.
+    //
+    // Refused as a *property*, not as a list of values: `display: none` and
+    // `position: absolute` were the two spellings the first version enumerated,
+    // and `display: contents` — which keeps the text and drops the box, so the
+    // margin vanishes with nothing on screen to show for it — walked straight
+    // through. Which values still generate an in-flow box is a question this
+    // guard would have to model, and the label needs neither property, so both
+    // are refused outright. A `display: block` that changes nothing reds here;
+    // that costs a minute, and the alternative is the defect shipping green.
+    expect(
+      label,
+      'the label must generate a box in normal flow: no display or position here',
+    ).not.toMatch(/(?:^|[;{\s])(?:display|position)\s*:/)
 
     // A `gap` of 0 would satisfy any margin at all, so the ratio is only
     // meaningful once the intra-group spacing is known positive. Both parses

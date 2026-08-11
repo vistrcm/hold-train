@@ -560,6 +560,34 @@ describe('renderEntryDrill screen', () => {
     expect(above?.className, 'the separating margin must land against the HSI').toBe('entry-hsi')
   })
 
+  // `separates the answer group from the instrument above it` in styles.test.ts
+  // refuses any rule that can reach these two elements *without naming their
+  // class* — `.entry-drill p`, `#entry-answers-label`, `.entry-drill > *` all
+  // outrank or tie a flat class rule and render. It can only do that from a list
+  // of the other names they carry, and that list is a claim about this DOM which
+  // no stylesheet assertion can check. Give the label a second class, or move
+  // the row out of section.entry-drill, and the guard goes on refusing the old
+  // set while an override for the new one walks past it.
+  it('carries only the names the stylesheet guard is told about', () => {
+    const { el } = setup('learn')
+    const label = el.querySelector<HTMLElement>('.entry-answers-label')!
+    const answers = el.querySelector<HTMLElement>('.entry-answers')!
+    expect([label.tagName, label.id, [...label.classList]]).toEqual([
+      'P',
+      'entry-answers-label',
+      ['entry-answers-label'],
+    ])
+    expect([answers.tagName, answers.id, [...answers.classList]]).toEqual([
+      'DIV',
+      '',
+      ['entry-answers'],
+    ])
+    // Same parent, and it is the one the guard's `within` names.
+    expect(label.parentElement).toBe(answers.parentElement)
+    expect(label.parentElement!.tagName).toBe('SECTION')
+    expect([...label.parentElement!.classList]).toEqual(['entry-drill'])
+  })
+
   // .entry-modes has carried role/aria-label since it shipped; .entry-answers
   // carried neither, so a screen reader met three ungrouped, unexplained
   // buttons. The visible label doubles as the accessible name.
