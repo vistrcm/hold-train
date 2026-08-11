@@ -89,7 +89,19 @@ function rootBlock(css: string): string {
  * is ever asked for: a member carrying any id, class, attribute or pseudo-class
  * ties or wins and is refused, while one built only from type selectors loses
  * and is ignored — that split is what keeps the live `p { color: … }` from
- * reding the suite. Ancestor compounds are matched loosely (any ancestor,
+ * reding the suite. But **specificity is not the only thing that decides**, and
+ * a comparison that treats it as though it were is the same fail-open one
+ * mechanism over: `!important` beats every normal declaration whatever the
+ * selector, so a *losing* member carrying one still renders. `p { margin-top: 0
+ * !important }` — one word added to a rule this sheet already has — is neither
+ * collected (it is not `member === selector`) nor refused (`p` carries no
+ * `[#.[:]`), i.e. invisible, and appended to the real styles.css it left
+ * `separates the answer group from the instrument above it` reporting 1.5rem
+ * against 0.5rem, green, with the buttons rendered flush against the panel. So a
+ * claimed member is refused on **either** ground, and the specificity split
+ * above decides only the normal declarations.
+ *
+ * Ancestor compounds are matched loosely (any ancestor,
  * whatever the combinator, in any order) because a tighter model is a selector
  * engine; the looseness only ever over-refuses, which is the direction to err
  * in. An empty `context` claims the element has no other name, so only `*` can
@@ -125,18 +137,23 @@ function rootBlock(css: string): string {
  * red is a minute's work; a false green is the defect this whole helper exists
  * to prevent.
  *
- * ⚠️ Four earlier versions of this docblock each claimed a coverage this code
+ * ⚠️ Five earlier versions of this docblock each claimed a coverage this code
  * did not have — first that at-rules were concatenated "unconditionally" and the
  * guard "errs toward failing rather than passing" (false in both directions),
  * then that a conditional group rule was "the only fail-open one" (nesting walks
  * straight through a name list), then that "every way of leaving it is loud"
  * while any rule reaching the element by tag, id or `*` left silently, then that
  * the name-set read was "sound only because `context` is asserted complete
- * against the DOM" — true of names, and `:nth-of-type(4)` is not a name. That
- * claim is the more dangerous half of the bug every time: it tells the next
- * session the one edit that reaches the defect is already covered. Note the
- * shape of the recurring miss, too — each version enumerated the *spellings* it
- * knew and called the list closed. State the mechanism, not the enumeration. */
+ * against the DOM" — true of names, and `:nth-of-type(4)` is not a name — then
+ * that a member "built only from type selectors loses and is ignored", true of
+ * the normal declarations that sentence was reasoning about and false of the one
+ * kind no selector outranks. That claim is the more dangerous half of the bug
+ * every time: it tells the next session the one edit that reaches the defect is
+ * already covered. Note the shape of the recurring miss, too — each version
+ * enumerated the *spellings* it knew and called the list closed, or named the
+ * one mechanism it had modelled and reasoned as though it were the only one.
+ * State the mechanism, not the enumeration; and ask whether it is the *only*
+ * mechanism, not just whether it is modelled correctly. */
 interface Context {
   /** Simple selectors the element itself carries besides the queried class. */
   readonly also?: readonly string[]
@@ -206,6 +223,13 @@ function reaches(
  * class rule renders. */
 const OUTRANKS = /[#.[:]/
 
+/** The one declaration neither specificity nor source order decides. Shared by
+ * the two refusals that turn on it — `ruleBlock`'s, for a rule it does not
+ * collect, and `remValue`'s, for one it does — so "what `!important` looks like"
+ * has a single spelling: two hand-written copies drift, and the half nobody
+ * edits waves the override through. */
+const IMPORTANT = /!\s*important\b/i
+
 function ruleBlock(css: string, selector: string, context: Context = {}): string {
   const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   const mentions = new RegExp(`${escaped}(?![\\w-])`)
@@ -246,6 +270,17 @@ function ruleBlock(css: string, selector: string, context: Context = {}): string
       const claimed =
         reaches(subject, own, denied) &&
         compounds.slice(0, -1).every((part) => reaches(part, anywhere, NONE))
+      // `!important` first, because it is the ground that does not depend on
+      // the one below: a member that *loses* on specificity still renders when
+      // it carries one, and losing is exactly what keeps it out of `blocks`, so
+      // `remValue`'s own refusal never sees it. Tested on the whole body rather
+      // than on the queried property, `ruleBlock` not being told which property
+      // is coming — the trade is a false red on an unrelated
+      // `p { color: … !important }`, against the silent green this file exists
+      // to prevent.
+      if (claimed && IMPORTANT.test(rule[2]!)) {
+        throw new Error(`${member} reaches ${selector} with !important, which no specificity beats`)
+      }
       if (claimed && OUTRANKS.test(member)) {
         throw new Error(`${member} reaches ${selector}: this guard cannot resolve specificity`)
       }
@@ -303,7 +338,7 @@ function remValue(block: string, prop: string): number {
   // earlier rule renders 0 while a last-declaration read goes on reporting the
   // 1.5rem underneath it. (On the *winning* declaration it already throws, but
   // with a message about notation: `1.5rem !important` is not a rem length.)
-  const important = declared.find(([, value]) => /!\s*important\b/i.test(value))
+  const important = declared.find(([, value]) => IMPORTANT.test(value))
   if (important) {
     throw new Error(`${important[0]}: ${important[1]} wins on !important whatever the order`)
   }
@@ -691,6 +726,45 @@ describe('styles.css', () => {
     // reaches the label, `html` being an ancestor of everything.
     const rooted = `${label}:root p {\n  margin-top: 0;\n}\n`
     expect(() => ruleBlock(rooted, '.row-label', answered)).toThrow(/reaches \.row-label/)
+  })
+
+  // Not a hole in the model but in the question it asks. Every refusal above
+  // weighs specificity — and specificity is not what decides an `!important`,
+  // which beats every normal declaration of the same property in the same origin
+  // whatever the selector. So a member that LOSES the comparison still renders,
+  // and losing is exactly what stops it being collected, so `remValue`'s own
+  // `!important` refusal never sees it: neither collected nor refused,
+  // invisible. Appended verbatim to the real styles.css — one word added to the
+  // live `p { color: … }` rule — this left `separates the answer group…`
+  // reporting 1.5rem against 0.5rem at 17/17 green, with the answer buttons
+  // rendered flush against the G1000 panel.
+  it('refuses a rule that reaches the element with !important, whatever it loses on', () => {
+    const label = '.row-label {\n  margin-top: 1.5rem;\n}\n'
+    const ctx = { also: ['p', '#row-label'], within: ['.panel'] } as const
+    for (const [name, rule] of [
+      // The bare type rule the specificity split deliberately ignores, which is
+      // what makes this the case no other test in this file reaches.
+      ['losing type', 'p {\n  margin-top: 0 !important;\n}\n'],
+      // Through an ancestor. Refused twice over, and `!important` is checked
+      // first so the message names the ground that actually decides.
+      ['losing descendant', '.panel p {\n  margin: 0 !important;\n}\n'],
+      // The spelling is the author's: CSS allows the space and ignores case.
+      ['spaced and capitalised', 'p {\n  margin-top: 0 ! IMPORTANT;\n}\n'],
+    ] as const) {
+      expect(() => ruleBlock(`${label}${rule}`, '.row-label', ctx), name).toThrow(
+        /reaches \.row-label with !important/,
+      )
+    }
+    // Non-vacuous: it is the `!important` that refuses, not the rule carrying
+    // it — strip the one word and the bare type rule is ignored as before.
+    const normal = `${label}p {\n  margin-top: 0;\n}\n`
+    expect(remValue(ruleBlock(normal, '.row-label', ctx), 'margin-top')).toBe(1.5)
+    // …and a member that cannot reach the element is still ignored, which is
+    // what keeps the live `[hidden] { display: none !important }` from reding
+    // the real sheet. The refusal needs reach *and* override, not either.
+    const hidden = `${label}[hidden] {\n  display: none !important;\n}\n`
+    const answered = { ...ctx, denies: ['[hidden]'] }
+    expect(remValue(ruleBlock(hidden, '.row-label', answered), 'margin-top')).toBe(1.5)
   })
 
   // The misread no boundary can catch, because the rule it reads is the right

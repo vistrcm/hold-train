@@ -2294,3 +2294,60 @@ CLAUDE.md rule.
   "(a) and (b) are entirely unverified". The box records that the step was *dispositioned*, and the
   text beside it states exactly which sub-points have evidence and which do not — which is the
   honest form. Left as is rather than unticking a step whose remaining half is not automatable here.
+
+## Post-completion review fixes — 2026-08-11 (code review iteration 11, entry answer-group branch)
+
+- **Fixed: `ruleBlock` decided refusal on specificity alone, and `!important` is the one thing
+  specificity does not decide** (`src/styles.test.ts`). Iterations 9 and 10 taught the guard which
+  rules *reach* the label; the refusal they both fed into was `claimed && OUTRANKS.test(member)`, i.e.
+  "does this member tie or beat a single class's (0,1,0)?". A member that **loses** that comparison
+  was ignored by design — the split that keeps the live `p { color: … }` rule from reding the suite.
+  But an `!important` declaration beats every normal declaration of the same property in the same
+  origin *whatever* the selector, so a losing member carrying one renders anyway. And losing is
+  precisely what keeps it out of `blocks`, so `remValue`'s own `!important` refusal (added in
+  iteration 8, for declarations inside a **collected** block) never saw it. Neither collected nor
+  refused: invisible, fail-open. Reproduced against the real `styles.css` — one word added to a rule
+  the sheet already carries at line 69:
+
+  ```css
+  p { margin-top: 0 !important }   /* (0,0,1), loses to .entry-answers-label's (0,1,0), renders anyway */
+  ```
+
+  `separates the answer group from the instrument above it` went on reporting `margin-top: 1.5rem`
+  against `gap: 0.5rem` and passed, while a browser renders **zero** separation — the answer buttons
+  flush against the G1000 panel rect, which is the exact 0 : 1 defect this branch exists to close.
+  This is the same shape as iterations 9 and 10 one mechanism over: not a spelling the model got
+  wrong, but a second mechanism the model never asked about.
+- Fix: a claimed member is now refused on **either** ground, `!important` checked first so the message
+  names the one that actually decides. The test is on the harvested body rather than on the queried
+  property, because `ruleBlock` is not told which property is coming; the accepted trade is a false red
+  on an unrelated `p { color: … !important }`, against the silent green. The regex is hoisted to one
+  `IMPORTANT` constant shared with `remValue` — two hand-written copies of "what `!important` looks
+  like" drift, and the half nobody edits waves the override through. The live
+  `[hidden] { display: none !important }` does not red the sheet: `[hidden]` is already a
+  `Context.denies` subject, so it never reaches `claimed`.
+- Docblock amended, per this file's own recurring lesson: the sentence "a member built only from type
+  selectors loses and is ignored" was true of the normal declarations it was reasoning about and false
+  of the one kind no selector outranks — the fifth time a `ruleBlock` docblock has claimed a coverage
+  the code did not have. The ⚠️ ledger inside it now records the *shape* of the repeat as well as the
+  count: each version either enumerated the spellings it knew and called the list closed, or named the
+  one mechanism it had modelled and reasoned as though it were the only one. **State the mechanism,
+  and ask whether it is the only mechanism — not just whether it is modelled correctly.**
+- Regression test: `refuses a rule that reaches the element with !important, whatever it loses on` —
+  three refusals (a losing bare type rule, a losing descendant, and the `! IMPORTANT` spelling CSS
+  permits) and two non-vacuity cases (strip the one word and the same bare type rule is ignored,
+  reading 1.5rem; a `denies`-answered `[hidden] { display: none !important }` stays invisible, so the
+  refusal needs reach *and* override rather than either). Mutation-confirmed both ways: disabling the
+  new throw reds **only** the new test, and the CSS escape above, appended to the real `styles.css`,
+  now reds the ratio with `p reaches .entry-answers-label with !important, which no specificity beats`.
+- Reviewed and **not** changed: the nav status line reserves a hard-coded 34 viewBox units for the
+  `TO`/`FROM` word (`src/ui/hsi.ts`, `.hsi-nav-distance` at `x = right − 34` against `.hsi-nav-sense`
+  at `x = right`, both `text-anchor="end"`). `FROM` at `font-size="11"` measures ≈31.7–32.4 px across
+  the plausible `system-ui` resolutions, so the clearance is real but thin, and nothing pins the two
+  fields against *each other*. Noted rather than fixed: it is a legibility margin, not a taught fact,
+  and no rendering here overruns.
+- Reviewed and **not** changed: `.written-options` sits 0 px below the same viewBox-filling panel on
+  `#/written`, i.e. the identical grouping defect from the identical cause. The plan scopes itself to
+  the entry drill explicitly, so this is recorded as a **known open item** rather than silently
+  carried — closing it means the same label-plus-margin treatment and widening the `styles.test.ts`
+  ratio to both rows.
