@@ -74,45 +74,57 @@ function rootBlock(css: string): string {
  * resolves them in for one repeated selector; `remValue` then takes the last
  * declaration.
  *
- * A conditional group rule (`@media`, `@supports`, `@container`, `@layer`) is
- * **refused**, not resolved — same rule as the specificity conflict above: what
- * this model cannot answer, it throws on. It does not degrade gracefully into a
- * flat read. The body group is `[^}]*`, so an at-rule's match runs only to the
- * *first* inner `}` and swallows the rule nested there whole: that rule is never
- * matched and its declarations are dropped silently, which is fail-OPEN. A
- * narrow-width `@media` override of `.entry-answers-label`'s `margin-top` would
- * leave `separates the answer group from the instrument above it` green on a
- * length that no longer renders — and a narrow width is precisely where the row
- * and the panel converge, i.e. the worst case for the defect that guard exists
- * to catch. A *later* nested rule is matched, and then read as though it applied
- * at every width, so which line of the media block someone typed on decides
- * which way the guard is wrong.
+ * A **nested style rule** is refused, not resolved — same rule as the
+ * specificity conflict above: what this model cannot answer, it throws on. It
+ * does not degrade gracefully into a flat read. The body group is `[^}]*`, which
+ * cannot cross a `}` but crosses a `{` freely, so a match containing a nested
+ * rule runs only to that rule's *inner* `}` and swallows it whole: the nested
+ * rule is never matched and its declarations are dropped silently, which is
+ * fail-OPEN. A narrow-width `@media` override of `.entry-answers-label`'s
+ * `margin-top` would leave `separates the answer group from the instrument above
+ * it` green on a length that no longer renders — and a narrow width is precisely
+ * where the row and the panel converge, i.e. the worst case for the defect that
+ * guard exists to catch. A *later* nested rule is matched, and then read as
+ * though it applied at every width, so which line of the block someone typed on
+ * decides which way the guard is wrong.
  *
- * ⚠️ This docblock used to claim the opposite — that at-rules were concatenated
- * "unconditionally" and the guard "errs toward failing rather than passing".
- * That was false in both directions and is the more dangerous half of the bug:
- * it told the next session the one edit that reaches the defect was already
- * covered. */
+ * The refusal is on the **shape** — a harvested body that still contains a `{` —
+ * and not on a list of at-rule names, because the swallow needs no at-rule at
+ * all. Native CSS nesting (`.entry-drill { & .entry-answers-label { … } }`) is
+ * the same hole with no keyword to match on, and it is now the default idiom for
+ * writing CSS, i.e. the likeliest future edit to this sheet; `@scope` and
+ * `@starting-style` reach it too. A name list gets each of those wrong by
+ * default, silently. Refusing the shape covers every spelling at once, and what
+ * it over-refuses is loud rather than green: a `@keyframes` added anywhere in
+ * the sheet throws here even though it cannot touch this rule. Fixing a false
+ * red is a minute's work; a false green is the defect this whole helper exists
+ * to prevent.
+ *
+ * ⚠️ Two earlier versions of this docblock each claimed a coverage this code did
+ * not have — first that at-rules were concatenated "unconditionally" and the
+ * guard "errs toward failing rather than passing" (false in both directions),
+ * then that a conditional group rule was "the only fail-open one" (nesting walks
+ * straight through a name list). That claim is the more dangerous half of the
+ * bug both times: it tells the next session the one edit that reaches the defect
+ * is already covered. State the mechanism, not the enumeration. */
 function ruleBlock(css: string, selector: string): string {
   const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   const mentions = new RegExp(`${escaped}(?![\\w-])`)
   const code = css.replace(/\/\*[\s\S]*?\*\//g, ' ')
-  // Refused rather than parsed — see the docblock. Tested against the
-  // comment-stripped text, so prose *naming* `@media` cannot trip it, and
-  // before the scan rather than inside it, because the fail-open case never
-  // produces a match to inspect.
-  const conditional = code.match(/@(?:media|supports|container|layer)\b/)
-  if (conditional) {
-    throw new Error(
-      `${conditional[0]} nests style rules conditionally; this guard reads flat rules only`,
-    )
-  }
   // The boundary is a lookbehind rather than a consumed character: one rule's
   // closing `}` is the next rule's boundary, and a match that eats it leaves the
   // rule right after it unmatchable — which is exactly the repeated-selector
   // case this scan was widened to catch.
   const blocks: string[] = []
   for (const rule of code.matchAll(/(?:^|(?<=[{};]))\s*([^{}]*?)\s*\{([^}]*)\}/g)) {
+    // Refused rather than parsed — see the docblock. A body that still holds a
+    // `{` is one whose nested rule this match just swallowed, and the fail-open
+    // case is precisely that the swallowed rule produces no match of its own to
+    // inspect. Tested on the comment-stripped text, so a brace in prose cannot
+    // trip it.
+    if (rule[2]!.includes('{')) {
+      throw new Error(`${rule[1]!.trim()} nests a style rule; this guard reads flat rules only`)
+    }
     for (const member of rule[1]!.split(',').map((part) => part.trim())) {
       if (member === selector) {
         blocks.push(rule[2]!)
@@ -168,6 +180,18 @@ function remValue(block: string, prop: string): number {
   const declared = [...block.matchAll(/(?:^|[;{\s])([\w-]+)\s*:\s*([^;}]+)/g)]
     .map(([, name, value]) => [name!, value!.trim()] as const)
     .filter(([name]) => family.includes(name))
+  // The one thing source order does not decide, so the last-declaration model
+  // cannot answer it: `!important` beats every normal declaration of the same
+  // property in the same origin, whatever follows it. Refused rather than
+  // resolved, for the same reason a nested rule is. Fail-open in the direction
+  // that matters — `.entry-answers-label { margin-top: 0 !important }` in an
+  // earlier rule renders 0 while a last-declaration read goes on reporting the
+  // 1.5rem underneath it. (On the *winning* declaration it already throws, but
+  // with a message about notation: `1.5rem !important` is not a rem length.)
+  const important = declared.find(([, value]) => /!\s*important\b/i.test(value))
+  if (important) {
+    throw new Error(`${important[0]}: ${important[1]} wins on !important whatever the order`)
+  }
   const last = declared.at(-1)
   if (last === undefined) throw new Error(`no ${prop} declared in {${block.trim()}}`)
   const [name, raw] = last
@@ -417,34 +441,46 @@ describe('styles.css', () => {
   })
 
   // The fifth mechanism, and the only fail-OPEN one the others could not reach:
-  // the body group is `[^}]*`, so an at-rule's match stops at the first inner
-  // `}` and the rule nested there is swallowed into the at-rule's *body* — never
-  // matched, never collected, silently gone. Both synthetics below returned the
-  // unconditional 1.5rem before this refusal existed, i.e. the margin the media
-  // block has just cancelled at exactly the width where the row and the panel
-  // converge. Position-dependent, too, which is why the second case exists: a
-  // *later* nested rule IS matched, and is then read as if it applied at every
-  // width.
-  it('refuses a conditional group rule rather than reading past it', () => {
+  // the body group is `[^}]*`, so a match stops at the first inner `}` and the
+  // rule nested there is swallowed into the outer *body* — never matched, never
+  // collected, silently gone. Every synthetic below returned the unconditional
+  // 1.5rem before this refusal existed, i.e. the margin the nested block has
+  // just cancelled at exactly the width where the row and the panel converge.
+  // Position-dependent, too, which is why the second case exists: a *later*
+  // nested rule IS matched, and is then read as if it applied unconditionally.
+  //
+  // The refusal is on the shape, not on a list of at-rule names, so the cases
+  // are chosen to span the spellings a name list gets wrong: native nesting
+  // carries no at-rule keyword at all, and `@scope` was in no such list here.
+  // Those two are the ones that shipped past the earlier name-matching version.
+  it('refuses a nested style rule rather than reading past it', () => {
     const label = '.row-label {\n  margin-top: 1.5rem;\n}\n'
     const swallowed = `${label}@media (max-width: 400px) {\n  .row-label {\n    margin-top: 0;\n  }\n}\n`
     const harvested =
       `${label}@media (max-width: 400px) {\n  .other {\n    gap: 0;\n  }\n` +
       '  .row-label {\n    margin-top: 0;\n  }\n}\n'
-    expect(() => ruleBlock(swallowed, '.row-label')).toThrow(/flat rules only/)
-    expect(() => ruleBlock(harvested, '.row-label')).toThrow(/flat rules only/)
-    expect(() => ruleBlock(`${label}@supports (display: grid) {\n  .row-label {\n  }\n}\n`, '.row-label')).toThrow(
-      /flat rules only/,
-    )
-    // Non-vacuous in the other direction: the refusal is of the at-rule, not of
-    // every sheet, and `styles.css` carries none today — the spacing guard below
-    // reads the real file and would throw here if that changed.
+    // No keyword to match on, and the default idiom for writing CSS today.
+    const nested = `${label}.panel {\n  & .row-label {\n    margin-top: 0;\n  }\n}\n`
+    const scoped = `${label}@scope (.panel) {\n  .row-label {\n    margin-top: 0;\n  }\n}\n`
+    for (const [name, sheet] of [
+      ['@media, swallowed', swallowed],
+      ['@media, harvested later', harvested],
+      ['@supports', `${label}@supports (display: grid) {\n  .row-label {\n  }\n}\n`],
+      ['native nesting', nested],
+      ['@scope', scoped],
+    ] as const) {
+      expect(() => ruleBlock(sheet, '.row-label'), name).toThrow(/flat rules only/)
+    }
+    // Non-vacuous in the other direction: the refusal is of the nested rule, not
+    // of every sheet, and `styles.css` carries none today (88 rules, 88 open
+    // braces) — the spacing guard below reads the real file and would throw here
+    // if that changed.
     expect(remValue(ruleBlock(label, '.row-label'), 'margin-top')).toBe(1.5)
-    // …and prose is not an at-rule: comments are stripped before the test, so a
-    // docblock discussing `@media` cannot red the suite.
-    expect(remValue(ruleBlock(`/* no @media here */\n${label}`, '.row-label'), 'margin-top')).toBe(
-      1.5,
-    )
+    // …and a brace in prose is not a nested rule: comments are stripped before
+    // the scan, so a docblock drawing the shape it refuses cannot red the suite.
+    expect(
+      remValue(ruleBlock(`/* .panel { & .row-label {} } */\n${label}`, '.row-label'), 'margin-top'),
+    ).toBe(1.5)
   })
 
   // The misread no boundary can catch, because the rule it reads is the right
@@ -467,6 +503,17 @@ describe('styles.css', () => {
       )
     }
     expect(() => remValue('gap: 0.5rem; column-gap: 0;', 'gap')).toThrow(/set by a later/)
+    // …and the one declaration source order does NOT decide. `ruleBlock` joins
+    // every rule for the selector, so the loser here is what a first repeated
+    // rule would leave behind: the read reports 1.5rem, the browser renders 0.
+    expect(() => remValue('margin-top: 0 !important; margin-top: 1.5rem;', 'margin-top')).toThrow(
+      /wins on !important/,
+    )
+    // Also refused when it is the winner, so the message is about the cascade
+    // rather than about `1.5rem !important` not parsing as a length.
+    expect(() => remValue('margin-top: 1.5rem !important;', 'margin-top')).toThrow(
+      /wins on !important/,
+    )
   })
 
   // The answer buttons are page controls sitting directly beneath a filled,
@@ -505,6 +552,17 @@ describe('styles.css', () => {
     expect(label, 'the label rule carries the separating margin').toMatch(/margin-top:/)
     expect(row, 'the answer row is the flex container').toMatch(/display:\s*flex/)
     expect(label).not.toBe(row)
+
+    // A margin separates nothing on an element that is not in flow, and this is
+    // the only place that is visible: the DOM half in entry-drill.test.ts reads
+    // `label.hidden`, which reflects the HTML attribute and sees no CSS. Make the
+    // label screen-reader-only — `display: none`, or the `position: absolute` +
+    // `clip` idiom — and `.entry-answers` follows `.entry-hsi` with nothing
+    // between them, i.e. the buttons flush against the G1000 rect again, while
+    // every number below still reads 1.5rem against 0.5rem and passes.
+    expect(label, 'the label must stay in flow, or its margin separates nothing').not.toMatch(
+      /display:\s*none|position:\s*(?:absolute|fixed)/,
+    )
 
     // A `gap` of 0 would satisfy any margin at all, so the ratio is only
     // meaningful once the intra-group spacing is known positive. Both parses

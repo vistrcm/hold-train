@@ -539,7 +539,14 @@ describe('renderEntryDrill screen', () => {
     const label = el.querySelector<HTMLElement>('.entry-answers-label')!
     expect(label).not.toBeNull()
     expect(label.textContent!.trim().length).toBeGreaterThan(0)
-    expect(label.hidden, 'the label is visible, not a screen-reader-only name').toBe(false)
+    // `hidden` reflects the HTML attribute and nothing else. Every screen-reader-only
+    // technique is CSS (`display: none`, `position: absolute` + `clip`), so this
+    // assertion cannot see the one that matters and must not claim to: an
+    // out-of-flow label leaves .entry-answers following .entry-hsi with nothing
+    // between them, buttons flush against the panel again. That half is guarded
+    // where it is visible — `separates the answer group…` in styles.test.ts reads
+    // the label's rule and refuses one that takes it out of flow.
+    expect(label.hidden, 'the label is not hidden by attribute').toBe(false)
     // Immediately before: any element between them would take the margin's gap
     // and be read as the thing the label names.
     expect(answers.previousElementSibling).toBe(label)

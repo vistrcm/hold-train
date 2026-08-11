@@ -2067,11 +2067,20 @@ CLAUDE.md rule.
   than parsed — `@media`/`@supports`/`@container`/`@layer` throw — which is the rule this helper
   already applies to specificity conflicts: what the model cannot resolve, it throws on. `styles.css`
   carries no at-rule today, so nothing else moves.
+  **⚠️ Amended 2026-08-11 — the diagnosis was right and the fix was too narrow.** The swallow is a
+  property of the body group, not of at-rules, so matching on the four **names** left native CSS
+  nesting (`.entry-drill { & .entry-answers-label { margin-top: 0 } }`) and `@scope` walking straight
+  through it: same silent drop, same green ratio, no keyword to match on — and nesting is now the
+  default idiom for writing CSS, i.e. the *likelier* edit of the two. Calling the at-rule "the fifth
+  mechanism and the only fail-open one" repeated the same over-claim this entry corrects, one level
+  down. See the 2026-08-11 correction below; the refusal is now on the shape (`{` in a harvested
+  body), which covers every spelling at once.
 - Regression test: `refuses a conditional group rule rather than reading past it`, covering both the
   swallowed-first-rule and harvested-later-rule shapes, and non-vacuous in both directions (a flat
   sheet still reads 1.5rem; a comment merely *naming* `@media` does not red the suite, since the
   refusal is tested against comment-stripped text). Mutation-confirmed: deleting the refusal reds
-  only this test.
+  only this test. **⚠️ Renamed 2026-08-11** to `refuses a nested style rule rather than reading past
+  it`, and widened — the at-rule cases alone could not fail on the two shapes that escaped.
 - **Amended: the trailing-boundary comment in `ruleBlock` named the wrong failure mode**
   (`src/styles.test.ts`). It read that `(?![\w-])` "stops `.entry-answers` claiming
   `.entry-answers-label`'s block". It does not — block collection is `member === selector`, exact
@@ -2082,3 +2091,60 @@ CLAUDE.md rule.
   own standard a comment that misattributes which mechanism catches which failure argues the next
   session into deleting the one that works, and here it would have sent a reader hunting a substring
   bug that exact match already precludes.
+
+## Post-completion review fixes — 2026-08-11 (code review iteration 8, entry answer-group branch)
+
+- **Fixed: `ruleBlock` refused an at-rule *name list*, but the fail-open swallow needs no at-rule**
+  (`src/styles.test.ts`). Iteration 7 closed `@media`/`@supports`/`@container`/`@layer` by name and its
+  docblock called the conditional group rule "the only fail-OPEN one". It is not the only one: the
+  mechanism is the body group `[^}]*`, which cannot cross a `}` but crosses a `{` freely, so **any**
+  nested style rule is swallowed into its parent's body and dropped. Native CSS nesting carries no
+  keyword to match on, and `@scope`/`@starting-style` were in no list. Both escapes were reproduced
+  against the real stylesheet: appending
+
+  ```css
+  .entry-drill { & .entry-answers-label { margin-top: 0; } }
+  ```
+
+  left `styles.test.ts` at 15/15 green with the answer buttons rendering flush against the G1000 panel
+  again — the exact defect the ratio guard exists to catch, reached by the edit a reader is *most*
+  likely to make, since nesting is the modern default idiom. `@scope (.entry-drill) { … }` did the
+  same. The refusal is now on the **shape** — a harvested body that still contains a `{` — which
+  subsumes all four at-rules, native nesting, `@scope` and `@starting-style` in one mechanism instead
+  of enumerating spellings. The name list is gone rather than kept alongside: everything it caught
+  that the shape does not (a blockless `@layer a, b;`, an empty `@media print {}`) swallows nothing
+  and changes no rendering, so keeping it would have left a branch no case could red — this ledger's
+  own fake-coverage standard. Over-refusal is accepted and documented: a `@keyframes` added anywhere
+  in the sheet now throws here though it cannot touch this rule. A false red costs a minute; a false
+  green is the defect. `styles.css` has 88 rules and 88 open braces — no nested bodies — so nothing
+  else moves.
+- Regression test: `refuses a nested style rule rather than reading past it` (renamed from
+  `refuses a conditional group rule …`), now table-driven over five shapes — `@media` swallowed,
+  `@media` harvested-later, `@supports`, native nesting, `@scope` — the last two being the ones that
+  shipped past the name-matching version. Non-vacuous in both directions: a flat sheet still reads
+  1.5rem, and a *comment* drawing the nested shape it refuses does not red the suite, since the scan
+  runs on comment-stripped text. Mutation-confirmed: deleting the refusal reds only this test;
+  appending either escape to the real `styles.css` reds
+  `separates the answer group from the instrument above it` with a legible message naming the prelude.
+- **Fixed: `remValue` read past a losing `!important`** (`src/styles.test.ts`). Its model is
+  last-declaration-wins, and `!important` is the one thing source order does **not** decide — it beats
+  every normal declaration of the same property in the same origin, whatever follows it. Since
+  `ruleBlock` concatenates every rule for the selector, an earlier
+  `.entry-answers-label { margin-top: 0 !important }` renders 0 while the read went on reporting the
+  1.5rem below it: fail-open, same class as the nesting hole and in the same helper. Now refused, like
+  the shorthand-override case beside it. On the *winning* declaration it already threw, but with a
+  message about notation (`1.5rem !important` is not a rem length) rather than about the cascade.
+- Regression test: two cases in `resolves a property the way the cascade does: last declaration wins`
+  — the loser (green before the fix) and the winner. Mutation-confirmed: deleting the refusal reds
+  only that test.
+- **Fixed: the answer label's "not screen-reader-only" assertion could not see the technique it
+  named** (`src/modules/entry-drill.test.ts`, `src/styles.test.ts`).
+  `expect(label.hidden, 'the label is visible, not a screen-reader-only name')` reads the HTML
+  attribute and nothing else; every sr-only idiom is CSS (`display: none`, `position: absolute` +
+  `clip`), so each passed it. That matters beyond wording: an out-of-flow label leaves `.entry-answers`
+  following `.entry-hsi` with nothing between them — buttons flush against the panel again — while the
+  ratio guard still compares 1.5rem to 0.5rem and passes, a margin on an element that separates
+  nothing. The DOM message now says what it checks, and the missing half is asserted where it is
+  visible: `separates the answer group from the instrument above it` refuses a `.entry-answers-label`
+  rule declaring `display: none` or `position: absolute|fixed`. Mutation-confirmed: adding
+  `position: absolute` to that rule reds it.
