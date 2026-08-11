@@ -150,10 +150,19 @@ are real; the choice of rung is ours.
 
 > Mutation-tested before being trusted, per CLAUDE.md. `gap` 0.5rem -> 0.6rem fails it (the
 > assertion moves with the constant, unlike a `toBe(1.5)`); `margin-top: 24px` throws at the parse.
-> `ruleBlock`'s two misreads are guarded by *different* mechanisms and needed separate synthetic
-> cases: the leading boundary stops a compound `.pill.row`, while the trailing `\s*\{` — not the
-> boundary — is what stops `.entry-answers` harvesting `.entry-answers-label`. The first synthetic
-> written here passed with the boundary deleted and its comment named the wrong mechanism.
+>
+> ⚠️ **Amended 2026-08-11:** this note used to claim `ruleBlock`'s misreads were "guarded by
+> *different* mechanisms" and named the leading boundary as the one stopping `.pill.row`. That was
+> false in the shipped test. Every decoy in the synthetic sat *above* the target rule, so the
+> last-declaration read masked any leak, and all four expectations passed with the leading boundary
+> deleted outright — the boundary half was fake coverage and the comment misattributed it. Two live
+> escapes followed from the same anchoring: an override written as a selector list with the target
+> not last (`\.entry-answers-label,\n.entry-stats { margin-top: 0.2rem }` — the sheet's idiom in 14
+> rules) and a descendant rule that always applies (`.entry-drill .entry-answers-label`) both left
+> the guard reporting `1.5rem` against a browser rendering `0.2rem`/`0`. `ruleBlock` now splits the
+> prelude on `,`, bounds the selector trailing-only, throws on a subject it cannot resolve, and
+> collects every rule; each mechanism is mutation-confirmed to red the named test on its own, and
+> both escapes now red the ratio. See the answer-group bullet in `CLAUDE.md`.
 
 ### Task 3: Verify acceptance criteria
 

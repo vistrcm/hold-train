@@ -33,20 +33,31 @@ function rootBlock(css: string): string {
   return match[1]
 }
 
-/** The declarations of one rule, by exact selector. Comments are stripped first
- * so prose naming a class cannot be mistaken for the rule itself.
+/** The declarations of one *class* rule, by exact selector. Comments are
+ * stripped first so prose naming a class cannot be mistaken for the rule itself.
  *
- * Three different ways of reading the wrong rule, guarded separately, because a
- * reader who thinks one mechanism covers all three will delete the parts that
- * actually work. Every one of them returns a block silently, so a mis-read is a
- * green test computing its ratio from some other rule's numbers.
- *  - the trailing `\s*\{` stops `.entry-answers` harvesting
- *    `.entry-answers-label`'s block: the brace must follow the selector, so a
- *    longer name never matches;
- *  - the leading boundary — one of `}{;,` then whitespace, never whitespace
- *    alone — stops a *compound* rule that merely ends in the selector
- *    (`.foo.entry-answers`) and a *descendant* one that merely contains it
- *    (`.foo .entry-answers`, whose declarations only apply inside `.foo`);
+ * The model is deliberately small — flat rules, source order, last declaration
+ * wins — and every way of leaving it is loud. Four mechanisms, guarded
+ * separately, because a reader who thinks one covers the rest will delete the
+ * parts that actually work. A silent mis-read is a green test computing its
+ * ratio from some other rule's numbers.
+ *  - the prelude is split on `,` and matched member by member. A selector list
+ *    is this sheet's dominant idiom (14 rules) and a scan anchored on
+ *    `<selector> {` sees the target only when it happens to be written *last*,
+ *    so which side of a comma someone types on decided whether an override was
+ *    visible;
+ *  - the trailing `(?![\w-])` stops `.entry-answers` claiming
+ *    `.entry-answers-label`'s block. There is no *leading* boundary and none is
+ *    wanted: a class selector's own `.` already delimits it, and a leading
+ *    boundary would hide the compound `.pill.entry-answers` — which is why this
+ *    helper takes a class selector and nothing else;
+ *  - a member the model cannot resolve **throws** rather than being skipped. A
+ *    rule whose subject (its rightmost compound) merely contains the selector —
+ *    `.pill.entry-answers`, `.entry-drill .entry-answers-label` — outranks the
+ *    flat rule on specificity whatever the source order, so the guard cannot say
+ *    what renders. "It only applies inside `.foo`" is not a reason to ignore it:
+ *    `.entry-answers-label` is *always* inside `.entry-drill`. Only the subject
+ *    counts, so `.entry-answers button` styles the button and is ignored;
  *  - collecting **every** matching rule rather than the first is what keeps the
  *    read in step with the cascade. A second `.entry-answers-label { margin-top:
  *    0.2rem }` appended anywhere below wins in a browser, and a first-match read
@@ -59,13 +70,25 @@ function rootBlock(css: string): string {
  * reading the *narrowest* value, i.e. toward failing rather than passing. */
 function ruleBlock(css: string, selector: string): string {
   const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const mentions = new RegExp(`${escaped}(?![\\w-])`)
   const code = css.replace(/\/\*[\s\S]*?\*\//g, ' ')
   // The boundary is a lookbehind rather than a consumed character: one rule's
   // closing `}` is the next rule's boundary, and a match that eats it leaves the
   // rule right after it unmatchable — which is exactly the repeated-selector
   // case this scan was widened to catch.
-  const rule = new RegExp(`(?:^|(?<=[};{,]))\\s*${escaped}\\s*\\{([^}]*)\\}`, 'g')
-  const blocks = [...code.matchAll(rule)].map((match) => match[1]!)
+  const blocks: string[] = []
+  for (const rule of code.matchAll(/(?:^|(?<=[{};]))\s*([^{}]*?)\s*\{([^}]*)\}/g)) {
+    for (const member of rule[1]!.split(',').map((part) => part.trim())) {
+      if (member === selector) {
+        blocks.push(rule[2]!)
+        continue
+      }
+      const subject = member.split(/[\s>+~]+/).filter(Boolean).at(-1) ?? ''
+      if (mentions.test(subject)) {
+        throw new Error(`${member} also styles ${selector}: this guard cannot resolve specificity`)
+      }
+    }
+  }
   if (blocks.length === 0) throw new Error(`styles.css has no ${selector} rule`)
   return blocks.join(';')
 }
@@ -320,19 +343,39 @@ describe('styles.css', () => {
   // The whole spacing guard below rests on `ruleBlock` reading the rule it was
   // asked for: every wrong read returns a block rather than throwing, so the
   // ratio would be computed from some other rule's numbers and the failure
-  // would look like a stylesheet defect. Three misreads are exercised, each
-  // killed by a different part of the pattern — the compound `.pill.row` and the
-  // descendant `.panel .row` (leading boundary) and the longer `.row-label`
-  // (requiring the brace to follow the selector). Pinned against a synthetic
-  // sheet so it keeps holding after styles.css is tidied.
+  // would look like a stylesheet defect. Each of the four mechanisms therefore
+  // gets an assertion that fails when that mechanism *alone* is removed —
+  // mutation-checked, not assumed. The synthetic this replaces put all of its
+  // decoys *before* the target rule, so the last-declaration read masked every
+  // leak: all four of its expectations passed with the leading boundary deleted
+  // outright, and the comment above them named mechanisms nothing exercised.
+  // Order the decoys so a leaked block would *win*, or the case proves nothing.
   it('reads a rule by exact selector, not by substring', () => {
-    const synthetic =
-      '.pill.row {\n  gap: 9rem;\n}\n.row-label {\n  margin-top: 1rem;\n}\n' +
-      '.panel .row {\n  gap: 7rem;\n}\n.row {\n  gap: 0.5rem;\n}\n'
-    expect(remValue(ruleBlock(synthetic, '.row'), 'gap')).toBe(0.5)
-    expect(remValue(ruleBlock(synthetic, '.row-label'), 'margin-top')).toBe(1)
-    expect(remValue(ruleBlock(synthetic, '.pill.row'), 'gap')).toBe(9)
-    expect(() => ruleBlock(synthetic, '.missing')).toThrow()
+    // A selector list with the target in the middle — this sheet's dominant
+    // idiom, and invisible to a scan anchored on `<selector> {`. It is last in
+    // source order, so a member-blind read reports the 0.5rem above it.
+    const listed =
+      '.row {\n  gap: 0.5rem;\n}\n.row-label {\n  margin-top: 1rem;\n}\n' +
+      '.hint,\n.row,\n.note {\n  gap: 2rem;\n}\n'
+    expect(remValue(ruleBlock(listed, '.row'), 'gap')).toBe(2)
+    // …and the longer name is not swept up with it, in either direction.
+    expect(ruleBlock(listed, '.row')).not.toMatch(/margin-top/)
+    expect(remValue(ruleBlock(listed, '.row-label'), 'margin-top')).toBe(1)
+
+    // A rule that also styles the element but outranks it on specificity is
+    // refused, not skipped: source order no longer decides, so the guard cannot
+    // say what renders. `.panel .row` is the live shape — `.entry-answers-label`
+    // is always inside `.entry-drill`, so a descendant rule always applies.
+    const compound = '.pill.row {\n  gap: 9rem;\n}\n.row {\n  gap: 0.5rem;\n}\n'
+    const descendant = '.panel .row {\n  gap: 7rem;\n}\n.row {\n  gap: 0.5rem;\n}\n'
+    expect(() => ruleBlock(compound, '.row')).toThrow(/cannot resolve specificity/)
+    expect(() => ruleBlock(descendant, '.row')).toThrow(/cannot resolve specificity/)
+    // Only the *subject* counts: `.row button` styles the button, and refusing
+    // it would red the suite over a rule that cannot touch the row at all.
+    const inner = '.row button {\n  gap: 9rem;\n}\n.row {\n  gap: 0.5rem;\n}\n'
+    expect(remValue(ruleBlock(inner, '.row'), 'gap')).toBe(0.5)
+
+    expect(() => ruleBlock(listed, '.missing')).toThrow(/no \.missing rule/)
     // Unitless zero is a length; px is not one this guard may compare.
     expect(remValue('margin-top: 0;', 'margin-top')).toBe(0)
     expect(() => remValue('gap: 8px;', 'gap')).toThrow(/not a rem length/)
