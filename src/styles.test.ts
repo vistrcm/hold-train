@@ -41,11 +41,12 @@ function rootBlock(css: string): string {
  * separately, because a reader who thinks one covers the rest will delete the
  * parts that actually work. A silent mis-read is a green test computing its
  * ratio from some other rule's numbers.
- *  - the prelude is split on `,` and matched member by member. A selector list
- *    is this sheet's dominant idiom (14 rules) and a scan anchored on
- *    `<selector> {` sees the target only when it happens to be written *last*,
- *    so which side of a comma someone types on decided whether an override was
- *    visible;
+ *  - the prelude is split at its **top-level** commas and matched member by
+ *    member. A selector list is this sheet's dominant idiom (14 rules) and a
+ *    scan anchored on `<selector> {` sees the target only when it happens to be
+ *    written *last*, so which side of a comma someone types on decided whether
+ *    an override was visible. Top-level because `:is()`/`:where()`/`:not()` take
+ *    a comma-separated argument list of their own — see `splitMembers`;
  *  - the trailing `(?![\w-])` stops `.entry-answers` *refusing to read at all*
  *    because `.entry-answers-label` exists. It does not decide which block is
  *    read — collection is `member === selector`, exact, so the longer name was
@@ -140,7 +141,7 @@ function rootBlock(css: string): string {
  * red is a minute's work; a false green is the defect this whole helper exists
  * to prevent.
  *
- * ⚠️ Five earlier versions of this docblock each claimed a coverage this code
+ * ⚠️ Six earlier versions of this docblock each claimed a coverage this code
  * did not have — first that at-rules were concatenated "unconditionally" and the
  * guard "errs toward failing rather than passing" (false in both directions),
  * then that a conditional group rule was "the only fail-open one" (nesting walks
@@ -150,9 +151,17 @@ function rootBlock(css: string): string {
  * against the DOM" — true of names, and `:nth-of-type(4)` is not a name — then
  * that a member "built only from type selectors loses and is ignored", true of
  * the normal declarations that sentence was reasoning about and false of the one
- * kind no selector outranks — and then that ancestor compounds were matched
- * loosely "whatever the combinator", when a sibling combinator was being
- * resolved against an ancestor set and so failed open, the sixth. That claim is
+ * kind no selector outranks — then that ancestor compounds were matched loosely
+ * "whatever the combinator", when a sibling combinator was being resolved
+ * against an ancestor set and so failed open, the sixth — and then, the seventh,
+ * that the prelude split was a settled case, written up in one bullet as though
+ * a comma had a single meaning, when `:is()`, `:where()` and `:not()` each take
+ * a comma-separated argument list that the split shredded. Note *where* that one
+ * hid: `splitCompounds` had already learned to mask bracketed and parenthesised
+ * runs before searching for a separator, and that lesson was written up as being
+ * about `+` and `~` in particular rather than about separator characters in
+ * general — so the identical bug one function up was never looked for. A
+ * mechanism stated too narrowly hides its own recurrence. That claim is
  * the more dangerous half of the bug every time: it tells the next session the
  * one edit that reaches the defect is already covered. Note the shape of the recurring miss, too — each version
  * enumerated the *spellings* it knew and called the list closed, or named the
@@ -235,6 +244,59 @@ const OUTRANKS = /[#.[:]/
  * edits waves the override through. */
 const IMPORTANT = /!\s*important\b/i
 
+/** A copy of `text` with every bracketed and parenthesised run blanked out, so
+ * that a search for a separator is a lexer rather than a character search.
+ *
+ * The mechanism, stated once because it has now been rediscovered twice: **every
+ * separator in this file's selector grammar also has a spelling inside `[…]` or
+ * `(…)` where it separates nothing.** `+` and `~` in `:nth-child(2n+1)` and
+ * `[class~="x"]`; `,` in `:is(.a, .b)` and `[title="a,b"]`. Splitting on the
+ * bare character shreds the selector into fragments that name nothing, so the
+ * member reaches nothing and is neither collected nor refused — fail-OPEN, and
+ * invisible. Do not re-narrow this to the characters listed here; it is a fact
+ * about the grammar, not about a set of tokens.
+ *
+ * The filler is a non-separator, and exactly one character wide. It stands in
+ * for text that must NOT split, so blanking with spaces would make the whole of
+ * `[class~="x"]` read as separators and drop it from the compound; and the mask
+ * is indexed in lockstep with the original, so a multi-character filler would
+ * slide the two out of alignment. Callers find indices in the mask and slice the
+ * *original*, never the mask — which is what keeps `reaches` seeing `[hidden]`
+ * and `:not(.x)` whole, and `denies` able to match on them. */
+function maskRuns(text: string): string {
+  return text.replace(/\[[^\]]*\]|\([^)]*\)/g, (run) => 'x'.repeat(run.length))
+}
+
+/** A selector list's members, split at its **top-level** commas.
+ *
+ * ⚠️ This was `prelude.split(',')`, and a comma is the third separator whose
+ * in-parentheses spelling means nothing: `:is()`, `:where()` and `:not()` all
+ * take an argument list. `:is(.entry-drill, .nope) p` came apart into
+ * `:is(.entry-drill` and `.nope) p` — the first names no element the label
+ * carries, the second hangs `p` under an ancestor compound `.nope)` that names
+ * nothing — so the rule was neither collected nor refused while it renders at
+ * (0,1,1) and zeroes the margin. Appended to the real styles.css it left
+ * `separates the answer group from the instrument above it` reporting 1.5rem
+ * against 0.5rem, green, with the answer buttons flush against the G1000 panel;
+ * `.entry-drill p:not(.a, .b)` is (0,2,1) and did the same. `:is()` grouping is
+ * the natural way to give two screens' `<p>` one margin rule, i.e. a likely edit
+ * to this sheet. `:where(p, div)` happened to *refuse*, by luck of which
+ * fragment landed where — so which side of a comma someone typed on decided
+ * whether the override was visible, the same hazard the selector-list bullet
+ * records for the scan this replaced. */
+function splitMembers(prelude: string): string[] {
+  const masked = maskRuns(prelude)
+  const members: string[] = []
+  let start = 0
+  for (let i = 0; i < prelude.length; i++) {
+    if (masked[i] !== ',') continue
+    members.push(prelude.slice(start, i).trim())
+    start = i + 1
+  }
+  members.push(prelude.slice(start).trim())
+  return members
+}
+
 /** A selector's compounds, split at its combinators, and whether any of those
  * combinators was a **sibling** one.
  *
@@ -259,17 +321,13 @@ const IMPORTANT = /!\s*important\b/i
  * fragments and the subject came out as the tail (`1)`), which names nothing and
  * therefore reached nothing — the same silent pass by a different route, and one
  * that survives the sibling refusal below unless the split itself is fixed.
- * Masking the bracketed and parenthesised runs is what makes this a lexer rather
- * than a character search. The compounds returned are slices of the *original*
- * text, never the mask, so `reaches` still sees `[hidden]` and `:not(.x)` whole
- * — blanking them for real would break `denies`, which matches on `[hidden]`. */
+ * `maskRuns` is what makes this a lexer rather than a character search, and the
+ * generalisation of that second bug — a separator inside a run separates nothing
+ * — belongs to it rather than to this function, which is why `splitMembers`
+ * shares it. Writing the lesson up here as a fact about `+` and `~` is exactly
+ * how the identical bug survived one function up. */
 function splitCompounds(member: string): { compounds: string[]; sibling: boolean } {
-  // The filler is a non-separator, and exactly one character wide. It stands in
-  // for text that must NOT split, so blanking with spaces would make the whole
-  // of `[class~="x"]` read as separators and drop it from the compound; and the
-  // mask is indexed in lockstep with `member`, so a multi-character filler would
-  // slide the two out of alignment.
-  const masked = member.replace(/\[[^\]]*\]|\([^)]*\)/g, (run) => 'x'.repeat(run.length))
+  const masked = maskRuns(member)
   const compounds: string[] = []
   let sibling = false
   let buffer = ''
@@ -308,7 +366,7 @@ function ruleBlock(css: string, selector: string, context: Context = {}): string
     if (rule[2]!.includes('{')) {
       throw new Error(`${rule[1]!.trim()} nests a style rule; this guard reads flat rules only`)
     }
-    for (const member of rule[1]!.split(',').map((part) => part.trim())) {
+    for (const member of splitMembers(rule[1]!)) {
       if (member === selector) {
         blocks.push(rule[2]!)
         continue
@@ -369,11 +427,29 @@ function ruleBlock(css: string, selector: string, context: Context = {}): string
  * renders 0 while a read that searches for `margin-top` still finds 1.5. Rather
  * than teach `remValue` to expand shorthands (a CSS parser's job, and one more
  * thing to get subtly wrong), it refuses: whichever of these is declared last
- * must be the property asked for. */
+ * must be the property asked for.
+ *
+ * Three ways one property sets another, and a family that models fewer than all
+ * three fails open — the unrecognised name is simply filtered out and the read
+ * goes on reporting a value the browser has already discarded:
+ *  - a **shorthand** (`margin`, and `all`, appended to every family below);
+ *  - a **logical equivalent** (`margin-block`, `margin-block-start`);
+ *  - a **legacy alias**. This is the one that was missing. `grid-gap`,
+ *    `grid-row-gap` and `grid-column-gap` were the original grid-only spellings;
+ *    Box Alignment renamed them and browsers keep the old names as aliases —
+ *    including on flex containers, which is what `.entry-answers` is. So
+ *    `.entry-answers { grid-column-gap: 2rem }` appended to the real styles.css
+ *    left `separates the answer group from the instrument above it` reading
+ *    0.5rem, passing `1.5 >= 3 × 0.5`, green — while the rendered inter-button
+ *    gap was 2rem against a 1.5rem separation, i.e. the 0.75:1 inversion of the
+ *    invariant. Same shape as the `margin-block` and `all` holes already closed
+ *    here, and the same warning applies: this is a claim that the set is closed
+ *    *per property*, which is only true because CSS gives no other name to these
+ *    three. It is not a list to append to when a test goes red. */
 const OVERRIDES: Readonly<Record<string, readonly string[]>> = {
   'margin-top': ['margin', 'margin-block', 'margin-block-start'],
   'margin-bottom': ['margin', 'margin-block', 'margin-block-end'],
-  gap: ['row-gap', 'column-gap'],
+  gap: ['row-gap', 'column-gap', 'grid-gap', 'grid-row-gap', 'grid-column-gap'],
 }
 
 /** One declaration's value as a number of `rem`.
@@ -892,6 +968,47 @@ describe('styles.css', () => {
     }
   })
 
+  // The same fail-open shape as the `:nth-child(2n+1)` case above, one function
+  // up: a comma has two meanings and the prelude split modelled one.
+  // `:is()`/`:where()`/`:not()` take an argument list, so splitting the prelude
+  // on the bare character cuts a member in half — neither fragment names the
+  // label, so the rule is neither collected nor refused while it renders. See
+  // `maskRuns`, which both splits now share.
+  it('refuses a rule that reaches the element through a functional selector list', () => {
+    const label = '.row-label {\n  margin-top: 1.5rem;\n}\n'
+    const ctx = { also: ['p', '#row-label'], within: ['.panel'] } as const
+    for (const [name, rule] of [
+      // (0,1,1) against the flat class's (0,1,0), and the natural way to give
+      // two screens' <p> one margin rule — i.e. a likely edit to this sheet.
+      ['is() in an ancestor', ':is(.panel, .other) p {\n  margin-top: 0;\n}\n'],
+      // (0,0,1), so this one genuinely loses; it is refused because `OUTRANKS`
+      // reads the member's text rather than computing `:where()`'s zero. That
+      // over-refusal is the direction to err in, and it is why the assertion
+      // below is what proves the refusal still has a gate.
+      ['where() in an ancestor', ':where(.panel, .other) p {\n  margin-top: 0;\n}\n'],
+      // (0,2,1), and the shredded half lands on the *subject* rather than on an
+      // ancestor compound — a second route to the same silent pass.
+      ['not() on the subject', '.panel p:not(.a, .b) {\n  margin-top: 0;\n}\n'],
+      // Not a functional selector at all: a comma inside an attribute value.
+      ['attribute value comma', 'p[title="a,b"] {\n  margin-top: 0;\n}\n'],
+    ] as const) {
+      expect(() => ruleBlock(`${label}${rule}`, '.row-label', ctx), name).toThrow(
+        /reaches \.row-label/,
+      )
+    }
+    // Non-vacuous, and the gate the `:where()` case above leans on: the refusal
+    // still turns on the subject reaching this element, not on the member
+    // carrying a `:is(`. A rule whose subject names something else stays
+    // ignored, so the idiom does not red a sheet that uses it.
+    const elsewhere = `${label}:is(.a, .b) .c {\n  margin: 0;\n}\n`
+    expect(remValue(ruleBlock(elsewhere, '.row-label', ctx), 'margin-top')).toBe(1.5)
+    // …and a **top-level** comma must still split, or the collection half breaks
+    // instead: a selector list is this sheet's dominant idiom and the target is
+    // not always written last in one.
+    const listed = `.a, .row-label, .b {\n  margin-top: 1.5rem;\n}\n`
+    expect(remValue(ruleBlock(listed, '.row-label', ctx), 'margin-top')).toBe(1.5)
+  })
+
   // The misread no boundary can catch, because the rule it reads is the right
   // one: a browser resolves the LAST declaration and a first-match read reports
   // a length that never renders. Three ordinary edits reach it — a second rule
@@ -912,6 +1029,17 @@ describe('styles.css', () => {
       )
     }
     expect(() => remValue('gap: 0.5rem; column-gap: 0;', 'gap')).toThrow(/set by a later/)
+    // The third way one property sets another, and the one the `gap` family
+    // missed: a **legacy alias**. Browsers still honour the grid-only spellings
+    // and alias them onto `gap`/`row-gap`/`column-gap` on flex containers too,
+    // which `.entry-answers` is. Unrecognised, the name is filtered out and the
+    // read reports the `gap` above it — so `.entry-answers { grid-column-gap:
+    // 2rem }` appended to the real styles.css left `separates the answer group…`
+    // comparing 1.5 against 0.5 and passing, with the buttons 2rem apart under a
+    // 1.5rem separation: the invariant inverted, suite green.
+    for (const alias of ['grid-gap: 2rem', 'grid-row-gap: 2rem', 'grid-column-gap: 2rem']) {
+      expect(() => remValue(`gap: 0.5rem; ${alias};`, 'gap'), alias).toThrow(/set by a later/)
+    }
     // `all` is not a margin shorthand, which is exactly why the three families
     // above missed it — it resets every property there is, so it reaches both
     // lengths this guard reads. `.entry-answers-label { all: unset }` appended to
