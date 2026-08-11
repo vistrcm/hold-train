@@ -101,11 +101,14 @@ function rootBlock(css: string): string {
  * claimed member is refused on **either** ground, and the specificity split
  * above decides only the normal declarations.
  *
- * Ancestor compounds are matched loosely (any ancestor,
- * whatever the combinator, in any order) because a tighter model is a selector
- * engine; the looseness only ever over-refuses, which is the direction to err
- * in. An empty `context` claims the element has no other name, so only `*` can
- * reach it — the safe default for a synthetic sheet.
+ * Ancestor compounds are matched loosely — any ancestor, in any order — because
+ * a tighter model is a selector engine, and *that* looseness only ever
+ * over-refuses. It is loose about **which** ancestor, never about whether the
+ * compound describes an ancestor at all: a `+` or a `~` names a **sibling**,
+ * which no ancestor set contains, so resolving one against `anywhere` silently
+ * under-refuses. That is `splitCompounds`' job, and it refuses. An empty
+ * `context` claims the element has no other name, so only `*` can reach it —
+ * the safe default for a synthetic sheet.
  *
  * The blocks are concatenated in source order, which is the order the cascade
  * resolves them in for one repeated selector; `remValue` then takes the last
@@ -147,9 +150,11 @@ function rootBlock(css: string): string {
  * against the DOM" — true of names, and `:nth-of-type(4)` is not a name — then
  * that a member "built only from type selectors loses and is ignored", true of
  * the normal declarations that sentence was reasoning about and false of the one
- * kind no selector outranks. That claim is the more dangerous half of the bug
- * every time: it tells the next session the one edit that reaches the defect is
- * already covered. Note the shape of the recurring miss, too — each version
+ * kind no selector outranks — and then that ancestor compounds were matched
+ * loosely "whatever the combinator", when a sibling combinator was being
+ * resolved against an ancestor set and so failed open, the sixth. That claim is
+ * the more dangerous half of the bug every time: it tells the next session the
+ * one edit that reaches the defect is already covered. Note the shape of the recurring miss, too — each version
  * enumerated the *spellings* it knew and called the list closed, or named the
  * one mechanism it had modelled and reasoned as though it were the only one.
  * State the mechanism, not the enumeration; and ask whether it is the *only*
@@ -230,6 +235,58 @@ const OUTRANKS = /[#.[:]/
  * edits waves the override through. */
 const IMPORTANT = /!\s*important\b/i
 
+/** A selector's compounds, split at its combinators, and whether any of those
+ * combinators was a **sibling** one.
+ *
+ * Two things `member.split(/[\s>+~]+/)` got wrong, both fail-OPEN.
+ *
+ * It **discarded which combinator it split on**, and `ruleBlock` then resolved
+ * every compound left of the subject against `anywhere` — an *ancestor* set. A
+ * compound joined by `+` or `~` names a **sibling**, which is never in that set,
+ * so `claimed` came out false and the rule was neither collected nor refused:
+ * invisible, while it renders. `.entry-hsi + p { margin-top: 0 }` is (0,1,1)
+ * against the flat class's (0,1,0), and the label *is* the `<p>` immediately
+ * after `.entry-hsi` — `entry-drill.test.ts` pins exactly that adjacency, so the
+ * selector is not hypothetical. Appended to the real styles.css it left
+ * `separates the answer group from the instrument above it` reporting 1.5rem
+ * against 0.5rem at 18/18 green, with the answer buttons rendered flush against
+ * the G1000 panel: the one defect this whole branch exists to close, restored
+ * through the one idiom (adjacent-sibling spacing) five earlier versions of this
+ * helper never modelled.
+ *
+ * It also split **inside brackets and parentheses**, where a `+` or a `~`
+ * combines nothing. `[class~="x"]` and `:nth-child(2n+1)` were shredded into
+ * fragments and the subject came out as the tail (`1)`), which names nothing and
+ * therefore reached nothing — the same silent pass by a different route, and one
+ * that survives the sibling refusal below unless the split itself is fixed.
+ * Masking the bracketed and parenthesised runs is what makes this a lexer rather
+ * than a character search. The compounds returned are slices of the *original*
+ * text, never the mask, so `reaches` still sees `[hidden]` and `:not(.x)` whole
+ * — blanking them for real would break `denies`, which matches on `[hidden]`. */
+function splitCompounds(member: string): { compounds: string[]; sibling: boolean } {
+  // The filler is a non-separator, and exactly one character wide. It stands in
+  // for text that must NOT split, so blanking with spaces would make the whole
+  // of `[class~="x"]` read as separators and drop it from the compound; and the
+  // mask is indexed in lockstep with `member`, so a multi-character filler would
+  // slide the two out of alignment.
+  const masked = member.replace(/\[[^\]]*\]|\([^)]*\)/g, (run) => 'x'.repeat(run.length))
+  const compounds: string[] = []
+  let sibling = false
+  let buffer = ''
+  for (let i = 0; i < member.length; i++) {
+    const char = masked[i]!
+    if (!/[\s>+~]/.test(char)) {
+      buffer += member[i]!
+      continue
+    }
+    if (char === '+' || char === '~') sibling = true
+    if (buffer) compounds.push(buffer)
+    buffer = ''
+  }
+  if (buffer) compounds.push(buffer)
+  return { compounds, sibling }
+}
+
 function ruleBlock(css: string, selector: string, context: Context = {}): string {
   const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   const mentions = new RegExp(`${escaped}(?![\\w-])`)
@@ -256,10 +313,26 @@ function ruleBlock(css: string, selector: string, context: Context = {}): string
         blocks.push(rule[2]!)
         continue
       }
-      const compounds = member.split(/[\s>+~]+/).filter(Boolean)
+      const { compounds, sibling } = splitCompounds(member)
       const subject = compounds.at(-1) ?? ''
       if (mentions.test(subject)) {
         throw new Error(`${member} also styles ${selector}: this guard cannot resolve specificity`)
+      }
+      // The subject naming this element is a *necessary* condition for the
+      // member to match it, so it is computed once and gates both refusals
+      // below. Gating them is what keeps an unrelated sibling rule elsewhere in
+      // the sheet from reding this guard.
+      const selects = reaches(subject, own, denied)
+      // A sibling combinator is refused, not resolved — the same doctrine as the
+      // nested rule and the specificity conflict. `anywhere` is a set of
+      // *ancestor* names, so a compound joined by `+` or `~` can never be found
+      // in it and the member would silently come out unreachable while it
+      // renders. This is the fail-OPEN direction, and `splitCompounds` explains
+      // the case that reached the real stylesheet.
+      if (selects && sibling) {
+        throw new Error(
+          `${member} reaches ${selector} through a sibling combinator, which this guard does not model`,
+        )
       }
       // The same refusal, reached from the DOM rather than from the selector
       // text — see the docblock. A member can only match if its subject names
@@ -268,8 +341,7 @@ function ruleBlock(css: string, selector: string, context: Context = {}): string
       // self-named ancestor is assumed to match, which over-refuses and never
       // under-refuses.
       const claimed =
-        reaches(subject, own, denied) &&
-        compounds.slice(0, -1).every((part) => reaches(part, anywhere, NONE))
+        selects && compounds.slice(0, -1).every((part) => reaches(part, anywhere, NONE))
       // `!important` first, because it is the ground that does not depend on
       // the one below: a member that *loses* on specificity still renders when
       // it carries one, and losing is exactly what keeps it out of `blocks`, so
@@ -326,7 +398,12 @@ const OVERRIDES: Readonly<Record<string, readonly string[]>> = {
  * than about notation. Don't restate that as "NaN would leave the test green".
  */
 function remValue(block: string, prop: string): number {
-  const family = [prop, ...(OVERRIDES[prop] ?? [])]
+  // `all` is appended rather than written into all three families because it is
+  // not a margin or a gap shorthand — it is the one property that resets *every*
+  // property there is, so it belongs to every family by construction. Left out,
+  // `.entry-answers-label { all: unset }` appended to the real styles.css kept
+  // this reporting 1.5rem against 0.5rem, green, with the label's margin gone.
+  const family = [prop, ...(OVERRIDES[prop] ?? []), 'all']
   const declared = [...block.matchAll(/(?:^|[;{\s])([\w-]+)\s*:\s*([^;}]+)/g)]
     .map(([, name, value]) => [name!, value!.trim()] as const)
     .filter(([name]) => family.includes(name))
@@ -767,6 +844,54 @@ describe('styles.css', () => {
     expect(remValue(ruleBlock(hidden, '.row-label', answered), 'margin-top')).toBe(1.5)
   })
 
+  // The fail-OPEN one combinator over. Every refusal above resolves the compounds
+  // left of the subject against `anywhere`, a set of ANCESTOR names, and the
+  // split that produced them threw away which combinator had joined them. A `+`
+  // or `~` compound names a SIBLING, which is never in that set, so the member
+  // came out unreachable and was neither collected nor refused — invisible, while
+  // it renders at (0,1,1) against the flat class's (0,1,0). This is not an exotic
+  // selector: the label IS the <p> immediately after `.entry-hsi`, an adjacency
+  // entry-drill.test.ts pins deliberately, and sibling spacing is a mainstream
+  // idiom. Appended verbatim to the real styles.css, `.entry-hsi + p { margin-top:
+  // 0 }` left `separates the answer group…` reporting 1.5rem against 0.5rem at
+  // 18/18 green, with the answer buttons rendered flush against the G1000 panel.
+  it('refuses a rule that reaches the element through a sibling, not an ancestor', () => {
+    const label = '.row-label {\n  margin-top: 1.5rem;\n}\n'
+    const ctx = { also: ['p', '#row-label'], within: ['.panel'] } as const
+    for (const [name, rule] of [
+      // The live shape: spacing keyed off the element the label follows.
+      ['adjacent sibling', '.hsi + p {\n  margin-top: 0;\n}\n'],
+      // No adjacency required, so it survives an element being slipped between.
+      ['general sibling', '.scenario ~ p {\n  margin-top: 0;\n}\n'],
+      // Mixed, so the sibling is not the only combinator in the member and the
+      // ancestor half still resolves.
+      ['inside an ancestor', '.panel .hsi + p {\n  margin-top: 0;\n}\n'],
+    ] as const) {
+      expect(() => ruleBlock(`${label}${rule}`, '.row-label', ctx), name).toThrow(
+        /through a sibling combinator/,
+      )
+    }
+    // Non-vacuous: the refusal turns on the subject reaching this element, not on
+    // the member merely carrying a `+`. A sibling rule about other elements stays
+    // ignored, which is what keeps this from reding a sheet that uses the idiom.
+    const elsewhere = `${label}.a + .b {\n  margin: 0;\n}\n`
+    expect(remValue(ruleBlock(elsewhere, '.row-label', ctx), 'margin-top')).toBe(1.5)
+    // …and a `+` or `~` that combines NOTHING must not be read as a combinator.
+    // Splitting on the bare character shredded these into fragments and left the
+    // subject as the tail (`1)`), which names nothing and so reached nothing —
+    // the same silent pass by another route, and one the refusal above cannot
+    // reach. Both outrank the flat class rule, so both must still refuse, and
+    // neither may refuse as a sibling.
+    for (const [name, rule] of [
+      ['nth-child arithmetic', '.panel p:nth-child(2n+1) {\n  margin-top: 0;\n}\n'],
+      ['attribute word match', 'p[class~="x"] {\n  margin-top: 0;\n}\n'],
+    ] as const) {
+      expect(() => ruleBlock(`${label}${rule}`, '.row-label', ctx), name).toThrow(
+        /reaches \.row-label(?!.*sibling)/,
+      )
+    }
+  })
+
   // The misread no boundary can catch, because the rule it reads is the right
   // one: a browser resolves the LAST declaration and a first-match read reports
   // a length that never renders. Three ordinary edits reach it — a second rule
@@ -787,6 +912,17 @@ describe('styles.css', () => {
       )
     }
     expect(() => remValue('gap: 0.5rem; column-gap: 0;', 'gap')).toThrow(/set by a later/)
+    // `all` is not a margin shorthand, which is exactly why the three families
+    // above missed it — it resets every property there is, so it reaches both
+    // lengths this guard reads. `.entry-answers-label { all: unset }` appended to
+    // the real styles.css left `separates the answer group…` reporting 1.5rem
+    // against 0.5rem, green, with the label's margin gone.
+    for (const prop of ['margin-top', 'margin-bottom', 'gap'] as const) {
+      expect(() => remValue(`${prop}: 1.5rem; all: unset;`, prop), prop).toThrow(/set by a later/)
+    }
+    // Declared *before* the property it would have reset, it is correctly not a
+    // refusal — the longhand after it is what renders.
+    expect(remValue('all: unset; margin-top: 1.5rem;', 'margin-top')).toBe(1.5)
     // …and the one declaration source order does NOT decide. `ruleBlock` joins
     // every rule for the selector, so the loser here is what a first repeated
     // rule would leave behind: the read reports 1.5rem, the browser renders 0.

@@ -2190,8 +2190,12 @@ CLAUDE.md rule.
   silently. Specificity is compared, not ignored, and the comparison is load-bearing in **both**
   directions: refusing everything that *could* match reds the live `p { color: var(--text-dim) }`
   (0,0,1, which genuinely loses), and ignoring the ancestor compounds reds `.entry-feedback p`, which
-  cannot reach the label at all. Ancestors are matched loosely — any ancestor, any combinator, any
-  order — because the tight version is a selector engine; looseness only ever over-refuses.
+  cannot reach the label at all. Ancestors are matched loosely — any ancestor, any order — because the
+  tight version is a selector engine; looseness only ever over-refuses.
+  **Amended 2026-08-11:** this sentence originally read "any ancestor, any **combinator**, any order",
+  which was false in the fail-*open* direction — a `+`/`~` compound names a sibling, never an
+  ancestor, so it was resolved against the wrong set and silently vanished. Superseded by the
+  correction entry below, not deleted.
 - Regression test: `refuses a rule that reaches the element without naming its class`, three refusals
   (descendant type, id, universal child) and three non-vacuity cases (a losing bare type rule, a
   descendant rule under an ancestor the element does not have, and the empty-context default where
@@ -2351,3 +2355,83 @@ CLAUDE.md rule.
   the entry drill explicitly, so this is recorded as a **known open item** rather than silently
   carried — closing it means the same label-plus-margin treatment and widening the `styles.test.ts`
   ratio to both rows.
+
+## Post-completion review fixes — 2026-08-11 (code review iteration 11, entry answer-group branch)
+
+- **Fixed: `ruleBlock` discarded which combinator it split on, so a sibling compound was resolved
+  against an ancestor set and vanished** (`src/styles.test.ts`). Every refusal built in iterations
+  9–10 resolves the compounds left of the subject against `anywhere` — the union of the element's own
+  names and its **ancestors'**. The split that produced them was `member.split(/[\s>+~]+/)`, which
+  throws the combinator away. A compound joined by `+` or `~` names a **sibling**, which is never in
+  an ancestor set, so `reaches` returned false, `claimed` came out false, and the member was neither
+  collected nor refused: invisible, while it renders. This is the sixth fail-open in this helper and
+  the first that is *under*-refusal by construction rather than by an unmodelled spelling.
+
+  Reproduced against the real `styles.css`, each leaving `separates the answer group from the
+  instrument above it` reporting `margin-top: 1.5rem` against `gap: 0.5rem` at 18/18 green with the
+  answer buttons rendered flush against the G1000 panel:
+
+  ```css
+  .entry-hsi + p            { margin-top: 0 }  /* (0,1,1); the label IS that <p> */
+  .entry-scenario ~ p       { margin-top: 0 }  /* (0,1,1); no adjacency needed */
+  .entry-answers-label + div { gap: 0 }        /* the row's half of the ratio */
+  ```
+
+  The first is not hypothetical in the smallest degree: `entry-drill.test.ts` deliberately pins
+  `label.previousElementSibling` as `.entry-hsi`, so the guard's own DOM test asserts the exact
+  adjacency this selector keys off, and sibling spacing (`.foo + .bar`) is a mainstream CSS idiom.
+- Fix, part 1 — the refusal: `splitCompounds` now reports whether any combinator was a sibling one,
+  and `ruleBlock` throws when the subject reaches the element and the member contains one. It is
+  gated on the subject reaching the element because that is a *necessary* condition for the member to
+  match at all; without the gate every unrelated `.a + .b` in the sheet would red the guard. Refused
+  rather than modelled, the same doctrine as the nested rule and the specificity conflict: what this
+  model cannot answer, it throws on.
+- Fix, part 2 — the **split itself**, which the refusal alone does not reach: splitting on the bare
+  character also split *inside* brackets and parentheses, where a `+` or `~` combines nothing.
+  `:nth-child(2n+1)` and `[class~="x"]` were shredded into fragments and the subject came out as the
+  tail (`1)`), which names nothing and therefore reached nothing — the same silent pass by a second
+  route, and one no sibling check can see because the masked member carries no combinator at all.
+  Reproduced green against the real `styles.css` with `.entry-drill p:nth-child(2n+1) { margin-top: 0 }`.
+  `splitCompounds` masks bracketed and parenthesised runs before scanning for separators; the filler
+  is one character wide and a non-separator (a space would make the whole of `[class~="x"]` read as
+  separators and drop it), the mask is indexed in lockstep with the original, and the compounds
+  returned are slices of the **original** text — blanking for real would break `denies`, which matches
+  on `[hidden]` whole.
+- **Fixed: `OVERRIDES` was an enumeration of margin/gap shorthands, and `all` is not one**
+  (`src/styles.test.ts`). `all` resets *every* property there is, so it reaches both lengths the ratio
+  reads, but it is not a margin shorthand and so was absent from all three hand-written families.
+  `.entry-answers-label { all: unset }` appended to the real `styles.css` left the ratio reporting
+  1.5rem against 0.5rem, green, with the label's margin gone — and `remValue`'s unit and `!important`
+  refusals never saw it either. It is now appended to every family in `remValue` rather than written
+  into the three lists, because it belongs to all of them by construction.
+- Docblock amended, per this file's own recurring lesson, and the ⚠️ ledger inside `ruleBlock` now
+  records six: "Ancestor compounds are matched loosely (any ancestor, **whatever the combinator**, in
+  any order) … the looseness only ever over-refuses" was true of the descendant and child combinators
+  it had modelled and false of the two it had not, in the one direction that ships the defect. The
+  wording now separates the two claims: loose about **which** ancestor, never about whether the
+  compound describes an ancestor at all. The same sentence had been copied verbatim into `CLAUDE.md`
+  and into the iteration-9 entry above; both are corrected, the ledger entry amended in place with the
+  counter-argument rather than edited past.
+- Regression test: `refuses a rule that reaches the element through a sibling, not an ancestor` —
+  three refusals (adjacent sibling, general sibling, a sibling nested under an ancestor so the
+  ancestor half still resolves) and three non-vacuity cases (an unrelated `.a + .b` still reads
+  1.5rem, so the refusal turns on reach rather than on the character; and `:nth-child(2n+1)` /
+  `[class~="x"]` must still refuse but must **not** refuse as siblings, which is what pins the mask).
+  The `all` case is pinned in `resolves a property the way the cascade does: last declaration wins` —
+  refused after the property for all three of `margin-top`/`margin-bottom`/`gap`, and correctly *not*
+  refused when declared before it, since the longhand after it is what renders.
+- Mutation-confirmed 2026-08-11: all five CSS escapes above, appended one at a time to the real
+  `styles.css`, now red the ratio with a message naming the offending prelude
+  (`.entry-hsi + p reaches .entry-answers-label through a sibling combinator, which this guard does
+  not model`), and the stylesheet was restored to its committed state after each.
+- Reviewed and **not** changed: the `within` half of the guard's context (`div`, `#app`, `body`,
+  `html`) is asserted only as far as the label's immediate parent — `entry-drill.test.ts` renders into
+  a detached `<div>` and structurally cannot see the real ancestor chain, and nothing asserts the
+  chain carries no *other* name. A class added to the router's screen container would make
+  `.screen p { margin: 0 }` silently invisible here. Recorded as a known open item: closing it means
+  either a router-level render that collects every ancestor's names, or an assertion in
+  `router.test.ts` that the container carries none.
+- Reviewed and **not** changed: a `margin-bottom` on `.entry-hsi` — the element the DOM test pins as
+  the thing above the label — is outside this guard's two-rule model and would collapse the
+  separation with the ratio still reading 1.5rem against 0.5rem. `.entry-hsi` carries no rule at all
+  today. Same class as the containing-block caveat already recorded in the guard's Scope comment.
