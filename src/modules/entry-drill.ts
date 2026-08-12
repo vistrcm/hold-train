@@ -26,9 +26,15 @@ import {
   type TurnDirection,
 } from '../engine/entry'
 import { angleDiff } from '../engine/geometry'
-import { renderHSI, type HSIProps } from '../ui/hsi'
+import {
+  DEVIATION_DOTS,
+  FULL_SCALE_NM,
+  FULL_SCALE_SOURCE,
+  renderHSI,
+  type HSIProps,
+} from '../ui/hsi'
 import { renderMap } from '../ui/mapview'
-import { courseText } from '../format'
+import { courseText, distanceText } from '../format'
 
 export type DrillMode = 'learn' | 'cockpit'
 
@@ -37,10 +43,179 @@ export const COCKPIT_TARGET_SECONDS = 15
 /** Cockpit results live under 'entry' — the drill the stored benchmark scores. */
 const DRILL_IDS: Record<DrillMode, string> = { cockpit: 'entry', learn: 'entry-learn' }
 
+/**
+ * The ATC rule that puts the fix ahead of the aircraft, verbatim.
+ *
+ * This is why the drill depicts an aircraft short of the fix rather than over
+ * it: the entry decision is made while the fix is still ahead. Rendered on the
+ * screen inside its cited span, per the CLAUDE.md citation convention — and NOT
+ * templated from `CLEARANCE_LEAD_MINUTES`, because a quotation with an
+ * interpolation in it is no longer a quotation. `entry-drill.test.ts` asserts
+ * the two agree instead.
+ *
+ * Verified against
+ * faa.gov/air_traffic/publications/atpubs/atc_html/chap4_section_6.html and the
+ * order's own PDF (the HTML renders its list markers from CSS, so the
+ * sub-paragraph letter is not in the markup).
+ */
+export const CLEARANCE_LEAD_ATC =
+  'When delay is expected, issue items in subparagraphs a and b at least ' +
+  '5 minutes before the aircraft is estimated to reach the clearance limit. ' +
+  'If the traffic situation requires holding an aircraft that is less than ' +
+  '5 minutes from the holding fix, issue these items immediately.'
+
+/**
+ * The order's lead time, minutes.
+ *
+ * A FLOOR in the order ("at least 5 minutes"), used here as the far end of the
+ * drill's window: the drill draws the last 5 minutes before the fix, which is
+ * the tightest case the order contemplates, not the only one. A clearance
+ * issued 20 minutes out is equally legal and simply off this picture.
+ */
+export const CLEARANCE_LEAD_MINUTES = 5
+
+export const CLEARANCE_LEAD_SOURCE = 'FAA JO 7110.65BB 4-6-1 c.4'
+
+/**
+ * The pilot's end of the same timeline, verbatim.
+ *
+ * The 3 minutes here is what 7110.65's NOTE under 4-6-1 c.4 says the 5-minute
+ * requirement is built on, so the two timings are one rule seen from both
+ * seats — which is what makes them a window rather than two unrelated numbers.
+ */
+export const SPEED_REDUCTION_AIM =
+  'When an aircraft is 3 minutes or less from a clearance limit and a clearance ' +
+  'beyond the fix has not been received, the pilot is expected to start a speed ' +
+  'reduction so that the aircraft will cross the fix, initially, at or below the ' +
+  'maximum holding airspeed.'
+
+/** The near end of the window, minutes — where the pilot's own timeline starts. */
+export const SPEED_REDUCTION_MINUTES = 3
+
+export const SPEED_REDUCTION_SOURCE = 'AIM 5-3-8 d'
+
+/**
+ * Groundspeed the window is converted to miles at, knots.
+ *
+ * ⚠️ NOT an FAA figure and never cited as one — a training assumption, chosen
+ * as a typical light single's cruise and comfortably under the 200 KIAS maximum
+ * holding airspeed at or below 6,000 ft (AIM 5-3-8 j2, TBL 5-3-1). It sets the
+ * scale of the picture, not the answer: `determineEntry` never sees it.
+ */
+export const NOMINAL_GROUNDSPEED_KT = 120
+
+/** Nearest the fix a scenario is drawn: the speed-reduction point, in miles. */
+export const MIN_DISTANCE_NM = (SPEED_REDUCTION_MINUTES / 60) * NOMINAL_GROUNDSPEED_KT
+
+/** Farthest: the order's minimum lead, in miles — see `CLEARANCE_LEAD_MINUTES`
+ *  for why the floor of the rule is the ceiling of the picture. */
+export const MAX_DISTANCE_NM = (CLEARANCE_LEAD_MINUTES / 60) * NOMINAL_GROUNDSPEED_KT
+
+/**
+ * How the two quoted timings become the miles on the panel — a derivation, and
+ * labelled as one.
+ *
+ * It renders OUTSIDE both cited spans for the same reason `OUTBOUND_TIMING_NOTE`
+ * does: neither the order nor the AIM says anything about groundspeed, so
+ * folding this into either quotation would present a training assumption as FAA
+ * text. Built from the constants rather than retyping their values, so the
+ * sentence a student reads cannot outlive a re-tuned window.
+ */
+export const LEAD_DISTANCE_NOTE =
+  `Those two timings bracket the window this drill draws from — ` +
+  `${SPEED_REDUCTION_MINUTES} to ${CLEARANCE_LEAD_MINUTES} minutes from the fix, flown at an ` +
+  `assumed ${NOMINAL_GROUNDSPEED_KT} kt groundspeed. The groundspeed is a training assumption ` +
+  `that sets the scale of the picture, not an FAA figure. The distance is display state either ` +
+  `way: the entry sector comes from heading against the holding course alone.`
+
+/**
+ * What a dot on the deviation bar is worth, verbatim (AIM 1-1-17 b.4, verified
+ * against faa.gov/air_traffic/publications/atpubs/aim_html/chap1_section_1.html).
+ *
+ * The needle is read quantitatively — two dots a side, so each is worth half of
+ * `FULL_SCALE_NM` — which makes the scale a user-visible aviation fact under the
+ * CLAUDE.md citation convention, and a citation counts only once it is on the
+ * screen. `FULL_SCALE_SOURCE` lives with the constant in `src/ui/hsi.ts`; this
+ * is where it renders, because the instrument draws no prose of its own.
+ */
+export const CDI_SCALE_AIM =
+  'The GPS receiver must be set to terminal (±1 NM) CDI sensitivity and the ' +
+  'navigation routes contained in the database in order to fly published IFR ' +
+  'charted departures and DPs.'
+
+/**
+ * What terminal scaling is actually conditioned on, verbatim (AIM 1-1-17
+ * b.5(e)(3), verified against
+ * faa.gov/air_traffic/publications/atpubs/aim_html/chap1_section_1.html).
+ *
+ * This quotation is here to **withdraw** a claim, not to add one. The screen used
+ * to argue that terminal was the honest mode because the drill's 6–10 NM window
+ * "sits well inside the 30 NM at which terminal scaling arms" — which compares two
+ * different distances. The AIM's 30 NM is measured from the *airport/heliport
+ * reference point*, and only with an approach loaded and armed; neither follows
+ * from being 6–10 NM from a *holding fix*. A hold 8 NM from its fix can sit
+ * hundreds of miles from any airport, with the receiver still on en route ±5 NM —
+ * where this needle would be far *less* pegged than the panel draws it. Quoting
+ * the conditions makes the withdrawal checkable rather than a second bare
+ * assertion, which is why the fix is a citation and not a deletion.
+ */
+export const CDI_ARMING_AIM =
+  'When an approach has been loaded in the navigation system, GPS receivers will give an ' +
+  // Inner quotes downgraded to singles: the AIM writes “arm”, and this string is
+  // rendered inside a “…” span, so nesting the same mark ends the quotation early
+  // on screen. The words are untouched.
+  '‘arm’ annunciation 30 NM straight line distance from the airport/heliport reference point. ' +
+  'Pilots should arm the approach mode at this time if not already armed (some receivers arm ' +
+  'automatically). Without arming, the receiver will not change from en route CDI and RAIM ' +
+  'sensitivity of ±5 NM either side of centerline to ±1 NM terminal sensitivity.'
+
+/**
+ * ⚠️ Cite the **sub-item**, not the list that contains it. This read `b.5(e)`
+ * until 2026-08-08; `(e)` is the ~10-item list "Procedures for Accomplishing GPS
+ * Approaches", and a student following the rendered `<cite>` landed on the list
+ * rather than the sentence. Walking the `<ol>` nesting of the fetched AIM page
+ * puts the quotation at path `[2, 5, 5, 3]` over levels one→four = b.5(e)(3).
+ * The neighbouring `±0.3 NM` ramp is a *different* sub-item, b.5(e)(5), and is
+ * conditioned on 2 NM from the FAWP — do not fold the two into one cite.
+ */
+export const CDI_ARMING_SOURCE = 'AIM 1-1-17 b.5(e)(3)'
+
+/**
+ * The caveat, and why it is a separate string.
+ *
+ * The AIM sentences above cite the ±1 NM *value* and the conditions terminal
+ * scaling arms under, and nothing else. No FAA source says a hold is flown on
+ * terminal scaling, and b.5(e)(3) does not supply one — see `CDI_ARMING_AIM`.
+ * Terminal is this drill's assumption. Folding that inside either quoted span
+ * would present an assumption as FAA text, which is the failure the
+ * `OUTBOUND_TIMING_AIM`/`OUTBOUND_TIMING_NOTE` split exists to prevent; this is
+ * the same split for the CDI scale. Built from the constants so the sentence
+ * cannot outlive a re-tuned scale.
+ */
+export const CDI_SCALE_NOTE =
+  `The needle is drawn on that terminal scale: full scale is ±${FULL_SCALE_NM} NM, so each of ` +
+  `the ${DEVIATION_DOTS} dots a side is worth ${FULL_SCALE_NM / DEVIATION_DOTS} NM of ` +
+  `cross-track. Terminal sensitivity is this drill's assumption and not an FAA statement about ` +
+  `holds: what the AIM conditions it on is an approach loaded and armed within 30 NM of the ` +
+  `airport reference point, and how far you are from a holding fix settles neither. Read the ` +
+  `picture the needle draws, not a distance inferred from the scale. Expect it pegged across ` +
+  `this drill's ${MIN_DISTANCE_NM}–${MAX_DISTANCE_NM} NM window: unless you are nearly on the ` +
+  `inbound course or its reciprocal, it is, and that is the picture of being cleared to hold ` +
+  `while not established.`
+
 export interface EntryScenario {
   seed: number
   /** Aircraft heading when the clearance is received. */
   heading: number
+  /**
+   * Distance to the holding fix, NM — the aircraft is tracking direct to it.
+   *
+   * Display state only. It drives the HSI's deviation bar and status line
+   * (`courseDeviation` in src/engine/nav.ts is the oracle for both) and touches
+   * the answer key nowhere: AIM 5-3-8 j3 decides the entry sector from heading
+   * against the holding course alone.
+   */
+  distanceNm: number
   clearanceText: string
   /**
    * What the plate says, for "as published" clearances only. ATC omits course
@@ -86,9 +261,17 @@ export function generateScenario(seed: number): EntryScenario {
   // of whatever the clearance generator drew.
   const rng = mulberry32(Math.trunc(seed) ^ 0x9e3779b9)
   const heading = Math.floor(rng() * 360)
+  // Appended AFTER the heading draw, never inserted before it: a stored miss
+  // and its exported Anki card are keyed by seed, so moving the heading a seed
+  // produces would rewrite questions already in a user's deck. Rounded to the
+  // one decimal `distanceText` renders, so the status line and the needle are
+  // computed from the same number.
+  const distanceNm =
+    Math.round((MIN_DISTANCE_NM + rng() * (MAX_DISTANCE_NM - MIN_DISTANCE_NM)) * 10) / 10
   const scenario: EntryScenario = {
     seed,
     heading,
+    distanceNm,
     clearanceText: clearance.text,
     holdSpec,
     result: determineEntry(heading, holdSpec),
@@ -274,8 +457,17 @@ export function renderEntryDrill(el: HTMLElement, options: EntryDrillOptions = {
       </div>
       <p class="entry-clearance"></p>
       <p class="entry-chart" hidden></p>
+      <p class="entry-scenario"></p>
       <div class="entry-hsi"></div>
-      <div class="entry-answers">
+      <!-- The label is what tells the row apart from the panel above it: the
+           G1000 rect fills its viewBox, so buttons flush against it read as
+           attached hardware. It speaks in the page's voice, not the panel's, and
+           doubles as the group's accessible name (.entry-modes has had one since
+           it shipped; this row had neither role nor name). The detaching margin
+           lives on the label in styles.css — putting it on .entry-answers would
+           split the label from the buttons it names. -->
+      <p class="entry-answers-label" id="entry-answers-label">Which entry?</p>
+      <div class="entry-answers" role="group" aria-labelledby="entry-answers-label">
         ${ENTRIES.map(
           (e) => `<button class="entry-answer" data-entry="${e}">${ENTRY_LABELS[e]}</button>`,
         ).join('')}
@@ -284,11 +476,17 @@ export function renderEntryDrill(el: HTMLElement, options: EntryDrillOptions = {
       <div class="entry-map"></div>
       <button class="entry-next" hidden>Next</button>
       <p class="entry-stats"></p>
+      <p class="entry-lead">“${CLEARANCE_LEAD_ATC}” <cite>${CLEARANCE_LEAD_SOURCE}</cite>
+        “${SPEED_REDUCTION_AIM}” <cite>${SPEED_REDUCTION_SOURCE}</cite> ${LEAD_DISTANCE_NOTE}</p>
+      <p class="entry-cdi">“${CDI_SCALE_AIM}” <cite>${FULL_SCALE_SOURCE}</cite>
+        “${CDI_ARMING_AIM}” <cite>${CDI_ARMING_SOURCE}</cite>
+        ${CDI_SCALE_NOTE}</p>
     </section>
   `
 
   const clearanceEl = el.querySelector<HTMLElement>('.entry-clearance')!
   const chartEl = el.querySelector<HTMLElement>('.entry-chart')!
+  const scenarioEl = el.querySelector<HTMLElement>('.entry-scenario')!
   const hsiEl = el.querySelector<HTMLElement>('.entry-hsi')!
   const mapEl = el.querySelector<HTMLElement>('.entry-map')!
   const feedbackEl = el.querySelector<HTMLElement>('.entry-feedback')!
@@ -297,8 +495,19 @@ export function renderEntryDrill(el: HTMLElement, options: EntryDrillOptions = {
   const answerBtns = [...el.querySelectorAll<HTMLButtonElement>('.entry-answer')]
 
   function drawHSI(showSectors: boolean): void {
-    const { heading, holdSpec, result } = drill.scenario
-    const props: HSIProps = { heading, course: holdSpec.inboundCourse }
+    const { heading, holdSpec, result, distanceNm } = drill.scenario
+    const props: HSIProps = {
+      heading,
+      course: holdSpec.inboundCourse,
+      // The bug is parked on the nose: nothing else is selected, which is where
+      // a pilot leaves it, so the HDG box, the bug and the heading readout all
+      // show one number here (see the note on HSIProps.headingBug).
+      headingBug: heading,
+      // The position is what makes the deviation bar and the TO/FROM flag say
+      // something true rather than decorative. `courseDeviation` reads it under
+      // a direct-to assumption, which the scenario line below states out loud.
+      nav: { fix: holdSpec.fix, distanceNm },
+    }
     if (mode === 'learn') {
       props.thumbOverlay = holdSpec.turnDirection
     }
@@ -324,6 +533,13 @@ export function renderEntryDrill(el: HTMLElement, options: EntryDrillOptions = {
     const note = drill.scenario.chartNote
     chartEl.textContent = note ?? ''
     chartEl.hidden = note === undefined
+    // Where the aircraft is. "Tracking direct" is not scene-setting: it is the
+    // assumption `courseDeviation` derives the TO/FROM flag from, so a student
+    // reading the needle is told it rather than left to infer it. Distance goes
+    // through `distanceText`, the same function the panel's status line uses.
+    const { holdSpec, distanceNm } = drill.scenario
+    scenarioEl.textContent =
+      `You are ${distanceText(distanceNm)} from ${holdSpec.fix}, tracking direct to the fix.`
     drawHSI(false)
     // The plan view answers the question, so it only appears with the feedback.
     mapEl.innerHTML = ''

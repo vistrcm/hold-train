@@ -1233,6 +1233,11 @@ deck — the one place the app cannot reach to correct anything.
   there and unaffected by proximity: the entry track is `PALETTE.entry.parallel` (`#2f6fd0`),
   2 px, `stroke-dasharray="5 3"`; the racetrack is `PALETTE.ink` (`#10161c`), 1.8 px, solid.
   Recorded so the next iteration re-measures the geometry rather than re-litigating it.
+  *(Amended 2026-08-07: the palette split renamed those two symbols to
+  `PALETTE.plate.entry.parallel` and `PALETTE.plate.ink`. The hexes, widths and dash pattern are
+  unchanged — `mapview.test.ts` passed through the split unedited — so only the paths above are
+  stale; they are corrected here rather than left ungreppable, since this bullet exists to send
+  the next session to the drawn colours instead of back into the argument.)*
 - **Not re-fixed:** the mapview rollout kink, reported a fifth time. Unchanged deliberate deferral.
 - **Declined: `PARALLEL_INTERCEPT_DEG = 45` as an out-of-scope change** away from the ≈31° measured
   in `docs/parallel-entry-evidence.md`. Already settled and recorded in CLAUDE.md as a deliberate
@@ -1325,3 +1330,1108 @@ failure this ledger records for the rejoin prose scan.
   state both-sides-protected / non-holding-narrower with the 8260.3G Table 16-6-1 citation.
   No regression test: the content-bank scans cover `src/content/` and the wind-lab screen,
   not `docs/` — docs prose remains guarded only by review.
+
+## Correction — 2026-08-07 (the entry drill depicted every clearance overhead the fix)
+
+Unlike most entries in this ledger, nothing here was a *false statement*. Every fact the drill
+rendered was correct; what was wrong was the **picture** — the only moment it could depict was one
+that is not the moment the decision is made, and the instrument depicting it showed an RMI's
+information content in an HSI's shape. A depiction a student rehearses is content, so it is
+recorded here on the same terms as a wrong sentence.
+
+- **Fixed: every scenario implied the aircraft was directly over the fix**
+  (`src/modules/entry-drill.ts`, `src/engine/nav.ts`, `src/ui/hsi.ts`). `generateScenario` produced
+  `seed → clearance + heading` and nothing else — the drill carried **no position at all**, so the
+  only picture the instrument could draw was the overhead one. A holding clearance arrives *before*
+  the clearance limit. **FAA JO 7110.65BB 4-6-1 c.4**, verbatim: *"When delay is expected, issue
+  items in subparagraphs a and b at least 5 minutes before the aircraft is estimated to reach the
+  clearance limit. If the traffic situation requires holding an aircraft that is less than 5 minutes
+  from the holding fix, issue these items immediately."* Its NOTE 1 ties that to the pilot's end of
+  the same timeline, **AIM 5-3-8 d**, verbatim: *"When an aircraft is 3 minutes or less from a
+  clearance limit and a clearance beyond the fix has not been received, the pilot is expected to
+  start a speed reduction so that the aircraft will cross the fix, initially, at or below the
+  maximum holding airspeed."* One rule from both seats, which is what makes the two numbers a
+  *window* rather than two unrelated figures. `EntryScenario` now carries `distanceNm`, drawn
+  uniformly across `MIN_DISTANCE_NM`–`MAX_DISTANCE_NM` and quantised to 0.1 NM (the resolution
+  `distanceText` renders — a stored 7.3365 would otherwise put "7.3 NM" on the panel beside a needle
+  computed from a different number). Both quotations are rendered on the screen inside their cited
+  spans (`.entry-lead`) and are **not** templated from the constants: a quotation with an
+  interpolation in it is not a quotation. ⚠️ The sub-paragraph is `c.4`, **not** `g` — the five
+  paragraphs after `c` are nested *under* it, which the rendered HTML and the order's PDF agree on
+  and recollection does not; the HTML renders its list markers from CSS and carries none in the
+  markup, so the letter was cross-checked against the PDF. `WebFetch` returns 403 on faa.gov;
+  `curl` with a browser UA was used. Regression tests: `cites both timings at sub-paragraph
+  granularity`, `quotes both timings verbatim with their sources, derivation kept outside`,
+  `places the aircraft inside the ATC lead window on every seed`,
+  `spans the window between the two verified timings`,
+  `spreads across the window rather than parking on one end` and
+  `quantises to the resolution distanceText renders` in `src/modules/entry-drill.test.ts`.
+- **⚠️ The groundspeed is a training assumption and must never become a citation.**
+  `NOMINAL_GROUNDSPEED_KT = 120` converts the two verified *timings* into the miles on the panel;
+  no FAA source supplies it. It is a typical light single's cruise, comfortably under the 200 KIAS
+  maximum holding airspeed at or below 6,000 ft (**AIM 5-3-8 j2**, TBL 5-3-1). The derivation
+  therefore renders **outside** both quoted spans, as `LEAD_DISTANCE_NOTE` — the same
+  `OUTBOUND_TIMING_AIM`/`OUTBOUND_TIMING_NOTE` split this ledger's citation convention requires.
+  The guard for that had to be strengthened after a mutation walked through it: asserting
+  `CLEARANCE_LEAD_ATC).not.toContain(LEAD_DISTANCE_NOTE)` is a claim about the *constants*, and the
+  template can still put the closing quotation mark after the derivation — presenting a training
+  assumption as FAA text with every plain `toContain` green. The test now asserts
+  ``toContain(`“${CLEARANCE_LEAD_ATC}”`)``: the quoted span must close *on* the FAA sentence. The
+  existing `OUTBOUND_TIMING_AIM`/`NOTE` pair has the same constant-level-only shape and the same
+  hole. Window: 3–5 min × 120 kt = **6.0–10.0 NM**. Regression test:
+  `quotes timings that still say what the generator’s constants claim` in
+  `src/modules/entry-drill.test.ts`, which fails when a constant is re-tuned and leaves a source
+  quoted beside a number it no longer governs.
+- **Fixed: the "course pointer" was an RMI needle wearing an HSI's shape** (`src/ui/hsi.ts`). A
+  full-length magenta line through the rose centre with no deviation bar, no TO/FROM flag and no
+  nav-status field carries exactly an RMI needle's information content — *the course is oriented
+  that way* — while being labelled and read as an HSI. The instrument is now a dark G1000-style PFD
+  panel: white card, cyan HDG box and heading bug, magenta CRS box and course pointer, a sliding
+  deviation bar with two dots a side, a TO/FROM glyph and a `GPS OBS <fix> <dist> TO/FROM` status
+  line. `FULL_SCALE_NM = 1` is what a dot means and a student reads it quantitatively, so it is a
+  user-visible aviation fact: **AIM 1-1-17 b.4**, verbatim: *"The GPS receiver must be set to
+  terminal (±1 NM) CDI sensitivity and the navigation routes contained in the database in order to
+  fly published IFR charted departures and DPs."* ⚠️ **The value is cited; the mode is not.** No FAA
+  source says a hold is flown on terminal scaling, and `1-1-17 b.5(e)` gives ±5 NM en route and
+  ±0.3 NM approach in the same sentence. **⚠️ Amended 2026-08-08 (twice wrong, both minor):** the
+  citation is one outline level too shallow — the arming sentence is `b.5(e)(3)` — and the two
+  figures are **not** in the same sentence: ±5 NM en route → ±1 NM terminal is `b.5(e)(3)`, while the
+  ±0.3 NM approach ramp is `b.5(e)(5)` and is gated on 2 NM from the FAWP, not on the 30 NM. See the
+  2026-08-08 correction entry below. ~~What makes terminal the honest choice is that the drill's
+  6–10 NM window sits well inside the 30 NM at which terminal scaling arms — labelled as an
+  assumption in the `FULL_SCALE_NM` docblock, and if the window is ever widened past 30 NM the
+  constant becomes 5, not 1.~~
+  **⚠️ Amended 2026-08-07 — the struck sentence is wrong and was rendered to the student.** It
+  compares two different distances. AIM 1-1-17 b.5(e), verbatim: *"When an approach has been loaded
+  in the navigation system, GPS receivers will give an 'arm' annunciation 30 NM straight line
+  distance from the **airport/heliport reference point**. … Without arming, the receiver will not
+  change from en route CDI and RAIM sensitivity of ±5 NM either side of centerline to ±1 NM terminal
+  sensitivity."* The 30 NM is measured from the airport, and it is gated on an approach being
+  **loaded and armed** — neither of which follows from being 6–10 NM from a **holding fix**. A hold
+  8 NM from its fix can sit hundreds of miles from any airport with no approach loaded, on en route
+  ±5 NM, where the needle would be far *less* pegged than the panel draws. The window therefore
+  neither justifies `FULL_SCALE_NM` nor bounds it, and the "widen past 30 NM and it becomes 5"
+  corollary falls with it. See the 2026-08-07 correction entry below.
+- **The needle is derived by one oracle, and the assumption behind it is on the screen**
+  (`src/engine/nav.ts`). `courseDeviation(heading, course, distanceNm)` is the single source of the
+  cross-track and the TO/FROM sense; the card's glyph, the status line's word and the `aria-label`
+  are all threaded from one call, because three renderings of one flag that each compute their own
+  are three chances to disagree on one panel. The geometry: the aircraft lies at bearing
+  `heading + 180` from the fix, `xtk = -D·sin(heading - course)` with **positive = right of the
+  course line**, and the needle deflects **opposite** the displacement. `sense` is `to` on the open
+  ±90° semicircle, `from` at exactly 90°. ⚠️ `sense` is derived from **heading alone**, which is
+  valid *only* because bearing-to-fix equals heading under direct-to tracking — a vectored aircraft
+  would get a wrong flag. That assumption is stated in the docblock **and** rendered to the student
+  in the `.entry-scenario` line ("You are 8.4 NM from ZORVU, tracking direct to the fix."), rather
+  than left to be inferred from a needle. `distanceNm === 0` is **rejected** (`RangeError`, same
+  branch as negatives and non-finites): over the fix the cross-track is zero for every heading and
+  the sense reduces to an angle comparison with no geometric meaning, so callers must not depict it.
+  Regression tests: the ten hand-drawn goldens and four properties in `src/engine/nav.test.ts`
+  (notably `heading = course + 90: aircraft LEFT of course, FROM at the exact tie-break`,
+  `puts the aircraft left of course whenever its heading is right of course`,
+  `reports TO for exactly the open semicircle within 90 degrees of the course` and
+  `rejects zero distance: over the fix there is no geometry to report`); at the drawing level,
+  `lands one dot right of centre for a half-scale left cross-track`,
+  `deflects LEFT when the aircraft is RIGHT of the course`,
+  `pegs on the outer dot instead of sliding off the card`,
+  `points up the course arrow when the course closes on the fix` and
+  `points down the tail when the course opens away from the fix` in `src/ui/hsi.test.ts`. Every one
+  of those is hand-derived from the drawn picture, never re-read from `courseDeviation` — the same
+  tautology trap CLAUDE.md records for `turnToInbound`, where renderer and expectation flip together
+  if the engine inverts.
+- **OBS is a fidelity decision, not decoration** (`src/ui/hsi.ts`, `navStatus`). On a real G1000
+  with GPS as the nav source and an active leg, the CRS knob is **inoperative** and a direct-to
+  auto-slews the desired track, so the CDI stays centred. The picture this drill needs — a manually
+  selected course with a large live deflection — therefore cannot occur in that configuration; it
+  occurs in **OBS/SUSP mode and nowhere else**. Annunciating `OBS` on the status line is what makes
+  the depiction honest rather than merely plausible, and it is consistent with content the app
+  already ships (the `g1000-obs-hold` oral item covers SUSP/OBS holds; Garmin Pilot's Guides,
+  non-FAA and caveat-flagged, per the sources table at the top of this file). The selected course
+  is the **inbound holding course** — the pilot has set it to visualise the hold — which is what
+  keeps the lubber-vs-pointer relationship that *is* the entry technique on the instrument.
+  Regression test: `annunciates OBS, the only mode this picture occurs in` in `src/ui/hsi.test.ts`.
+- **Recorded, not fixed: the needle is pegged in the large majority of scenarios.** With a 6–10 NM
+  lead distance and ±1 NM full scale, the bar is on scale only when the heading is within roughly
+  6–10° of the holding course or its reciprocal. This is not an artifact of the chosen scale — an
+  angular VOR-style scale pegs at 10° for the same reason. It is the physics of receiving a hold
+  clearance while not established on the holding course, and it is the picture worth teaching: *the
+  needle is pinned because you are not on the inbound course — that is what an entry is for.*
+  **Do not shorten the distances to make the needle livelier**; that trades a true picture for a
+  busy one. Consequence for the tests: the one unpegged golden uses 1.0 NM, deliberately shorter
+  than anything the drill generates, and says so in its comment so a later reader does not "fix" it
+  to a realistic distance and quietly turn it into a peg test.
+- **Recorded, not fixed: TO/FROM plus the bar's side together fix the quadrant of
+  `heading − course`,** and two of the four quadrants determine the entry outright. No information
+  is leaked — heading and course are both already on the rose — but it is a shortcut a student could
+  adopt in place of the sector reasoning. Accepted: the shortcut exists only because the instrument
+  is honest, and cockpit mode still withholds the drawn sectors and the thumb band.
+  *Amended 2026-08-08 with the arithmetic, which is sharper than "two of four quadrants" and worth
+  having on the record before anyone re-decides this.* With `d = angleDiff(inboundCourse, heading)`,
+  bar-right ⟺ `sin d > 0` and TO ⟺ `|d| < 90`, against `classify()` in `src/engine/entry.ts`
+  (direct `(−70, 110)`, teardrop `[110, 180]`, parallel `(−180, −70]`): bar-right + TO → `d ∈ (0, 90)`,
+  all direct; bar-left + FROM → `d ∈ (−180, −90)`, all parallel; bar-right + FROM → `d ∈ [90, 180)`,
+  **78% teardrop**; bar-left + TO → `d ∈ (−90, 0)`, **78% direct**. Guessing the majority in the two
+  "ambiguous" quadrants scores `(90 + 90 + 70 + 70)/360 = 88.9%` with no sector reasoning at all,
+  against a cockpit benchmark of 18/20 = 90% — and it is fast, which is the other half of what the
+  benchmark certifies. **Still accepted, and the reason is the first clause above, not the size of
+  the number**: `d` is fully determined by the pointer's angle against the lubber, both of which the
+  panel draws regardless, so withholding `nav` in cockpit mode would remove an honest picture
+  without removing the shortcut. What it would cost is the depiction of being cleared to hold while
+  not established, which is the whole reason the scenario carries a position.
+- **The written-test entry figure has an explicit no-nav contract** (`src/ui/hsi.ts`,
+  `src/modules/written-test.ts`). `renderHSI` has **two** consumers, and the written bank's entry
+  questions supply `{ heading, course }` with no position. With `course` and no `nav`, the course
+  pointer is drawn and the deviation bar, dots, TO/FROM glyph and status line are all **suppressed**
+  — a real HSI removes the deviation indication when it has no valid nav data, and a bar centred on
+  a course the figure has no position for reads as "established on course" on a graded question.
+  The pointer's middle is left empty (that gap is the bar's track) so nothing fills it. This was
+  previously unspecified. Those are fixed content items; giving them a position is a separate
+  decision, deliberately not taken here. Regression tests:
+  `draws the course pointer and no deviation indication when nav is absent`,
+  `drops the whole assembly when no course is given` and
+  `is absent when the instrument has no nav data` in `src/ui/hsi.test.ts`;
+  `shows the entry figure with no deviation indication, and still grades` in
+  `src/modules/written-test.test.ts`.
+- **Colour meaning is now pinned across two instruments** (`src/ui/palette.ts`,
+  `src/ui/palette.test.ts`). The dark panel forced `PALETTE` to split into `plate.*` (the map,
+  values unchanged) and `pfd.*` (new, dark), which duplicates the three entry colours — and the HSI
+  and the plan-view map appear **together** in the feedback view, so a hue drift would teach two
+  colour codes for one entry type on one screen. `keeps each entry colour the same hue on both
+  instruments` holds each `pfd.entry.X` within 5° of hue of its `plate.entry.X` (measured gaps:
+  1.58°, 0.16°, 0.00°). Every colour is still computed against WCAG thresholds rather than judged by
+  eye, now per group (`clears WCAG contrast on every backdrop its group renders on`,
+  `measures every group it declares against a backdrop`), and the dark panel is its own SC 1.4.11
+  boundary at 17.10:1 against `--bg` (`separates the PFD panel from the page`). ⚠️ **An alpha is
+  tuned to a face, not to a palette:** inverting the backdrop inverts which way a tint moves it, so
+  `OVERLAY_ALPHA.sectorFill` at the white-face value of 0.1 rendered the learn-mode wedge at 1.15:1
+  on near-black — a wedge that is not there — while every existing assertion passed, because all of
+  them were *ceilings*. It is now 0.25, held between a floor (`tints the wedge enough to be seen at
+  all`) and the ceiling (`keeps every card mark legible over a tinted sector`).
+  ⚠️ **Amended 2026-08-11:** that last clause named the wrong ceiling. The binding case is the
+  **thumb band over a wedge** at 3.38:1, not the dim minor ticks at 3.79:1 — see the correction entry
+  at the foot of this ledger. `sectorFill` stays 0.25; only what bounds it above has changed.
+- **Deliberately unchanged** (verified, not overlooked): `determineEntry` and the whole answer key —
+  distance and deviation are **display state only**, and the AIM 5-3-8 j3 sector is decided by
+  heading alone; the plan-view map, which stays a light chart-like plate and gains no aircraft
+  position (`mapview.test.ts` passed unedited through the palette split, so its output is
+  byte-identical); the miss snapshot and `missesToCards`, since the entry answer is already rebuilt
+  from `heading` + `holdSpec` and distance cannot reach it; and the seed stream — `distanceNm` is
+  drawn from a **second `rng()` call appended after** the heading draw, so every existing seed keeps
+  its heading and its answer. That last one is the "rewrites history" harm: stored misses and Anki
+  cards are keyed by seed, and shifting the stream would swap the question the student actually
+  missed. Pinned by `keeps every existing seed on its original heading and answer` in
+  `src/modules/entry-drill.test.ts`, whose expectations are hand-derived on both halves — headings
+  from `mulberry32(seed ^ 0x9e3779b9)`, answers from the heading against the fixture hold (seed 7:
+  inbound 080 right, 353 − 080 = 273° in the 180°–290° parallel sector; seed 42: inbound 250 left,
+  173 − 250 = 283° in the mirrored 250°–360° direct sector).
+- **Screen wiring** (`src/modules/entry-drill.ts`). `drawHSI` passes `headingBug: heading` (parked
+  on the nose — realistic and intentional, so the HDG box, the bug and the heading readout all show
+  the same number) and `nav: { fix: holdSpec.fix, distanceNm }`. The `.entry-lead` footnote carrying
+  both timings sits at the **foot** of the screen, not under the panel: it is static, and a cockpit
+  student is timed on the distance from the picture to the answer buttons. Regression tests:
+  `gives the panel the fix, the distance and a bug parked on the nose`,
+  `shows the deviation indication the written-test figure suppresses`,
+  `renders the distance in prose through distanceText, not a second rounding`,
+  `names the fix in the scenario line exactly as the clearance names it` and
+  `keeps the learn/cockpit aid gating unchanged now the panel carries nav data` in
+  `src/modules/entry-drill.test.ts`.
+
+Full plan, with the per-task mutation tables that establish each guard actually binds:
+`docs/plans/completed/20260807-g1000-hsi.md`.
+
+## Correction — 2026-08-07 (the CDI-scale citation was never rendered)
+
+Amends the `FULL_SCALE_NM` bullet above, which recorded the scale as "a user-visible aviation fact:
+**AIM 1-1-17 b.4**" and stopped there.
+
+- **Fixed: the citation existed only in a docblock** (`src/ui/hsi.ts` → `src/modules/entry-drill.ts`).
+  `FULL_SCALE_SOURCE = 'AIM 1-1-17 b.4'` was exported with **no consumer anywhere** — not rendered,
+  not asserted, not referenced. The CLAUDE.md convention is not "a fact has a source constant", it
+  is that the source is **rendered in the UI**, and the same paragraph requires a known caveat to
+  surface on screen. So the one fact on this branch the ledger itself flags as *value cited, mode
+  not* was the one the student could not see: a needle read quantitatively, with no statement that a
+  dot is 0.5 NM, no citation, and no warning that terminal scaling for a hold is this drill's
+  assumption. The failing half was invisible because the ledger and the docblock described a screen
+  state that did not exist.
+- The drill screen now carries a third cited footnote, `.entry-cdi`, split the way
+  `OUTBOUND_TIMING_AIM`/`_NOTE` is: `CDI_SCALE_AIM` is the AIM 1-1-17 b.4 sentence verbatim — which
+  is about *departures and DPs*, and cites the ±1 NM value and nothing more — with `CDI_SCALE_NOTE`
+  **outside** the quoted span carrying the arithmetic (0.5 NM a dot), the terminal-mode assumption
+  labelled as one, and why the needle is pegged at 6–10 NM. Folding the assumption inside the quote
+  would be the exact failure the 2026-08-02 rejoin audit corrects.
+- Regression tests, both in `src/modules/entry-drill.test.ts`:
+  `cites the CDI scale beside the needle, with the mode caveat outside the quote` (fails if the
+  span is not rendered, if the `<cite>` is missing, or if the caveat migrates inside the quotation
+  marks) and `quotes a scale the instrument still draws on` (fails when `FULL_SCALE_NM` or
+  `DEVIATION_DOTS` is re-tuned and leaves the AIM sentence quoted beside a scale it no longer
+  governs — the drift guard the lead-time timings already had). README's source list gains
+  AIM 1-1-17.
+  **Amended 2026-08-07:** the `DEVIATION_DOTS` half of that claim was false as written, and the
+  `FULL_SCALE_NM` half was true of only one of the four assertions. `CDI_SCALE_AIM` is a fixed
+  literal, so re-reading `FULL_SCALE_NM` against it binds; `CDI_SCALE_NOTE` is *built* from these
+  constants, so the three lines that re-read `FULL_SCALE_NM`, `FULL_SCALE_NM / DEVIATION_DOTS` and
+  the distance window against it restated the template and could not fail — `DEVIATION_DOTS`
+  appeared only inside those tautologies. Fake coverage under the CLAUDE.md rule, and a ledger entry
+  crediting it with a failure mode it never had. The three are now hand-written literals
+  (`±1 NM`, `2 dots a side`, `0.5 NM`, `6–10 NM`), which is what actually reds on a re-tune.
+- **Also fixed, same pass:** the deviation goldens all sat at exactly `FULL_SCALE_NM` or 90° off
+  course, so *clamping the distance to full scale before* `courseDeviation` passed 727/727 while
+  turning a correctly pegged needle at 6–10 NM into a near-centred one. Closed by
+  `scales the deflection by the distance, well beyond full scale` in `src/ui/hsi.test.ts` — a
+  hand-drawn 4 NM case whose deflection is neither centred nor pegged. Two premises of the new
+  contrast model were unpinned the same way: the sector wedge's **radius** (`OVER_WEDGE` marks
+  `pfd.chrome` as never-over-a-tint only because the card ring at `roseR` sits outside the wedges'
+  `tickR`) and its **paint order** (SVG has no z-index, so "over a wedge" is document order alone) —
+  now asserted in `a sector wedge sweeps clockwise between its two boundary radii` and
+  `paints the sector wedges under the card marks, not over them`.
+
+## Post-completion review fixes — 2026-08-07 (code review iteration 2)
+
+- **The two `renderHSI` consumers never pinned the `heading` and `course` they pass.** This branch
+  promoted both from decorative pointer inputs to the values that drive the deviation bar's
+  deflection, the TO/FROM glyph and status word, the CRS readout and the `aria-label`. The new
+  consumer-side tests pinned `fix`, `distanceNm`, `headingBug` and the *presence* of the deviation
+  elements — nothing asserted the two props that determine the whole picture. Three mutations, each
+  run against the real suite, passed **732/732**:
+  - `course: (holdSpec.inboundCourse + 180) % 360` in `drawHSI` — the drill draws the **outbound**
+    course: wrong CRS box, wrong pointer, needle deflected the wrong way, TO/FROM inverted for most
+    headings, wrong accessible description.
+  - `heading: (heading + 37) % 360` — compass card rotated 37° off the scenario while the HDG box
+    and the graded answer keep the true heading. A panel that contradicts itself.
+  - `renderHSI(figureEl, { heading: q.entry.inboundCourse, course: q.entry.heading })` in
+    `written-test.ts` — the two swapped on a **graded** question: a well-formed HSI of a different
+    aircraft than the one asked about.
+  `hsi.ts` cannot see its own consumers and its no-nav contract is silent by design, so the whole
+  HSI suite stays green through all three — the same consumer-vs-oracle hole CLAUDE.md records for
+  `mapview.ts`/`sim.ts` and the parallel rejoin, one screen over.
+- Regression tests: `draws the card on the scenario heading and the pointer on the inbound course`
+  (`src/modules/entry-drill.test.ts`) pins `.hsi-heading-readout`, `.hsi-crs-value`,
+  `.hsi-nav-sense`, the `.hsi-tofrom` sense and the bar's side for seed 42, and the added block in
+  `shows the entry figure with no deviation indication, and still grades`
+  (`src/modules/written-test.test.ts`) pins the figure's readout and CRS box. Both derive their
+  goldens from the **scenario**, stated as literals (seed 42: heading 173, course 250, 9.9 NM out,
+  TO, bar pegged left) rather than re-read out of `holdSpec.inboundCourse` or recomputed from
+  `courseDeviation` — an expectation built from the field the consumer reads agrees by construction
+  when the consumer reads it wrongly. The written-test half selects a question whose heading and
+  inbound course **differ**: `entry-direct-inbound` is heading 090 on a 090 course, where a swap is
+  invisible and the assertion could not fail.
+
+## Correction — 2026-08-07 (terminal CDI scaling was justified by a distance that does not apply)
+
+This section **reverses part of the 2026-08-07 "the CDI-scale citation was never rendered" entry**,
+argued in place rather than silently edited past: that entry now carries a struck sentence and an
+amendment note pointing here.
+
+- **Fixed: the drill told the student its 6–10 NM window was what made terminal scaling honest**
+  (`src/modules/entry-drill.ts`, `src/ui/hsi.ts`). `CDI_SCALE_NOTE` rendered, on screen, "Terminal
+  sensitivity is this drill's assumption and not an FAA statement about holds — what makes it honest
+  is that the 6–10 NM window above sits well inside the 30 NM at which terminal scaling arms." The
+  `FULL_SCALE_NM` docblock carried the same inference plus a corollary ("widen that window past
+  30 NM and this constant becomes 5, not 1"), and `entry-drill.test.ts` repeated it in a comment
+  justifying the `MAX_DISTANCE_NM < 30` bound. **The inference is invalid: it compares two different
+  distances.** AIM 1-1-17 b.5(e) — **amended 2026-08-08 to `b.5(e)(3)`; the `<ol>` walk this entry
+  cites was run only as far as the containing list, and `(e)` is the ~10-item "Procedures for
+  Accomplishing GPS Approaches"** — fetched and verified verbatim against
+  faa.gov/air_traffic/publications/atpubs/aim_html/chap1_section_1.html (outline position confirmed
+  by walking the published `<ol>` nesting, not by reading the rendered text): *"When an approach has
+  been loaded in the navigation system, GPS receivers will give an 'arm' annunciation 30 NM straight
+  line distance from the airport/heliport reference point. Pilots should arm the approach mode at
+  this time if not already armed (some receivers arm automatically). Without arming, the receiver
+  will not change from en route CDI and RAIM sensitivity of ±5 NM either side of centerline to ±1 NM
+  terminal sensitivity."* The 30 NM is measured **from the airport/heliport reference point** and is
+  gated on an approach being **loaded and armed**. The drill's 6–10 NM is a distance to a **holding
+  fix**, which establishes neither: a hold 8 NM from its fix can sit hundreds of miles from any
+  airport with no approach loaded, on en route ±5 NM — where this needle would be far *less* pegged
+  than the panel draws it. The claim was also **uncited**: the paragraph's only `<cite>` was
+  `AIM 1-1-17 b.4`, which contains no 30 NM statement, so a derivation was presented as fact inside
+  a cited span — the failure the `OUTBOUND_TIMING_AIM`/`_NOTE` split exists to prevent.
+- **The fix is a citation, not a deletion.** Deleting the sentence would have left a bare assertion
+  ("terminal is our assumption") with nothing a student could check, and nothing stopping the next
+  session from re-deriving the same inference from the same paragraph. The screen now renders the
+  b.5(e) conditions verbatim beside the b.4 value quote (`CDI_ARMING_AIM`/`CDI_ARMING_SOURCE`), and
+  `CDI_SCALE_NOTE` states what those conditions do *not* settle: "what the AIM conditions it on is
+  an approach loaded and armed within 30 NM of the airport reference point, and how far you are from
+  a holding fix settles neither." `FULL_SCALE_NM`'s docblock records the withdrawal and that
+  re-tuning the window is no longer a reason to revisit the constant; the test comment records that
+  `MAX_DISTANCE_NM < 30` is a unit-slip guard only (it catches the dropped ÷ 60 that turns the window
+  into 360–600 NM) and not an avionics threshold.
+- Regression test: `does not offer the drill's distance as a reason for terminal scaling`
+  (`src/modules/entry-drill.test.ts`). It guards the **shape** of the correction, not the deleted
+  words: every `30 NM` in the rendered prose must be followed within 120 characters by its
+  airport/heliport reference point, and `sits well inside` may not reappear. Mutation-confirmed in
+  both directions — restoring the original sentence reds it, and so does the subtler mutation that
+  keeps the withdrawal's wording but strips `30 NM` of its reference point. The paragraph's `<cite>`
+  list is now asserted as `[FULL_SCALE_SOURCE, CDI_ARMING_SOURCE]` in order, so a quote rendered
+  without its source, or a source without its quote, fails.
+- **Accepted, unchanged:** the needle is still drawn on ±1 NM and is still pegged at 6–10 NM for
+  most headings (recorded as accepted in the overhead-fix correction above). What changed is only
+  the *justification* offered for the mode — the picture the student sees is the same one.
+
+- **Fixed: the `aria-label` omitted the HDG box, contradicting the contract written above it**
+  (`src/ui/hsi.ts`). The panel is `role="img"`, so the label is all a screen reader gets, and the
+  comment on the line above says so: "a field that reaches the panel and not this line is invisible."
+  The heading bug reached the panel and not the line. No shipping consumer was affected — the drill
+  parks the bug on the nose and the written-test figure omits it — but the omission was invisible to
+  the suite for the same reason the drawn bug angle needs `headingBug ≠ heading`: the test passed
+  `headingBug: 41` beside `heading: 41`, so `toContain(courseText(41))` was satisfied by the heading
+  alone and the bug field was never asserted. `HSIProps.headingBug`'s own docblock already records
+  this trap for the drawn angle; the label had the same hole one field over. Regression tests:
+  `names heading, bug, course, deviation, mode, fix, distance and sense` (now at
+  `headingBug: 120`, `heading: 41`, mutation-confirmed) and `omits the bug when no heading is
+  selected` for the suppression half.
+
+## Post-completion review fixes — 2026-08-08 (code review iteration 3)
+
+- **Fixed: the HSI announced a deflection side for a needle it drew dead centre** (`src/engine/nav.ts`,
+  `src/ui/hsi.ts`). At the reciprocal heading the aircraft sits **on** the course line, past the fix —
+  the outbound end of the same line `heading === course` puts it on. `courseDeviation` returned
+  `-1.1e-15` NM there rather than zero, because `Math.sin(PI)` is `1.2246e-16`, not `0`, and the
+  existing guard covered only the inbound end (`Math.sin(0)` is `+0`, whose product is `-0`). The
+  residual is negative, so `deviationText` fell past its `crossTrackNm === 0` branch and rendered
+  **"deviation 0.0 dots right"** — a side on an aircraft that has none, which is the exact reading the
+  function's own docblock and its test comment claim is impossible. The bar itself was drawn correctly
+  centred (`r2` rounds the offset to `cx`), so the panel and its `aria-label` described different
+  pictures, and `role="img"` means the label is *all* a screen-reader user gets: the one reading that
+  cannot be cross-checked against the drawing was the wrong one. **Reachable in the shipping drill** —
+  headings are integers and fixture inbound courses are multiples of 10 or 45, so 15 of the first 5000
+  seeds hit it (~1 in 360, i.e. most 20-question sessions); seed 648 renders heading 170 / course 350 /
+  9.1 NM and said "0.0 dots right".
+- **Fixed at both layers, because they are two different defects.** The oracle now states the geometry —
+  `offCourse === 0 || Math.abs(offCourse) === 180` is "on the course line", exact comparisons with **no
+  epsilon**, since off those two headings the cross-track is genuinely non-zero however small and a
+  tolerance would round a real displacement away. Separately, `deviationText` now chooses its wording
+  from the number it will **print** rather than from the raw cross-track, so its three wordings
+  partition the pictures the panel can draw.
+- **Fixed: an unpegged needle printed the peg's own count** (`src/ui/hsi.ts`). Rounding to the nearest
+  tenth turned 1.976 dots into `"2.0 dots"`, the full-scale number, for a bar measurably short of the
+  outer dot (0.988 NM of cross-track draws at 29.6 px against a dot at 30). "Full scale" is a *state* —
+  the docblock's "at least this far", drawn by the clamp — so the count it owns must not appear under
+  it. The printed tenths are now clamped to `DEVIATION_DOTS * 10 - 1`. Round-to-nearest is deliberately
+  **kept** rather than floored: `Math.sin(30°)` is `0.49999999999999994`, so flooring turns the exact
+  one-dot golden into `"0.9 dots"` (mutation M4 below fails on precisely that). 29 of the first 20000
+  seeds printed the peg count unpegged.
+- **Regression tests**, each mutation-confirmed against the specific defect it names:
+  `is exactly zero at BOTH ends of the course line, for every course` (`nav.test.ts`, swept over all
+  360 courses and asserted with `Object.is`, so `-0` fails too); the sibling golden
+  `heading = course + 180` upgraded from `toBeCloseTo(0, 10)` to `toBe(0)` — **the slack was the bug's
+  hiding place**, the same claim being pinned exactly at one end of the line and loosely at the other;
+  `announces no side at the far end of the course line, where the bar is centred` and
+  `never prints the peg count for a needle short of the peg` (`hsi.test.ts`), both drawn-against-
+  announced and both built from real shipping seeds (648 and 154); and
+  `reports a deflection below its own printed resolution as centred`, which is the one guard the
+  `nav.ts` fix does **not** reach — a genuine sub-tenth displacement — so the label layer's own
+  classification is load-bearing rather than fake coverage.
+- **Fixed: a stale test cross-reference** (`docs/content-audit.md`). The 2026-08-07 `aria-label` entry
+  cited `names heading, bug, course, fix, distance and sense when it has nav data`; the test is
+  `names heading, bug, course, deviation, mode, fix, distance and sense`. That entry's own Task 9 note
+  says names were harvested from source so every cross-reference resolves, "a stale name is worse than
+  none".
+
+## Post-completion review fixes — 2026-08-08 (code review iteration 4)
+
+- **Fixed: `role="img"` hid the entire learn-mode teaching aid from screen readers**
+  (`src/ui/hsi.ts`). The panel's `aria-label` docblock states the governing rule — "a screen reader
+  gets this whole string or none of the picture, so a field that reaches the panel and not this line
+  is invisible" — and then the two overlays the drill layers *on top* of the instrument, the entry
+  sector wedges and the 20° thumb band, reached the panel and not the line. Every other omission that
+  rule has caught was a readout duplicated somewhere else on screen; this one was not. In learn mode
+  the wedges and the band **are** the content, the drill prints no other description of them before
+  the answer, and `flyItText` only appears after it — so a screen-reader user got the instrument and
+  none of the aid the mode exists for. Not a rendering bug: `OVERLAY_ALPHA` and `OVER_WEDGE` are
+  carefully tuned so the wedges are legible, but every one of those measurements is about the sighted
+  case, which is exactly how the gap stayed invisible to the contrast suite.
+- The label now carries `overlayText(props)`, read **last** — the instrument is what the student is
+  graded on and the aid is layered over it. Sector boundaries ride the card, so they are magnetic and
+  go through `courseText` like any other bearing; the band is airframe-fixed, so its numbers are angles
+  off the nose and deliberately **do not** (`courseText` would pad `70` to `070°`, which reads as a
+  heading). The suppression half matters more here than usual and is asserted: the drill draws the
+  sectors only in learn mode or *after* the answer, so a label naming them on a graded question would
+  hand the answer to a screen-reader user alone.
+- **The band's `[70, 90]` is now single-sourced** as `THUMB_BAND_DEG`. It was about to exist twice —
+  drawn in `thumbBand`, spoken in `overlayText` — which is the drift class this repo keeps re-learning:
+  the label would go on announcing a band the card had stopped drawing. Mirroring to the 9 o'clock side
+  for a nonstandard hold stays in the drawing, the only place that needs card angles. Mutation-confirmed
+  as genuinely one source: widening the constant to `[60, 90]` fails the spoken assertion **and** the
+  three drawn-band assertions together (4 failures), which a second copy could not do.
+- **Fixed: the "every mark" paint sweep left two rendered letters unmeasured** (`src/ui/hsi.test.ts`).
+  `paints every mark in the colour palette.test.ts measures it as` closes the hole where `TIERS`/
+  `OVER_WEDGE` assume what each colour draws and nothing checks it — its docblock claims "Every mark
+  either map names, asserted against the DOM". It asserted neither the `HDG`/`CRS` captions nor their
+  digits. The captions are load-bearing: `valueBox`'s own docblock says they are *why* `pfd.bug` is
+  classified `text` rather than `graphic`. Repainting them `pfd.chrome` — a plausible "quieten the
+  caption" edit — ships two rendered letters at 3.38:1, an SC 1.4.3 failure, while `palette.test.ts`
+  goes on certifying `chrome` at its graphic tier and the whole suite stays green. No live defect: the
+  shipping paint was already correct, which is precisely why only a coverage assertion closes it.
+  Same "a scope narrower than the claim reads as coverage" pattern as the ICAO-citation glob.
+- **Regression tests**, each mutation-confirmed against the defect it names: `names the entry sectors
+  it shades` (fails when the spoken arc ends are reversed, and when a sector name is paired with
+  another sector's arc — reordering the list alone correctly does *not* fail it, since no label→arc
+  pairing changes); `names the thumb band on the side it draws it`, asserted on **both** turn
+  directions because the side is the whole point — a label saying "right" over a nonstandard hold's
+  left-side band teaches the shortcut backwards; `says nothing about overlays it does not draw`; and
+  the four caption/digit paint assertions added to the sweep above.
+- **Reviewed and not changed: `nav.fix` is interpolated into the SVG text node and the `aria-label`
+  without escaping** (`src/ui/hsi.ts`), and the result is assigned through `el.innerHTML`. There is no
+  injection path today and it is not a latent one by accident: every value reaching it comes from the
+  frozen fixture lists in `src/engine/clearance.ts` (`PUBLISHED_HOLDS`, `VOR_NAMES`, `NDB_NAMES`),
+  which the fixture-name convention already constrains to invented five-letter idents, and the app has
+  no server, no import path and no free-text field feeding a hold. Escaping now would buy nothing and
+  add a hand-written HTML escaper to a zero-dependency codebase. Recorded because the calculus flips
+  the moment a fix name becomes user-supplied — a "build your own hold" screen or an imported
+  clearance makes this stored XSS with nothing else in the way, and that change must bring escaping
+  or an ident whitelist with it.
+
+## Post-completion review fixes — 2026-08-08 (code review iteration 5)
+
+- **Fixed: the thumb band was painted in an entry colour** (`src/ui/hsi.ts`, `thumbBand`). The 20°
+  band was filled `PALETTE.pfd.entry.teardrop` at `OVERLAY_ALPHA.thumbBand = 0.9` — a near-opaque
+  mark in one of the three colours the whole screen uses as an entry code. The stated reason, carried
+  in the test comment, was that "teardrop is the entry the shortcut resolves". **It is not, in either
+  reading of the card**, and the module's own `THUMB_BAND_DEG` docblock says so: the band's nose-side
+  edge is the **direct/parallel** boundary. By the pointer-head rule the "entries" lesson teaches, a
+  course-pointer head inside the band's 70°–90° resolves **parallel** — converting `sectorArcs`
+  (`direct: c−70…c+110`, `teardrop: c+110…c+180`, `parallel: c+180…c+290`) from heading into
+  pointer-head angle `C − H` gives direct `(−110, 70)`, parallel `[70, 180)`, teardrop `[180, 250)`.
+  By the drawn wedges' rule it resolves nothing: the wedges are indexed by **heading** and ride the
+  card, the band is airframe-fixed, so the pair they cover drifts with the scenario. At
+  `heading === inboundCourse` — a direct entry — the band covers magnetic `[C+70, C+90]`, squarely
+  inside the **green** direct wedge, and occludes its outer rim (band radii `roseR`→`roseR−9` =
+  84→75; wedges run to `tickR` = 80, so 5 px of genuine overlap). Orange then means both "teardrop
+  sector" and "thumb marker" on one screen — the second colour code that
+  `keeps each entry colour the same hue on both instruments` exists to prevent, arriving by a route
+  that guard cannot see. Pre-existing on master; the palette split made it louder, not new (on the
+  white face the composite was a dark brown, on the near-black panel it is a bright orange at 8.83:1).
+- **The fix is a marker colour, in-palette.** The band is now `PALETTE.pfd.cardDim`: already
+  classified `graphic` in both `TIERS` and `OVER_WEDGE`, so it needs no new palette entry and no new
+  classification, and it composites to **5.47:1** against `pfd.face` at the same 0.9 — clear of SC
+  1.4.11's 3:1. `pfd.chrome`, the only other non-semantic colour, was measured and rejected at
+  **2.95:1**. No alpha changed, so nothing drawn over a wedge moves.
+- Regression test: `paints the thumb band in a marker colour, never an entry colour`
+  (`src/ui/hsi.test.ts`), mutation-confirmed by restoring the teardrop fill. The **negative** half is
+  the durable one — the band may carry no entry colour, whichever marker colour is chosen — and the
+  positive half only ties the drawn colour to the one `palette.test.ts` composites, which is the
+  drawn-vs-measured tie the `overlay paint` block exists for. `keeps the thumb band above the graphic
+  tier` (`src/ui/palette.test.ts`) now composites `cardDim`; it reads `hsi.ts` as source text only, so
+  without the DOM assertion the two would be free to describe different pictures again.
+- **Fixed: `CDI_ARMING_SOURCE` cited one outline level too shallow** (`src/modules/entry-drill.ts`).
+  It read `AIM 1-1-17 b.5(e)`, rendered in a `<cite>` on the drill's CDI footnote. Re-fetching
+  faa.gov/air_traffic/publications/atpubs/aim_html/chap1_section_1.html and walking the `<ol>`
+  nesting to the **leaf** puts the quoted sentence at path `[2, 5, 5, 3]` over levels one→four =
+  **b.5(e)(3)**. `b.5(e)` is the containing ~10-item list "Procedures for Accomplishing GPS
+  Approaches", so a student following the citation landed on the list rather than the sentence. The
+  claim was never false, only coarse — but sub-paragraph granularity is the convention the 2026-08-07
+  entry above rests on, and that entry's own `<ol>` walk stopped at the container. Amended in place.
+- **Fixed: two AIM distances folded into one cite** (`src/ui/hsi.ts`, `FULL_SCALE_NM` docblock, and
+  the 2026-08-07 ledger entry). "b.5(e) gives the other two modes **in one sentence** … and ramps to
+  ±0.3 NM approaching the FAWP" — the ±0.3 NM ramp is a *different* sub-item, **b.5(e)(5)**, and is
+  conditioned on **2 NM from the FAWP**, not on b.5(e)(3)'s 30 NM from the airport/heliport reference
+  point. Same shape as the inference withdrawn on 2026-08-07: two distances treated as one condition.
+  Docblock-only (nothing renders it), corrected rather than deleted so the next session does not
+  re-derive it.
+- Regression test: the depth assertion added to `cites the CDI scale beside the needle, with the mode
+  caveat outside the quote` (`src/modules/entry-drill.test.ts`), mutation-confirmed by flattening the
+  constant back to `b.5(e)`. It pins the **shape** — `/^AIM 1-1-17 b\.5\(e\)\(\d+\)$/` — not the
+  string, because the regression is collapsing to the container, and a `toBe` on the full literal
+  would fail for a re-verified sub-item too.
+- **Reviewed and not changed: "tracking direct to the fix" beside the panel's `OBS` annunciation**
+  (`src/modules/entry-drill.ts` scenario line vs `navStatus` in `src/ui/hsi.ts`). Raised as a fidelity
+  conflict — a G1000 Direct-To auto-slews the desired track, so a pilot reads "direct to" as
+  implying a centred CDI, yet the needle is pegged. Not a defect: "tracking direct to the fix"
+  describes the **ground track**, which is `courseDeviation`'s stated and load-bearing assumption, and
+  it is compatible with a manually selected course in OBS — that combination is exactly why the
+  annunciator says OBS rather than being decorative. The prose cannot be deleted without unstating the
+  oracle's assumption. Recorded so the wording is not "fixed" into something that stops stating it.
+
+## Post-completion review fixes — 2026-08-09 (code review iteration 6, entry answer-group branch)
+
+- **Fixed: two of the eight compass-card numerals were set as cardinals** (`src/ui/hsi.ts`, `labels`).
+  The treatment was chosen by `label.length === 1`, which is true of `'3'` and `'6'` as well as of
+  `N`/`E`/`S`/`W` — so 030° and 060° rendered at the bold 14 px letter face while `12`/`15`/`21`/`24`/
+  `30`/`33` rendered 12 px/400. The docblock two lines up states the intent ("cardinal letters,
+  numbers without the trailing zero elsewhere") and a real G1000 card sets all eight numerics alike.
+  Pre-existing on master (at the old 13/11 sizes), but inside the rewritten `labels()` and both
+  constants moved on this branch. Now `/^[A-Z]$/.test(label)`. Depiction fidelity, not an aviation
+  fact, so no `source` field — same class as the `GPS`/`OBS` annunciators.
+  Regression test: `sets the eight numerics alike and the four letters apart` (`src/ui/hsi.test.ts`),
+  mutation-confirmed by restoring the length test. Asserted as "the eight agree and differ from the
+  four" rather than against retyped px values, because the sizes have already changed once; the
+  third assertion is the non-vacuity half, since making *every* label identical also satisfies the
+  first two.
+- **Fixed: the plan-view instrument had no drawn-vs-measured paint tie** (`src/ui/mapview.test.ts`).
+  `hsi.test.ts`'s `paints every mark in the colour palette.test.ts measures it as` closed this hole
+  for the `pfd` half on 2026-08-08 and the `plate` half was left open. `palette.test.ts` reads
+  `mapview.ts` as **source text only**, so its scans are satisfied by any interpolated `PALETTE`
+  value: repainting the fix label or the north `N` with `plate.inkDim` ships two rendered letters at
+  **3.61:1** — an SC 1.4.3 failure — while the contrast suite goes on reporting `inkDim` compliant at
+  its 3:1 graphic tier. This branch also re-tiered `plate.readout` from `text` down to `graphic` on
+  the strength of a comment ("it drew the HSI's heading digits until the palette split"), so the
+  claim that it now draws only the flown polyline was load-bearing and unasserted.
+  Regression tests: three, under `paint (every mark in the colour palette.test.ts measures it as)`.
+  Mutation-confirmed twice — the north `N` repainted `plate.inkDim`, and the flown track repainted
+  `plate.ink` — each reds exactly one.
+- **Fixed: the `OVER_WEDGE` "`pfd.chrome` is never over a tint" premise was pinned to a constant that
+  moves with it** (`src/ui/hsi.test.ts`). The guard was `expect(Number(r)).toBeCloseTo(LAYOUT.tickR)`,
+  but the wedge is *drawn at* `LAYOUT.tickR`, so raising that constant to `roseR` moves both sides
+  together: the card ring then renders over a tint at **1.96:1**, SC 1.4.11, with the assertion that
+  exists to prevent it still passing. This is the documented trap — "guarding a constant needs an
+  assertion whose value moves with it" — reappearing in the guard written to close a different half
+  of it. The premise is a relation between two *rendered* radii, so both now come off the DOM
+  (`.hsi-card-ring`'s `r` vs the wedge path's). Mutation-confirmed at `tickR: 84`.
+- **Fixed: `OVERLAY_ALPHA.thumbBand`'s "occludes rather than tints" premise had no floor**
+  (`src/ui/palette.test.ts`, `src/ui/palette.ts`). The band is excluded from `OVER_WEDGE` because at
+  0.9 it *hides* the marks in its 20° arc, and its docblock warns "lower this materially and that
+  stops being true". Nothing asserted it, and the existing `keeps the thumb band above the graphic
+  tier` cannot: the band gains contrast as the alpha **rises**, so that assertion passes all the way
+  down to 0.6 while the ticks and card ring under the band come back as half-visible ghosts nothing
+  measures. At 0.7 the major ticks read **2.52:1** through it. New guard `hides the card marks it
+  covers rather than half-tinting them` states the claim as a ceiling on what still shows through
+  (`OCCLUSION_CEILING = 1.5`): deliberately **not** an SC threshold — the requirement here is the
+  opposite of legibility — and, like `TINT_FLOOR`, a chosen number the values it must reject fail.
+  Passes today at 1.36:1 (the white major ticks are the loosest), reds at 0.8. Mutation-confirmed.
+  The docblock's "washing them to ~1.15:1" was also wrong for the brightest mark and now gives the
+  measured range, 1.12:1 (chrome) – 1.36:1 (white major ticks).
+- **Fixed: the answer-group invariant was guarded on one side only** (`src/styles.test.ts`,
+  `src/modules/entry-drill.test.ts`, CLAUDE.md). The design is "the gap above the group exceeds the
+  gaps inside it", and only `margin-top >= 3 × gap` was asserted. Raising `.entry-answers-label`'s
+  `margin-bottom` to the separation re-attaches the label to the panel and splits it from the row it
+  names — the same grouping defect arriving from below, with the ratio still passing. Separately,
+  the ratio only closes the defect while the element above the label *is* the instrument, which is a
+  DOM fact no stylesheet assertion can see: slipping a hint line between them, or moving the panel,
+  puts the buttons flush against the G1000 rect again with both guards green. Now
+  `margin-bottom < gap` in the stylesheet guard and `label.previousElementSibling === .entry-hsi` in
+  the DOM one. Both mutation-confirmed.
+- **Amended: the stated reason `remValue` throws was inverted** (`src/styles.test.ts` docblock and
+  CLAUDE.md). Both said a `NaN` return "would leave both comparisons false and the test green". It
+  would not: `toBeGreaterThan`/`toBeGreaterThanOrEqual` **fail** on `NaN`, so a NaN parse reds the
+  suite — and the same file said so correctly 250 lines further down. The throw's real value is
+  refusing a foreign **unit**: a *lenient* parse is the green-test hazard, since `margin-top: 24px`
+  against `gap: 0.5rem` compares 24 to 1.5 and clears `3 × gap` sixteenfold while the drawn gap is
+  smaller than the buttons' own. Recorded because CLAUDE.md's own rule is that a comment
+  misattributing which assertion catches which failure mode argues the next session into deleting
+  the part that works — here, the rem-only regex.
+- **Amended: CLAUDE.md's `renderHSI` prop inventory undercounted the entry drill** (CLAUDE.md). It
+  listed `heading`, `course`, `headingBug`, `nav` and stopped; `drawHSI` also passes `thumbOverlay`
+  in learn mode and `sectorOverlay` in learn mode or once an answer is graded. Read as the definitive
+  contract inventory the bullet is written to be, that says the two overlays have no production
+  caller — they are the whole learn-mode teaching aid and the reason `OVERLAY_ALPHA`'s ceiling/floor
+  tuning and `OVER_WEDGE` exist. Same class of under-count the bullet itself was written to correct.
+- **Fixed: the answer-group plan's manual step named a route that does not exist**
+  (`docs/plans/20260809-entry-answers-grouping.md`). It said "open `#/entry`"; the registered path is
+  `entry-drill` and `entry` is the drill's **store id** — the two-namespaces-one-string confusion
+  CLAUDE.md flags for drill ids. That step carries the sub-points explicitly recorded as unverified,
+  so it is the instruction a later session actually follows, and it landed on the router's
+  unknown-route path.
+- Also corrected: CLAUDE.md cited `leaves the pointer’s centre empty…` with an ASCII apostrophe while
+  the test title uses a typographic one, so a literal grep of the name returned nothing.
+- **Considered and not changed.** (a) The dot loop's `(i / DEVIATION_DOTS) * FULL_SCALE_NM *
+  PX_PER_NM` is algebraically `i * DOT_SPACING`, but the round trip is what keeps the dots on the
+  same NM scale as the bar rather than on `DOT_SPACING` alone; the redundancy is the coupling.
+  (b) `hueOf`'s two inner modulo guards are identities over the reachable range — it is the canonical
+  HSL formula and re-deriving a tested numeric oracle for cosmetics is churn. (c) `written-test.ts`'s
+  figure sits above `.written-options` with the same 0 px-to-panel geometry; the plan scoped other
+  screens out deliberately, so it stays a follow-up decision rather than a silent scope widening.
+  (d) The completed plan was **not** moved to `docs/plans/completed/` — the review loop reads it at
+  its current path, so archiving is the step after review closes, not part of it.
+
+## Post-completion review fixes — 2026-08-11 (code review iteration 7, entry answer-group branch)
+
+Five-agent review of `master..HEAD`. Nothing user-visible was wrong this round; every finding is a
+guard whose premise was unasserted, a comment that misattributed which assertion catches which
+failure, or a doc claim the branch had outgrown. All mutation-confirmed before being trusted, per the
+CLAUDE.md rule.
+
+- **Fixed: the answer-group spacing guard could not see the cascade** (`src/styles.test.ts`). This is
+  the branch's headline invariant and it is asserted against stylesheet *text* precisely because
+  jsdom cannot compute the cascade — but `ruleBlock` returned the **first** rule matching a selector
+  and `remValue` the **first** declaration of a property, while a browser resolves the **last** of
+  each. Three ordinary edits therefore changed the rendered spacing with the named guard green and
+  the buttons back flush against the G1000 rect: a second `.entry-answers-label` rule appended lower
+  in the sheet, a `margin: 0` written after `margin-bottom` inside the existing rule, and a
+  `column-gap: 0` after `gap` in `.entry-answers`. Fixed by collecting **every** matching rule in
+  source order, reading the last declaration, and refusing outright when the last member of a
+  property's family is a shorthand (`margin`/`margin-block`/`margin-block-start` for `margin-top`,
+  `row-gap`/`column-gap` for `gap`) — expanding shorthands is a CSS parser's job and one more thing
+  to get quietly wrong, so the guard fails loudly instead. The rule boundary is now a **lookbehind**:
+  one rule's closing `}` is the next rule's boundary, and a match that consumes it leaves the rule
+  right after it unmatchable, which is the repeated-selector case itself. That boundary also closes a
+  fourth, pre-existing misread the docblock never named — a *descendant* rule (`.foo .entry-answers`)
+  whose declarations apply only inside `.foo` was harvested as if it were the rule itself. All four
+  mutations now red the suite; each passed before.
+- **Fixed: `mapview.test.ts`'s new paint block rendered at describe scope.** `renderMap` validates its
+  input and throws, so a future tightening lands during **collection**: the file reports
+  `(0 test)` and all 31 guards in it — the parallel-entry oracle checks included — go silent under an
+  error naming none of them. This is verbatim the hazard recorded for `tints()` in `palette.test.ts`
+  on 2026-08-08 ("a red suite that names nothing is not a guard"). Moved into a function.
+- **Fixed: `OVER_WEDGE` claimed the heading bug is drawn over a sector wedge** (`src/ui/palette.test.ts`).
+  The notch rides the card's *outer* edge (radii 84.1–91.4) and the wedges stop at `LAYOUT.tickR` = 80,
+  so by the map's own rule it belongs at `null`, like `pfd.chrome`. Over-strict rather than unsafe, but
+  the map is documented as exhaustive claims about the drawing, and a false premise in it is what the
+  next tuning session reasons from. Re-classified, and the premise is now pinned to the picture:
+  `sits on the outer edge of the card, where the lubber reads` measures the notch against a **rendered**
+  wedge radius, not against the constant the wedge is drawn from.
+- **Fixed: every drawn instrument dimension was pinned only against zero.** `draws the bar as a
+  visible needle` asserted `bottom - top > 0`, which a 4-unit stub on a 168-unit card satisfies;
+  `BAR_HALF_LEN 30 → 2` passed the whole suite. Now measured against the aircraft symbol's own span,
+  which is the claim that symbol's docblock makes ("the deviation bar reads across it"), drawn-vs-drawn
+  so rescaling the panel moves both sides together. Same hole closed for two more marks whose scale is
+  teaching content, not decoration: the 10°/5° tick distinction (`MINOR_TICK → MAJOR_TICK` and a single
+  stroke-width both passed 758/758, erasing the card's two readings), and the thumb band's **radial
+  span** — `palette.test.ts` exempts the band from `OVER_WEDGE` on the grounds that it occludes "the
+  outer half of both tick weights", and a band thinned to `roseR - 1` crosses no tick at all, leaving
+  that whole premise measuring a picture the panel does not draw.
+- **Fixed: the nav status line's "below the card" bound was on the text baseline.** SVG text grows
+  upward from `y`, so `STATUS_Y = 208` — glyph tops at ~200, through the bottom compass ticks at 202 —
+  passed a bare `y > cy + roseR`. Now the glyph box clears the card, with the font size read off the
+  rendered node.
+- **Fixed: `deviationText`'s lower boundary was unpinned.** The nearest cases print `tenths` of 0, 10
+  and 19; nothing exercised 1, so widening the guard to `tenths <= 1` announced a real, drawn
+  deflection as "centred" with the suite green — the same class as the `1.976 → "2.0 dots"` defect the
+  upper clamp exists for. Added `names the smallest deflection it can print, one tenth of a dot`
+  (1 NM, 2.87° off course → 0.0501 NM), which also asserts the bar is visibly off centre.
+- **Amended: `hsi.test.ts`'s far-end-of-the-course-line comment claimed it binds both layers.** It
+  said "drawn-against-announced, so it binds whichever layer regresses". It does not: deleting
+  `Math.abs(offCourse) === 180` from `courseDeviation` leaves the whole HSI file green, because the
+  1.1e-15 NM residual is rounded onto the centreline by `r2` and into "centred" by the label's tenths.
+  The engine-side guard is `is exactly zero at BOTH ends of the course line, for every course` in
+  `nav.test.ts` (verified: the only two failures on that mutation). Recorded because a comment that
+  misattributes which assertion catches which failure argues the next session into deleting the one
+  that works.
+- **Amended: CLAUDE.md had outgrown three of its own claims.** (a) The `aria-label` inventory listed
+  the deviation reading and `GPS OBS` but not the two learn-mode overlays, which `overlayText` now
+  appends — the same under-count the bullet corrected one clause earlier for the prop list. (b) "So
+  overlays need a **floor**" over-generalised from `sectorFill` to `thumbBand`, whose binding bound
+  runs the *other* way: it gains contrast as its alpha rises and passes down to 0.6, so what holds it
+  up is `OCCLUSION_CEILING`, not a floor. A session lowering the band for legibility would have found
+  only "raise it" advice. (c) The drawn-vs-measured tie was credited to `hsi.test.ts` alone, after
+  iteration 6 added the `plate` half in `mapview.test.ts` — and by this repo's own "guarding two of
+  three leaves the third free to go stale" rule, naming one carrier invites the other's deletion.
+- **Amended: the plan's Task 4 recorded a verification its own branch falsified.**
+  `docs/plans/20260809-entry-answers-grouping.md` carried "**No `docs/content-audit.md` entry** …
+  (verified untouched)" and a scope line reading "do not touch `hsi.ts`"; iteration 6 did both. The
+  rule remains right *for the answer-group defect* — this is a layout change and teaches nothing wrong
+  about holding entries — but it was written as a claim about the whole branch. Amended in place with
+  the counter-fact and a scope note listing the five files the review loop added, rather than edited
+  past.
+- **Considered and not changed.** (a) The `nav.fix` interpolation into the HSI `aria-label` is
+  unescaped, but every call site passes an ident from a fixture list and no user input reaches it —
+  escaping it now would be guarding a path that does not exist. (b) The dot loop's cancelling
+  constants, declined again for the reason recorded in iteration 6: the round trip states that a dot
+  marks a fraction of *full scale*, which is the aviation meaning, where `i * DOT_SPACING` states only
+  a layout. (c) The course-pointer radii written as `LAYOUT.tickR - k`: the one with a real constraint
+  (`POINTER_STEM` vs `BAR_HALF_LEN`) is already guarded by `leaves the pointer’s centre empty…`, which
+  reds if the gap ever closes on the bar, so the finding is a readability preference on a file this
+  plan scoped out. (d) The spacing guard cannot see its containing block — if `.entry-drill` ever
+  becomes a flex column with a `gap`, margins stop collapsing and the `margin-bottom < gap` half
+  silently stops meaning what it says. Left as a stated assumption in the test comment rather than a
+  conditional assertion that is vacuous today, which is the fake-coverage shape this ledger has
+  rejected before.
+- **Fixed: the tightest composite on the PFD was measured nowhere, and the docblock named a ceiling
+  that would have shipped an SC 1.4.11 failure** (`src/ui/palette.ts`, `src/ui/palette.test.ts`,
+  `src/ui/hsi.test.ts`). Learn mode draws **both** overlays: `thumbBand()` is emitted after `</g>`
+  closes `.hsi-rose`, so it paints *over* the sector wedges, and its annulus `roseR`→`roseR − 9`
+  (84→75) overlaps the wedges' `tickR` (80) across 75–80. The sectors sum to 360°, so there is no
+  heading at which the nose sits over bare face — the composite renders on every learn-mode scenario.
+  Measured: 3.38 / 3.41 / 3.77:1 on the direct / teardrop / parallel tints, against the 3.79:1 minor
+  ticks that `OVERLAY_ALPHA.sectorFill`'s docblock called "the tightest of them … what fixes the
+  ceiling". It is not: 3:1 falls at `sectorFill` ≈ 0.29, not the documented 0.32. The values shipping
+  today are legal (3.38 > 3), so nothing renders wrong — the defect is that the **bound** was wrong
+  and the case that sets it was invisible. Confirmed by mutation: at the docblock's own 0.32 the band
+  renders at 2.79:1, and before this fix the whole suite stayed green, because
+  `keeps the thumb band above the graphic tier` composites against the **bare face** (5.47:1) and
+  `OVER_WEDGE` excludes `pfd.cardDim`'s band role on grounds argued only about the marks *under* the
+  band. Two assertions, not one, because they bound different constants and neither implies the
+  other: the bare-face reading *gains* contrast as `thumbBand` rises, the over-a-tint reading *loses*
+  it as `sectorFill` rises.
+- Regression test: `keeps the thumb band above the graphic tier over a tinted sector`
+  (`palette.test.ts`), which also asserts the over-tint reading is the tighter of the two so it
+  cannot degrade into a restatement of the bare-face one; plus
+  `is painted over the sector wedges, not under them` (`hsi.test.ts`), the drawn-vs-measured tie —
+  SVG has no z-index and the band's paint order is a **cross-group** fact, so moving `thumbBand()` in
+  among `.hsi-rose`'s children inverts the picture with every ratio `palette.test.ts` prints
+  unchanged. The radial-overlap half of the premise was already pinned by `is thick enough to cover
+  the card marks palette.test.ts says it hides`. Mutation-confirmed: `sectorFill: 0.32` reds only the
+  new palette test; relocating `thumbBand()` inside the rose group reds only the new HSI test.
+- **Fixed: `ruleBlock`'s at-rule handling was fail-open, and its docblock promised the opposite**
+  (`src/styles.test.ts`). The scan's body group is `[^}]*`, which cannot cross a `}` but happily
+  crosses a `{`, so an `@media` match runs to the **first** inner `}` and swallows the rule nested
+  there into the at-rule's own body — never matched, never collected, silently dropped. A
+  narrow-width `@media` override of `.entry-answers-label`'s `margin-top` therefore left
+  `separates the answer group from the instrument above it` green on a length that no longer renders,
+  and a narrow width is exactly where the row and the panel converge: the plan's own Task 3(d) names
+  it "the worst case for this defect" and leaves it manually unverified. Position-dependent as well —
+  a *second* nested rule for the same selector **is** matched, and is then read as though it applied
+  at every width — so which line of the media block someone typed on decided which way the guard was
+  wrong. The docblock claimed at-rules were concatenated "unconditionally" and that the guard "errs
+  toward failing rather than passing"; false in both directions, and the more dangerous half, since it
+  told the next session that the one edit reaching the defect was already covered. Now refused rather
+  than parsed — `@media`/`@supports`/`@container`/`@layer` throw — which is the rule this helper
+  already applies to specificity conflicts: what the model cannot resolve, it throws on. `styles.css`
+  carries no at-rule today, so nothing else moves.
+  **⚠️ Amended 2026-08-11 — the diagnosis was right and the fix was too narrow.** The swallow is a
+  property of the body group, not of at-rules, so matching on the four **names** left native CSS
+  nesting (`.entry-drill { & .entry-answers-label { margin-top: 0 } }`) and `@scope` walking straight
+  through it: same silent drop, same green ratio, no keyword to match on — and nesting is now the
+  default idiom for writing CSS, i.e. the *likelier* edit of the two. Calling the at-rule "the fifth
+  mechanism and the only fail-open one" repeated the same over-claim this entry corrects, one level
+  down. See the 2026-08-11 correction below; the refusal is now on the shape (`{` in a harvested
+  body), which covers every spelling at once.
+- Regression test: `refuses a conditional group rule rather than reading past it`, covering both the
+  swallowed-first-rule and harvested-later-rule shapes, and non-vacuous in both directions (a flat
+  sheet still reads 1.5rem; a comment merely *naming* `@media` does not red the suite, since the
+  refusal is tested against comment-stripped text). Mutation-confirmed: deleting the refusal reds
+  only this test. **⚠️ Renamed 2026-08-11** to `refuses a nested style rule rather than reading past
+  it`, and widened — the at-rule cases alone could not fail on the two shapes that escaped.
+- **Amended: the trailing-boundary comment in `ruleBlock` named the wrong failure mode**
+  (`src/styles.test.ts`). It read that `(?![\w-])` "stops `.entry-answers` claiming
+  `.entry-answers-label`'s block". It does not — block collection is `member === selector`, exact
+  string equality, so the longer name was never a candidate with or without the lookahead. What the
+  lookahead actually bounds is the specificity **throw**: without it every `-label` sibling is read as
+  an unresolvable conflict and the guard refuses a sheet it could have read. The mechanism is real and
+  mutation-reds the test, which is why this is an amendment and not a removal — but by this ledger's
+  own standard a comment that misattributes which mechanism catches which failure argues the next
+  session into deleting the one that works, and here it would have sent a reader hunting a substring
+  bug that exact match already precludes.
+
+## Post-completion review fixes — 2026-08-11 (code review iteration 8, entry answer-group branch)
+
+- **Fixed: `ruleBlock` refused an at-rule *name list*, but the fail-open swallow needs no at-rule**
+  (`src/styles.test.ts`). Iteration 7 closed `@media`/`@supports`/`@container`/`@layer` by name and its
+  docblock called the conditional group rule "the only fail-OPEN one". It is not the only one: the
+  mechanism is the body group `[^}]*`, which cannot cross a `}` but crosses a `{` freely, so **any**
+  nested style rule is swallowed into its parent's body and dropped. Native CSS nesting carries no
+  keyword to match on, and `@scope`/`@starting-style` were in no list. Both escapes were reproduced
+  against the real stylesheet: appending
+
+  ```css
+  .entry-drill { & .entry-answers-label { margin-top: 0; } }
+  ```
+
+  left `styles.test.ts` at 15/15 green with the answer buttons rendering flush against the G1000 panel
+  again — the exact defect the ratio guard exists to catch, reached by the edit a reader is *most*
+  likely to make, since nesting is the modern default idiom. `@scope (.entry-drill) { … }` did the
+  same. The refusal is now on the **shape** — a harvested body that still contains a `{` — which
+  subsumes all four at-rules, native nesting, `@scope` and `@starting-style` in one mechanism instead
+  of enumerating spellings. The name list is gone rather than kept alongside: everything it caught
+  that the shape does not (a blockless `@layer a, b;`, an empty `@media print {}`) swallows nothing
+  and changes no rendering, so keeping it would have left a branch no case could red — this ledger's
+  own fake-coverage standard. Over-refusal is accepted and documented: a `@keyframes` added anywhere
+  in the sheet now throws here though it cannot touch this rule. A false red costs a minute; a false
+  green is the defect. `styles.css` has 88 rules and 88 open braces — no nested bodies — so nothing
+  else moves.
+- Regression test: `refuses a nested style rule rather than reading past it` (renamed from
+  `refuses a conditional group rule …`), now table-driven over five shapes — `@media` swallowed,
+  `@media` harvested-later, `@supports`, native nesting, `@scope` — the last two being the ones that
+  shipped past the name-matching version. Non-vacuous in both directions: a flat sheet still reads
+  1.5rem, and a *comment* drawing the nested shape it refuses does not red the suite, since the scan
+  runs on comment-stripped text. Mutation-confirmed: deleting the refusal reds only this test;
+  appending either escape to the real `styles.css` reds
+  `separates the answer group from the instrument above it` with a legible message naming the prelude.
+- **Fixed: `remValue` read past a losing `!important`** (`src/styles.test.ts`). Its model is
+  last-declaration-wins, and `!important` is the one thing source order does **not** decide — it beats
+  every normal declaration of the same property in the same origin, whatever follows it. Since
+  `ruleBlock` concatenates every rule for the selector, an earlier
+  `.entry-answers-label { margin-top: 0 !important }` renders 0 while the read went on reporting the
+  1.5rem below it: fail-open, same class as the nesting hole and in the same helper. Now refused, like
+  the shorthand-override case beside it. On the *winning* declaration it already threw, but with a
+  message about notation (`1.5rem !important` is not a rem length) rather than about the cascade.
+- Regression test: two cases in `resolves a property the way the cascade does: last declaration wins`
+  — the loser (green before the fix) and the winner. Mutation-confirmed: deleting the refusal reds
+  only that test.
+- **Fixed: the answer label's "not screen-reader-only" assertion could not see the technique it
+  named** (`src/modules/entry-drill.test.ts`, `src/styles.test.ts`).
+  `expect(label.hidden, 'the label is visible, not a screen-reader-only name')` reads the HTML
+  attribute and nothing else; every sr-only idiom is CSS (`display: none`, `position: absolute` +
+  `clip`), so each passed it. That matters beyond wording: an out-of-flow label leaves `.entry-answers`
+  following `.entry-hsi` with nothing between them — buttons flush against the panel again — while the
+  ratio guard still compares 1.5rem to 0.5rem and passes, a margin on an element that separates
+  nothing. The DOM message now says what it checks, and the missing half is asserted where it is
+  visible: `separates the answer group from the instrument above it` refuses a `.entry-answers-label`
+  rule declaring `display: none` or `position: absolute|fixed`. Mutation-confirmed: adding
+  `position: absolute` to that rule reds it.
+  - ⚠️ **Amended 2026-08-11 (iteration 9):** that refusal was a *value* list and the list was not
+    closed. `display: contents` generates no box — the text stays, the margin goes — so it takes the
+    label out of flow through a declaration this guard permitted, and `display: contents` appended to
+    `.entry-answers-label` left the ratio green with the buttons flush against the panel. The refusal
+    is now on the **property**: no `display` and no `position` on that rule at all. See the correction
+    entry below.
+
+## Post-completion review fixes — 2026-08-11 (code review iteration 9, entry answer-group branch)
+
+- **Fixed: `ruleBlock` matched selector *text* where the cascade matches *elements*, so any rule
+  reaching the label without naming its class was invisible** (`src/styles.test.ts`). Every mechanism
+  the helper had — exact-member collection, the `(?![\w-])` boundary, the subject-contains-the-selector
+  throw, all-matching-rules, the nested-rule refusal — asks a question about the string
+  `.entry-answers-label`. A rule that never writes that string was neither collected (so its
+  declarations were not read) nor refused (so nothing said the guard could not resolve it): silently
+  absent, i.e. fail-open. Four vectors were reproduced against the real `styles.css`, each leaving
+  `separates the answer group from the instrument above it` reporting `margin-top: 1.5rem` against
+  `gap: 0.5rem` while a browser renders something smaller:
+
+  ```css
+  .entry-drill p    { margin: 0.35rem 0 }   /* (0,1,1) beats (0,1,0) — 5.6 px vs an 8 px gap */
+  #entry-answers-label { margin-top: 0 }    /* (1,0,0) */
+  .entry-drill > *  { margin: 0 }           /* (0,1,0) tie, later in source order */
+  .entry-drill div  { gap: 0 }              /* the row's half of the ratio */
+  ```
+
+  The first is not hypothetical: `.foo p { margin }` is this stylesheet's own idiom for `<p>` margins
+  (`.entry-feedback p`, `.written-report p`, `.tofrom-feedback p`, and `.lab-debrief li` alongside),
+  so it is the likeliest future edit to this section. The second is reachable only because this branch
+  added the id — `aria-labelledby` needs one — and `#app` shows the sheet already selects on ids. That
+  is the 0-ish : 1 spacing defect the whole branch exists to close, restored with the suite green.
+- Fix: `ruleBlock` now takes a `context` naming the *other* ways a rule can reach the element — the
+  simple selectors it carries itself (`also`: `p`, `#entry-answers-label`) and the ones its ancestors
+  carry (`within`: `.entry-drill`, `section`, `div`, `#app`, `body`, `html`) — and refuses any member
+  whose subject is drawn from `also` (or `*`), whose ancestor compounds are drawn from the union, and
+  whose specificity ties or beats a single class's (0,1,0). Those are DOM facts no stylesheet
+  assertion can check, so they are pinned in `entry-drill.test.ts` by
+  `carries only the names the stylesheet guard is told about` (tag, id, exact class list, and the
+  parent being `section.entry-drill`) — a context that drifts from the markup would re-open the hole
+  silently. Specificity is compared, not ignored, and the comparison is load-bearing in **both**
+  directions: refusing everything that *could* match reds the live `p { color: var(--text-dim) }`
+  (0,0,1, which genuinely loses), and ignoring the ancestor compounds reds `.entry-feedback p`, which
+  cannot reach the label at all. Ancestors are matched loosely — any ancestor, any order — because the
+  tight version is a selector engine; looseness only ever over-refuses.
+  **Amended 2026-08-11:** this sentence originally read "any ancestor, any **combinator**, any order",
+  which was false in the fail-*open* direction — a `+`/`~` compound names a sibling, never an
+  ancestor, so it was resolved against the wrong set and silently vanished. Superseded by the
+  correction entry below, not deleted.
+- Regression test: `refuses a rule that reaches the element without naming its class`, three refusals
+  (descendant type, id, universal child) and three non-vacuity cases (a losing bare type rule, a
+  descendant rule under an ancestor the element does not have, and the empty-context default where
+  only `*` can reach). Mutation-confirmed: deleting the refusal reds only the new test; making it
+  specificity-blind and dropping the ancestor check each red **both** it and the real-stylesheet
+  ratio; and each of the four CSS overrides above, appended to `styles.css`, now reds the ratio with
+  a message naming the offending prelude.
+- **Fixed: the in-flow refusal was a value list, and `display: contents` was not on it**
+  (`src/styles.test.ts`). Iteration 6 refused `display: none` and `position: absolute|fixed` — the two
+  spellings it had thought of. `display: contents` keeps the label's text and generates no box, so its
+  `margin-top` renders nothing and `.entry-answers` returns flush against the G1000 rect, with every
+  number in the ratio still reading 1.5rem against 0.5rem. Which `display` values still generate an
+  in-flow box is a question this guard would have to model, and the label needs neither property, so
+  both are now refused outright: no `display`, no `position`, on that rule. Same trade as the nested
+  rule's shape refusal — a harmless `display: block` now reds, which costs a minute, against a false
+  green that ships the defect. Mutation-confirmed: `display: contents` on `.entry-answers-label` reds
+  the ratio.
+- Amends the 2026-08-09 entry above (iteration 6) in place; the "refuses `display: none` or
+  `position: absolute|fixed`" wording there is superseded, not deleted.
+- **Recurring pattern, recorded because it is now three for three:** each version of this helper's
+  docblock enumerated the spellings it knew and called the list closed — at-rules "err toward failing
+  rather than passing", then the conditional group rule as "the only fail-open one", then "every way
+  of leaving it is loud". The over-claim is the more dangerous half of each bug: it tells the next
+  session the one edit that reaches the defect is already covered. State the mechanism, not the
+  enumeration.
+- Reviewed and **not** changed: `.written-figure` in `src/modules/written-test.ts` renders the same
+  viewBox-filling panel directly above `.written-options` (`gap: 0.5rem`, no separating margin) — the
+  identical 0 px-to-panel defect, on the panel's second consumer. Out of this plan's scope, already
+  recorded as a deferral, and left as an open item rather than fixed here.
+- Reviewed and **not** changed: `nav.fix` is interpolated unescaped into `renderHSI`'s markup and into
+  its `aria-label`. Every caller passes a value from a static fixture list, so it is not reachable
+  today; escaping only this one interpolation while the rest of the app builds `innerHTML` the same
+  way would be inconsistent rather than safer.
+
+## Post-completion review fixes — 2026-08-11 (code review iteration 10, entry answer-group branch)
+
+- **Fixed: `ruleBlock`'s new `context` resolved *names*, and read a non-name token as proof of a
+  non-match** (`src/styles.test.ts`). Iteration 9 closed the "reaches the element without naming its
+  class" hole by resolving each compound against a set of names the DOM test asserts exhaustively.
+  `reaches` was `parts.every(part => part === '*' || names.has(part))`, and its comment called that
+  "sound only because `context` is asserted complete against the DOM". Completeness is a claim about
+  **names** — a tag, an id, a class. A compound may instead carry a **condition**: `:nth-of-type(4)`,
+  `:not(.x)`, `[id]`, `:first-child`. A set of names cannot decide a condition, so its absence from
+  `context` proved nothing, yet it was read as "cannot match" — the compound was neither collected nor
+  refused, i.e. the same fail-open one level in, reached by one more spelling. Five escapes were
+  reproduced against the real `styles.css`, each leaving `separates the answer group from the
+  instrument above it` reporting `margin-top: 1.5rem` against `gap: 0.5rem` at 16/16 green with the
+  answer buttons rendered flush against the G1000 panel:
+
+  ```css
+  .entry-drill p:nth-of-type(4) { margin-top: 0 }  /* (0,2,1); the label is the 4th <p> */
+  .entry-drill p:not(.nope)     { margin-top: 0 }  /* (0,2,1); matches every <p> there */
+  .entry-drill > *:first-child  { margin: 0 }      /* (0,2,0) */
+  p[id]                         { margin-top: 0 }  /* (0,1,1); the id exists for aria-labelledby */
+  .entry-drill div:last-of-type { gap: 0 }         /* the row's half of the ratio */
+  ```
+
+  The first two are not hypothetical: `:nth-of-type`/`:not` are the ordinary way to reach one `<p>` in
+  a stack of them, and this section is exactly a stack of them (`.entry-clearance`, `.entry-chart`,
+  `.entry-scenario`, then the label).
+- Fix: `reaches` now splits its tokens. A **name** (`/^[.#]?[\w-]+$/`) is decidable and an unlisted one
+  still proves a non-match; `*` matches anything; every other token is undecidable and **does not
+  block**, so the compound counts as reaching the element and the existing specificity throw refuses
+  it. Over-refusal is the accepted direction and the staleness is loud — the next bare pseudo-class
+  rule added to this sheet throws here until someone answers it. `Context.denies` is that answer, for
+  the two bare-condition subjects the sheet already has (`:root`, `[hidden]`), and it is a **DOM
+  assertion** rather than a convenience: `carries only the names the stylesheet guard is told about`
+  in `entry-drill.test.ts` now also asserts `!label.matches(sel)` and `!answers.matches(sel)` for
+  each. Without that pin, `denies` is the old fail-open with a list in front of it. It answers the
+  **subject** only — an ancestor's conditions are facts about *other* elements, and `:root p`
+  genuinely reaches the label (`html` is an ancestor of everything), so a denial must not silence it.
+- Regression test: `refuses a rule that reaches the element through a condition, not a name` — four
+  refusals (structural pseudo, negation, universal + pseudo, attribute) and four non-vacuity cases (a
+  `denies`-answered `:root`/`[hidden]` pair reading 1.5rem, the *unanswered* form of the same pair
+  throwing, a condition on a name the element does not carry staying invisible, and `:root p` still
+  throwing under a denial). Mutation-confirmed: restoring the one-line name-set read reds **only** the
+  new test, and each of the five CSS escapes above, appended to the real `styles.css`, now reds the
+  ratio with a message naming the offending prelude.
+- **Fixed: the band's occlusion list omitted the sector wedges under a comment claiming to be
+  exhaustive** (`src/ui/palette.test.ts`). `hides the card marks it covers rather than half-tinting
+  them` is the whole justification for `thumbBand` being exempt from `OVER_WEDGE` — at 0.9 it occludes
+  rather than tints, so the marks under it need no measuring. It looped over
+  `['card', 'cardDim', 'chrome']` under the comment "Every mark the band's radii cross". The band's
+  annulus is `roseR → roseR − 9` (75–84) and `sectorOverlay` strokes each wedge **opaque** in
+  `PALETTE.pfd.entry.*` out to `tickR = 80` along two radial edges and around the arc, with the band
+  painted over it (`is painted over the sector wedges, not under them`) — so the wedge boundaries are
+  under the band exactly as the ticks are, and were the one covered group nothing measured. No live
+  defect: at 0.9 the loosest entry colour reads 1.25:1 against `OCCLUSION_CEILING = 1.5`. The exposure
+  was a brighter entry colour or a lowered `thumbBand` half-tinting a boundary with the suite green,
+  and — as this ledger has now recorded four times against `ruleBlock` — the over-claiming comment is
+  the dangerous half. The entry colours are **spread from `PALETTE.pfd.entry`**, not hand-listed, so a
+  fourth is measured by default; hand-listing is what let the first three go unmeasured. What no
+  assertion in that file can carry is stated instead of implied: the list is a claim about `hsi.ts`'s
+  `LAYOUT` radii, and a radius change moves what lies under the band without touching a line there.
+- Regression test: the same test, now reporting six marks. Mutation-confirmed by lowering
+  `OVERLAY_ALPHA.thumbBand` to 0.55, where the failure message names
+  `pfd.entry.direct` (2.97), `pfd.entry.teardrop` (2.94) and `pfd.entry.parallel` (2.49) alongside the
+  three it always measured — before the fix those three could not appear at any alpha.
+- Reviewed and **not** changed: the plan's Task 3 manual step is boxed `[x]` while its own text says
+  "(a) and (b) are entirely unverified". The box records that the step was *dispositioned*, and the
+  text beside it states exactly which sub-points have evidence and which do not — which is the
+  honest form. Left as is rather than unticking a step whose remaining half is not automatable here.
+
+## Post-completion review fixes — 2026-08-11 (code review iteration 11, entry answer-group branch)
+
+- **Fixed: `ruleBlock` decided refusal on specificity alone, and `!important` is the one thing
+  specificity does not decide** (`src/styles.test.ts`). Iterations 9 and 10 taught the guard which
+  rules *reach* the label; the refusal they both fed into was `claimed && OUTRANKS.test(member)`, i.e.
+  "does this member tie or beat a single class's (0,1,0)?". A member that **loses** that comparison
+  was ignored by design — the split that keeps the live `p { color: … }` rule from reding the suite.
+  But an `!important` declaration beats every normal declaration of the same property in the same
+  origin *whatever* the selector, so a losing member carrying one renders anyway. And losing is
+  precisely what keeps it out of `blocks`, so `remValue`'s own `!important` refusal (added in
+  iteration 8, for declarations inside a **collected** block) never saw it. Neither collected nor
+  refused: invisible, fail-open. Reproduced against the real `styles.css` — one word added to a rule
+  the sheet already carries at line 69:
+
+  ```css
+  p { margin-top: 0 !important }   /* (0,0,1), loses to .entry-answers-label's (0,1,0), renders anyway */
+  ```
+
+  `separates the answer group from the instrument above it` went on reporting `margin-top: 1.5rem`
+  against `gap: 0.5rem` and passed, while a browser renders **zero** separation — the answer buttons
+  flush against the G1000 panel rect, which is the exact 0 : 1 defect this branch exists to close.
+  This is the same shape as iterations 9 and 10 one mechanism over: not a spelling the model got
+  wrong, but a second mechanism the model never asked about.
+- Fix: a claimed member is now refused on **either** ground, `!important` checked first so the message
+  names the one that actually decides. The test is on the harvested body rather than on the queried
+  property, because `ruleBlock` is not told which property is coming; the accepted trade is a false red
+  on an unrelated `p { color: … !important }`, against the silent green. The regex is hoisted to one
+  `IMPORTANT` constant shared with `remValue` — two hand-written copies of "what `!important` looks
+  like" drift, and the half nobody edits waves the override through. The live
+  `[hidden] { display: none !important }` does not red the sheet: `[hidden]` is already a
+  `Context.denies` subject, so it never reaches `claimed`.
+- Docblock amended, per this file's own recurring lesson: the sentence "a member built only from type
+  selectors loses and is ignored" was true of the normal declarations it was reasoning about and false
+  of the one kind no selector outranks — the fifth time a `ruleBlock` docblock has claimed a coverage
+  the code did not have. The ⚠️ ledger inside it now records the *shape* of the repeat as well as the
+  count: each version either enumerated the spellings it knew and called the list closed, or named the
+  one mechanism it had modelled and reasoned as though it were the only one. **State the mechanism,
+  and ask whether it is the only mechanism — not just whether it is modelled correctly.**
+- Regression test: `refuses a rule that reaches the element with !important, whatever it loses on` —
+  three refusals (a losing bare type rule, a losing descendant, and the `! IMPORTANT` spelling CSS
+  permits) and two non-vacuity cases (strip the one word and the same bare type rule is ignored,
+  reading 1.5rem; a `denies`-answered `[hidden] { display: none !important }` stays invisible, so the
+  refusal needs reach *and* override rather than either). Mutation-confirmed both ways: disabling the
+  new throw reds **only** the new test, and the CSS escape above, appended to the real `styles.css`,
+  now reds the ratio with `p reaches .entry-answers-label with !important, which no specificity beats`.
+- Reviewed and **not** changed: the nav status line reserves a hard-coded 34 viewBox units for the
+  `TO`/`FROM` word (`src/ui/hsi.ts`, `.hsi-nav-distance` at `x = right − 34` against `.hsi-nav-sense`
+  at `x = right`, both `text-anchor="end"`). `FROM` at `font-size="11"` measures ≈31.7–32.4 px across
+  the plausible `system-ui` resolutions, so the clearance is real but thin, and nothing pins the two
+  fields against *each other*. Noted rather than fixed: it is a legibility margin, not a taught fact,
+  and no rendering here overruns.
+- Reviewed and **not** changed: `.written-options` sits 0 px below the same viewBox-filling panel on
+  `#/written`, i.e. the identical grouping defect from the identical cause. The plan scopes itself to
+  the entry drill explicitly, so this is recorded as a **known open item** rather than silently
+  carried — closing it means the same label-plus-margin treatment and widening the `styles.test.ts`
+  ratio to both rows.
+
+## Post-completion review fixes — 2026-08-11 (code review iteration 11, entry answer-group branch)
+
+- **Fixed: `ruleBlock` discarded which combinator it split on, so a sibling compound was resolved
+  against an ancestor set and vanished** (`src/styles.test.ts`). Every refusal built in iterations
+  9–10 resolves the compounds left of the subject against `anywhere` — the union of the element's own
+  names and its **ancestors'**. The split that produced them was `member.split(/[\s>+~]+/)`, which
+  throws the combinator away. A compound joined by `+` or `~` names a **sibling**, which is never in
+  an ancestor set, so `reaches` returned false, `claimed` came out false, and the member was neither
+  collected nor refused: invisible, while it renders. This is the sixth fail-open in this helper and
+  the first that is *under*-refusal by construction rather than by an unmodelled spelling.
+
+  Reproduced against the real `styles.css`, each leaving `separates the answer group from the
+  instrument above it` reporting `margin-top: 1.5rem` against `gap: 0.5rem` at 18/18 green with the
+  answer buttons rendered flush against the G1000 panel:
+
+  ```css
+  .entry-hsi + p            { margin-top: 0 }  /* (0,1,1); the label IS that <p> */
+  .entry-scenario ~ p       { margin-top: 0 }  /* (0,1,1); no adjacency needed */
+  .entry-answers-label + div { gap: 0 }        /* the row's half of the ratio */
+  ```
+
+  The first is not hypothetical in the smallest degree: `entry-drill.test.ts` deliberately pins
+  `label.previousElementSibling` as `.entry-hsi`, so the guard's own DOM test asserts the exact
+  adjacency this selector keys off, and sibling spacing (`.foo + .bar`) is a mainstream CSS idiom.
+- Fix, part 1 — the refusal: `splitCompounds` now reports whether any combinator was a sibling one,
+  and `ruleBlock` throws when the subject reaches the element and the member contains one. It is
+  gated on the subject reaching the element because that is a *necessary* condition for the member to
+  match at all; without the gate every unrelated `.a + .b` in the sheet would red the guard. Refused
+  rather than modelled, the same doctrine as the nested rule and the specificity conflict: what this
+  model cannot answer, it throws on.
+- Fix, part 2 — the **split itself**, which the refusal alone does not reach: splitting on the bare
+  character also split *inside* brackets and parentheses, where a `+` or `~` combines nothing.
+  `:nth-child(2n+1)` and `[class~="x"]` were shredded into fragments and the subject came out as the
+  tail (`1)`), which names nothing and therefore reached nothing — the same silent pass by a second
+  route, and one no sibling check can see because the masked member carries no combinator at all.
+  Reproduced green against the real `styles.css` with `.entry-drill p:nth-child(2n+1) { margin-top: 0 }`.
+  `splitCompounds` masks bracketed and parenthesised runs before scanning for separators; the filler
+  is one character wide and a non-separator (a space would make the whole of `[class~="x"]` read as
+  separators and drop it), the mask is indexed in lockstep with the original, and the compounds
+  returned are slices of the **original** text — blanking for real would break `denies`, which matches
+  on `[hidden]` whole.
+- **Fixed: `OVERRIDES` was an enumeration of margin/gap shorthands, and `all` is not one**
+  (`src/styles.test.ts`). `all` resets *every* property there is, so it reaches both lengths the ratio
+  reads, but it is not a margin shorthand and so was absent from all three hand-written families.
+  `.entry-answers-label { all: unset }` appended to the real `styles.css` left the ratio reporting
+  1.5rem against 0.5rem, green, with the label's margin gone — and `remValue`'s unit and `!important`
+  refusals never saw it either. It is now appended to every family in `remValue` rather than written
+  into the three lists, because it belongs to all of them by construction.
+- Docblock amended, per this file's own recurring lesson, and the ⚠️ ledger inside `ruleBlock` now
+  records six: "Ancestor compounds are matched loosely (any ancestor, **whatever the combinator**, in
+  any order) … the looseness only ever over-refuses" was true of the descendant and child combinators
+  it had modelled and false of the two it had not, in the one direction that ships the defect. The
+  wording now separates the two claims: loose about **which** ancestor, never about whether the
+  compound describes an ancestor at all. The same sentence had been copied verbatim into `CLAUDE.md`
+  and into the iteration-9 entry above; both are corrected, the ledger entry amended in place with the
+  counter-argument rather than edited past.
+- Regression test: `refuses a rule that reaches the element through a sibling, not an ancestor` —
+  three refusals (adjacent sibling, general sibling, a sibling nested under an ancestor so the
+  ancestor half still resolves) and three non-vacuity cases (an unrelated `.a + .b` still reads
+  1.5rem, so the refusal turns on reach rather than on the character; and `:nth-child(2n+1)` /
+  `[class~="x"]` must still refuse but must **not** refuse as siblings, which is what pins the mask).
+  The `all` case is pinned in `resolves a property the way the cascade does: last declaration wins` —
+  refused after the property for all three of `margin-top`/`margin-bottom`/`gap`, and correctly *not*
+  refused when declared before it, since the longhand after it is what renders.
+- Mutation-confirmed 2026-08-11: all five CSS escapes above, appended one at a time to the real
+  `styles.css`, now red the ratio with a message naming the offending prelude
+  (`.entry-hsi + p reaches .entry-answers-label through a sibling combinator, which this guard does
+  not model`), and the stylesheet was restored to its committed state after each.
+- Reviewed and **not** changed: the `within` half of the guard's context (`div`, `#app`, `body`,
+  `html`) is asserted only as far as the label's immediate parent — `entry-drill.test.ts` renders into
+  a detached `<div>` and structurally cannot see the real ancestor chain, and nothing asserts the
+  chain carries no *other* name. A class added to the router's screen container would make
+  `.screen p { margin: 0 }` silently invisible here. Recorded as a known open item: closing it means
+  either a router-level render that collects every ancestor's names, or an assertion in
+  `router.test.ts` that the container carries none.
+- Reviewed and **not** changed: a `margin-bottom` on `.entry-hsi` — the element the DOM test pins as
+  the thing above the label — is outside this guard's two-rule model and would collapse the
+  separation with the ratio still reading 1.5rem against 0.5rem. `.entry-hsi` carries no rule at all
+  today. Same class as the containing-block caveat already recorded in the guard's Scope comment.

@@ -10,18 +10,40 @@ import {
 } from '../engine/entry'
 import { normalizeDeg } from '../engine/geometry'
 import {
+  CDI_ARMING_AIM,
+  CDI_ARMING_SOURCE,
+  CDI_SCALE_AIM,
+  CDI_SCALE_NOTE,
+  CLEARANCE_LEAD_ATC,
+  CLEARANCE_LEAD_MINUTES,
+  CLEARANCE_LEAD_SOURCE,
   COCKPIT_TARGET_SECONDS,
   createEntryDrill,
   entryDrillScreen,
   flyItText,
   generateScenario,
   gradeEntryAnswer,
+  LEAD_DISTANCE_NOTE,
+  MAX_DISTANCE_NM,
+  MIN_DISTANCE_NM,
+  NOMINAL_GROUNDSPEED_KT,
   OUTBOUND_TIMING_AIM,
   OUTBOUND_TIMING_NOTE,
   OUTBOUND_TIMING_SOURCE,
   renderEntryDrill,
+  SPEED_REDUCTION_AIM,
+  SPEED_REDUCTION_MINUTES,
+  SPEED_REDUCTION_SOURCE,
 } from './entry-drill'
-import { courseText } from '../format'
+import { courseText, distanceText } from '../format'
+import {
+  DEVIATION_DOTS,
+  FULL_SCALE_NM,
+  FULL_SCALE_SOURCE,
+  LAYOUT,
+  PX_PER_NM,
+  renderHSI,
+} from '../ui/hsi'
 
 /** First seed whose generated clearance is a charted "as published" hold. */
 const CHARTED_SEED = 4
@@ -95,6 +117,108 @@ describe('generateScenario', () => {
   it('rejects a non-finite seed', () => {
     expect(() => generateScenario(NaN)).toThrow(RangeError)
     expect(() => generateScenario(Infinity)).toThrow(RangeError)
+  })
+})
+
+describe('scenario distance to the fix', () => {
+  /**
+   * Regression pin, captured BEFORE `distanceNm` existed.
+   *
+   * A stored miss and the Anki card exported from it are keyed by seed alone
+   * (`store.recordMiss` here, `missesToCards` in src/app/anki-export.ts), so
+   * what a seed produces is history rather than an implementation detail:
+   * shifting the RNG stream would silently rewrite every card already in a
+   * user's deck to a different question. The distance draw is therefore
+   * APPENDED after the heading draw, and this is what pins that.
+   *
+   * Both halves are hand-derived, not only read back:
+   *  - headings, from `mulberry32(seed ^ 0x9e3779b9)` — seed 7 → 353,
+   *    seed 42 → 173;
+   *  - answers, from the heading against the fixture hold. Seed 7 is inbound
+   *    080 with right turns, and 353 − 080 = 273°, inside the 180°–290°
+   *    parallel sector of a standard pattern. Seed 42 is inbound 250 with left
+   *    turns, and 173 − 250 = 283°, inside the mirrored 250°–360° direct
+   *    sector. That is also the plan's before/after check on the answer key:
+   *    distance is display state and must not reach `determineEntry`.
+   */
+  it('keeps every existing seed on its original heading and answer', () => {
+    const a = generateScenario(7)
+    expect(a.heading).toBe(353)
+    expect(a.result.primary).toBe('parallel')
+
+    const b = generateScenario(42)
+    expect(b.heading).toBe(173)
+    expect(b.result.primary).toBe('direct')
+  })
+
+  it('places the aircraft inside the ATC lead window on every seed', () => {
+    for (let seed = 0; seed < 200; seed++) {
+      const { distanceNm } = generateScenario(seed)
+      expect(distanceNm).toBeGreaterThanOrEqual(MIN_DISTANCE_NM)
+      expect(distanceNm).toBeLessThanOrEqual(MAX_DISTANCE_NM)
+    }
+  })
+
+  it('spans the window between the two verified timings', () => {
+    // Ordering first: the speed-reduction point is inside the lead time, which
+    // is the whole reason the two bracket a window rather than name a point.
+    expect(SPEED_REDUCTION_MINUTES).toBeLessThan(CLEARANCE_LEAD_MINUTES)
+    expect(MIN_DISTANCE_NM).toBeLessThan(MAX_DISTANCE_NM)
+    // Hand check, deliberately not a restatement of the formula: 3 and 5
+    // minutes at 120 kt is 6 and 10 NM — single-digit miles, which is the scale
+    // of picture the panel draws. The defect these bounds exist to catch is the
+    // unit slip the derivation invites: drop the ÷ 60 and the window becomes
+    // 360–600 NM, which still passes every range assertion above because those
+    // are stated against the same constants.
+    //
+    // ⚠️ The upper bound is a unit-slip guard and nothing more. It used to be
+    // justified here as "well inside the 30 NM at which a GPS arms terminal CDI
+    // scaling (AIM 1-1-17 b.5(e))" — a comparison between distance to a holding
+    // fix and distance to an airport reference point, which is not a comparison
+    // at all. That inference is withdrawn (see `CDI_ARMING_AIM`); do not restore
+    // it by reading 30 as an airspace or avionics threshold. Any bound that
+    // catches 360–600 NM would do.
+    expect(MIN_DISTANCE_NM).toBeGreaterThan(1)
+    expect(MAX_DISTANCE_NM).toBeLessThan(30)
+    expect(NOMINAL_GROUNDSPEED_KT).toBeGreaterThan(0)
+  })
+
+  it('spreads across the window rather than parking on one end', () => {
+    const seen = new Set<number>()
+    for (let seed = 0; seed < 200; seed++) {
+      seen.add(generateScenario(seed).distanceNm)
+    }
+    expect(seen.size).toBeGreaterThan(20)
+    const mid = (MIN_DISTANCE_NM + MAX_DISTANCE_NM) / 2
+    expect([...seen].some((d) => d < mid)).toBe(true)
+    expect([...seen].some((d) => d > mid)).toBe(true)
+  })
+
+  it('quantises to the resolution distanceText renders', () => {
+    // The status line shows one decimal. A stored 7.3365 would put "7.3 NM" on
+    // the panel beside a needle computed from a different number — small, but
+    // it is the same class of two-roundings-disagree defect `distanceText`
+    // itself exists to prevent.
+    for (let seed = 0; seed < 60; seed++) {
+      const { distanceNm } = generateScenario(seed)
+      expect(Number(distanceNm.toFixed(1))).toBe(distanceNm)
+      expect(distanceText(distanceNm)).toBe(`${distanceNm.toFixed(1)} NM`)
+    }
+  })
+
+  it('cites both timings at sub-paragraph granularity', () => {
+    expect(CLEARANCE_LEAD_SOURCE).toBe('FAA JO 7110.65BB 4-6-1 c.4')
+    expect(SPEED_REDUCTION_SOURCE).toBe('AIM 5-3-8 d')
+  })
+
+  // The quoted sentences are verbatim FAA text, so they are NOT templated from
+  // the constants — a quotation with an interpolation in it is not a quotation.
+  // The agreement is asserted instead: retune either constant and the sentence
+  // rendered beside the distance stops supporting the number it explains, which
+  // is the failure mode of a source quoted next to a value it no longer governs.
+  it('quotes timings that still say what the generator’s constants claim', () => {
+    expect(CLEARANCE_LEAD_ATC).toContain(`at least ${CLEARANCE_LEAD_MINUTES} minutes`)
+    expect(SPEED_REDUCTION_AIM).toContain(`${SPEED_REDUCTION_MINUTES} minutes or less`)
   })
 })
 
@@ -403,6 +527,114 @@ describe('renderEntryDrill screen', () => {
     }
   })
 
+  // The answer row sits directly under the G1000 panel, which is a filled rect
+  // that fills its whole viewBox — flush against it, the buttons read as part of
+  // the instrument (a softkey strip) rather than as the answer input. The label
+  // is the first half of the separation: it gives the row a page voice, and it
+  // is what the detaching margin hangs on in styles.css (on the label, not on
+  // .entry-answers, so the gap opens above the group and not inside it).
+  it('names the answer row in the page’s voice, immediately above the buttons', () => {
+    const { el } = setup('learn')
+    const answers = el.querySelector<HTMLElement>('.entry-answers')!
+    const label = el.querySelector<HTMLElement>('.entry-answers-label')!
+    expect(label).not.toBeNull()
+    expect(label.textContent!.trim().length).toBeGreaterThan(0)
+    // `hidden` reflects the HTML attribute and nothing else. Every screen-reader-only
+    // technique is CSS (`display: none`, `position: absolute` + `clip`), so this
+    // assertion cannot see the one that matters and must not claim to: an
+    // out-of-flow label leaves .entry-answers following .entry-hsi with nothing
+    // between them, buttons flush against the panel again. That half is guarded
+    // where it is visible — `separates the answer group…` in styles.test.ts reads
+    // the label's rule and refuses one that takes it out of flow.
+    expect(label.hidden, 'the label is not hidden by attribute').toBe(false)
+    // Immediately before: any element between them would take the margin's gap
+    // and be read as the thing the label names.
+    expect(answers.previousElementSibling).toBe(label)
+    // And the other side of the same adjacency, which the whole spacing guard
+    // rests on and nothing asserted: the margin in styles.css detaches the group
+    // from whatever precedes the label, so it only closes this defect while that
+    // is the instrument. Move the panel below the row, or slip a hint line
+    // between them, and the buttons are flush against the G1000 rect again with
+    // both the DOM test above and the stylesheet ratio still green.
+    const above = label.previousElementSibling
+    expect(above?.className, 'the separating margin must land against the HSI').toBe('entry-hsi')
+  })
+
+  // `separates the answer group from the instrument above it` in styles.test.ts
+  // refuses any rule that can reach these two elements *without naming their
+  // class* — `.entry-drill p`, `#entry-answers-label`, `.entry-drill > *` all
+  // outrank or tie a flat class rule and render. It can only do that from a list
+  // of the other names they carry, and that list is a claim about this DOM which
+  // no stylesheet assertion can check. Give the label a second class, or move
+  // the row out of section.entry-drill, and the guard goes on refusing the old
+  // set while an override for the new one walks past it.
+  //
+  // Scope, since the guard's list is longer than this: the drill renders into a
+  // detached element here, so this pins the two subjects' own names and their
+  // immediate parent. The rest of that list (`div`, `#app`, `body`, `html`) is
+  // the router's per-screen container and index.html, above this element and
+  // outside what this test can see — the ⚠️ in styles.test.ts says so, and a
+  // missing ancestor name there is fail-open.
+  it('carries only the names the stylesheet guard is told about', () => {
+    const { el } = setup('learn')
+    const label = el.querySelector<HTMLElement>('.entry-answers-label')!
+    const answers = el.querySelector<HTMLElement>('.entry-answers')!
+    expect([label.tagName, label.id, [...label.classList]]).toEqual([
+      'P',
+      'entry-answers-label',
+      ['entry-answers-label'],
+    ])
+    expect([answers.tagName, answers.id, [...answers.classList]]).toEqual([
+      'DIV',
+      '',
+      ['entry-answers'],
+    ])
+    // Same parent, and it is the one the guard's `within` names.
+    expect(label.parentElement).toBe(answers.parentElement)
+    expect(label.parentElement!.tagName).toBe('SECTION')
+    expect([...label.parentElement!.classList]).toEqual(['entry-drill'])
+    // The other half of that claim, and the half a name list cannot carry. A
+    // compound may select on a *condition* rather than a name, and the guard
+    // refuses every condition it is not told about — `:root` and `[hidden]` are
+    // live rule subjects in styles.css, so its `DENIES` answers those two, and
+    // an answer is only sound while the real elements match neither. Mark the
+    // label hidden (or move either element to the document root) and the
+    // stylesheet guard would wave through a rule that genuinely applies.
+    for (const el of [label, answers]) {
+      for (const condition of [':root', '[hidden]']) {
+        expect(el.matches(condition), `${el.className} must not match ${condition}`).toBe(false)
+      }
+    }
+  })
+
+  // .entry-modes has carried role/aria-label since it shipped; .entry-answers
+  // carried neither, so a screen reader met three ungrouped, unexplained
+  // buttons. The visible label doubles as the accessible name.
+  it('groups the answer buttons and names them by the visible label', () => {
+    const { el } = setup('learn')
+    const answers = el.querySelector<HTMLElement>('.entry-answers')!
+    const label = el.querySelector<HTMLElement>('.entry-answers-label')!
+    expect(answers.getAttribute('role')).toBe('group')
+    const named = answers.getAttribute('aria-labelledby')
+    expect(named).not.toBeNull()
+    // The id must actually resolve, and to *that* label — an aria-labelledby
+    // pointing at nothing leaves the group anonymous with the markup looking right.
+    expect(el.querySelector(`#${named}`)).toBe(label)
+  })
+
+  // One template serves both modes, so this is a regression guard rather than a
+  // second behaviour: a future mode-specific branch must not drop the label from
+  // the timed view, where the row is the only thing the student touches.
+  it('labels and groups the row in cockpit mode too', () => {
+    const { el } = setup('cockpit')
+    const answers = el.querySelector<HTMLElement>('.entry-answers')!
+    const label = el.querySelector<HTMLElement>('.entry-answers-label')!
+    expect(label.textContent!.trim().length).toBeGreaterThan(0)
+    expect(answers.previousElementSibling).toBe(label)
+    expect(answers.getAttribute('role')).toBe('group')
+    expect(el.querySelector(`#${answers.getAttribute('aria-labelledby')}`)).toBe(label)
+  })
+
   // The plan-view picture of the entry is the thing an HSI cannot show — you
   // cannot see a teardrop's 30° offset or a parallel's >180° reintercept on a
   // compass rose. mapview builds and tests it; until it is rendered here the
@@ -512,13 +744,39 @@ describe('renderEntryDrill screen', () => {
     answerButton(el, generateScenario(42).result.primary).click()
     el.querySelector<HTMLButtonElement>('.entry-next')!.click()
 
-    expect(el.querySelector('.entry-clearance')!.textContent).toContain(
-      generateScenario(43).clearanceText,
-    )
+    const next = generateScenario(43)
+    expect(el.querySelector('.entry-clearance')!.textContent).toContain(next.clearanceText)
     expect(el.querySelector('.entry-feedback')!.textContent).toBe('')
     for (const entry of ENTRIES) {
       expect(answerButton(el, entry).disabled).toBe(false)
     }
+  })
+
+  // The clearance is not the whole prompt: the scenario line and the panel's
+  // nav data are the aircraft's POSITION, and they are rendered from separate
+  // reads of `drill.scenario`. Checking the clearance alone leaves a Next that
+  // advances the answer key while the position stays on the previous scenario —
+  // a needle and a distance describing an aircraft the question is not about.
+  // Asserted against a seed pair that actually differs in each field, so the
+  // assertion cannot pass by the two scenarios coinciding.
+  it('next moves the position too, not just the clearance', () => {
+    const before = generateScenario(42)
+    const after = generateScenario(43)
+    expect(after.distanceNm, 'seeds 42/43 must differ for this to bind').not.toBe(before.distanceNm)
+
+    const { el } = setup('learn')
+    expect(el.querySelector('.hsi-nav-distance')!.textContent).toBe(distanceText(before.distanceNm))
+
+    answerButton(el, before.result.primary).click()
+    el.querySelector<HTMLButtonElement>('.entry-next')!.click()
+
+    expect(el.querySelector('.entry-scenario')!.textContent).toContain(
+      distanceText(after.distanceNm),
+    )
+    expect(el.querySelector('.entry-scenario')!.textContent).toContain(after.holdSpec.fix)
+    expect(el.querySelector('.hsi-nav-distance')!.textContent).toBe(distanceText(after.distanceNm))
+    expect(el.querySelector('.hsi-nav-fix')!.textContent).toBe(after.holdSpec.fix)
+    expect(el.querySelector('.hsi-hdg-value')!.textContent).toBe(courseText(after.heading))
   })
 
   it('mode toggle switches to cockpit and drops the aids', () => {
@@ -541,6 +799,287 @@ describe('renderEntryDrill screen', () => {
   it('hides the plate line when the clearance states course and turns', () => {
     const { el } = setup('cockpit', 0)
     expect(el.querySelector<HTMLElement>('.entry-chart')!.hidden).toBe(true)
+  })
+
+  // --- the aircraft's position reaches the panel ------------------------------
+  //
+  // Every scenario used to imply the aircraft was overhead the fix: the drill
+  // carried no position and the HSI got heading and course only. These pin the
+  // wiring that ends that, from the screen side — `hsi.ts` cannot see its own
+  // consumers, and its no-nav contract is silent by design, so a drill that
+  // stopped passing `nav` would draw the written test's picture with the whole
+  // HSI suite still green.
+
+  it('gives the panel the fix, the distance and a bug parked on the nose', () => {
+    const { el } = setup('cockpit')
+    const s = generateScenario(42)
+    expect(el.querySelector('.hsi-nav-fix')!.textContent).toBe(s.holdSpec.fix)
+    expect(el.querySelector('.hsi-nav-distance')!.textContent).toBe(distanceText(s.distanceNm))
+    // The bug is parked on the current heading, so the HDG box reads it back —
+    // see the note on HSIProps.headingBug: same number three times, on purpose.
+    expect(el.querySelector('.hsi-bug')).not.toBeNull()
+    expect(el.querySelector('.hsi-hdg-value')!.textContent).toBe(courseText(s.heading))
+  })
+
+  // `fix`, `distanceNm` and `headingBug` above are what the panel draws AROUND
+  // the picture. `heading` and `course` ARE the picture: they set the card
+  // rotation, the pointer, the CRS box, which way the bar deflects and the
+  // TO/FROM word. A drawHSI that hands over the reciprocal course, or swaps the
+  // two, still draws a well-formed panel — of a different aircraft — and every
+  // assertion above it stays green. All three mutations passed 732/732 before
+  // this test existed.
+  //
+  // The goldens are STATED, not re-read out of `s`: an expectation built from
+  // `s.holdSpec.inboundCourse` agrees by construction with a drawHSI reading
+  // that same field wrongly, which is the consumer-vs-oracle tautology the
+  // parallel-entry rule in CLAUDE.md warns about one screen over.
+  it('draws the card on the scenario heading and the pointer on the inbound course', () => {
+    // Seed 42: heading 173, hold 250° left turns, 9.9 NM out. `keeps every
+    // existing seed on its original heading and answer` is what holds these.
+    const s = generateScenario(42)
+    expect([s.heading, s.holdSpec.inboundCourse], 'seed 42 goldens moved').toEqual([173, 250])
+
+    const { el } = setup('cockpit')
+    expect(el.querySelector('.hsi-heading-readout')!.textContent).toBe('173°')
+    expect(el.querySelector('.hsi-crs-value')!.textContent).toBe('250°')
+
+    // TO/FROM hand-derived from the drawn picture rather than from
+    // `courseDeviation`, which would flip along with the renderer: tracking
+    // direct, the aircraft sits 9.9 NM out on the 353 bearing from Delta, and
+    // 173 lies 77° off the 250 course — inside the 90° abeam boundary — so
+    // flying 250 from here closes on the fix. TO. Cross-track is
+    // −9.9·sin(−77°) = +9.6 NM, i.e. right of course, so the bar (which shows
+    // where the course is, not where you are) pegs LEFT of the centreline.
+    expect(el.querySelector('.hsi-nav-sense')!.textContent).toBe('TO')
+    expect(el.querySelector('.hsi-tofrom')!.getAttribute('data-sense')).toBe('to')
+    expect(Number(el.querySelector('.hsi-cdi-bar')!.getAttribute('x1'))).toBeLessThan(LAYOUT.cx)
+  })
+
+  it('shows the deviation indication the written-test figure suppresses', () => {
+    // The bar, the dots and the flag are exactly what `hsi.ts` drops when there
+    // is no position, so their presence here is the assertion that the position
+    // arrived — not that the panel merely rendered.
+    const { el } = setup('cockpit')
+    expect(el.querySelector('.hsi-cdi-bar')).not.toBeNull()
+    expect(el.querySelectorAll('.hsi-cdi-dot')).toHaveLength(DEVIATION_DOTS * 2)
+    expect(el.querySelector('.hsi-tofrom')).not.toBeNull()
+    expect(el.querySelector('.hsi-status')).not.toBeNull()
+  })
+
+  it('renders the distance in prose through distanceText, not a second rounding', () => {
+    // A bare `${distanceNm} NM` agrees with distanceText on 8.4 and disagrees on
+    // a whole mile ("9 NM" vs "9.0 NM"), so a whole-mile seed is the only one
+    // that can catch the second rounding rule distanceText exists to prevent.
+    // Found rather than hard-coded: the generator's window may be re-tuned.
+    const seeds = [...Array(200).keys()]
+    const wholeSeed = seeds.find((s) => Number.isInteger(generateScenario(s).distanceNm))
+    expect(wholeSeed, 'no whole-mile distance in the first 200 seeds').toBeDefined()
+
+    for (const seed of [42, wholeSeed!]) {
+      const { el } = setup('learn', seed)
+      const s = generateScenario(seed)
+      const line = el.querySelector('.entry-scenario')!.textContent!
+      expect(line, `seed ${seed}`).toContain(distanceText(s.distanceNm))
+      expect(line, `seed ${seed}`).toContain(s.holdSpec.fix)
+      // The direct-to assumption is what makes the panel's TO/FROM flag true
+      // (see the docblock on courseDeviation); the student is told it, not left
+      // to infer it from a needle.
+      expect(line, `seed ${seed}`).toMatch(/tracking direct/i)
+    }
+  })
+
+  it('names the fix in the scenario line exactly as the clearance names it', () => {
+    // One ident on the radio call, in the prose and on the panel. Two spellings
+    // of one fix on one screen would read as two fixes.
+    for (const seed of [0, 1, 42, DUAL_KEYED_SEED, CHARTED_SEED]) {
+      const { el } = setup('learn', seed)
+      const { holdSpec } = generateScenario(seed)
+      expect(el.querySelector('.entry-clearance')!.textContent, `seed ${seed}`).toContain(
+        holdSpec.fix,
+      )
+      expect(el.querySelector('.entry-scenario')!.textContent, `seed ${seed}`).toContain(
+        holdSpec.fix,
+      )
+      expect(el.querySelector('.hsi-nav-fix')!.textContent, `seed ${seed}`).toBe(holdSpec.fix)
+    }
+  })
+
+  it('quotes both timings verbatim with their sources, derivation kept outside', () => {
+    const { el } = setup('cockpit')
+    const lead = el.querySelector('.entry-lead')!
+    // Each quoted span CLOSES on the FAA sentence — asserted with the quotation
+    // marks, not merely with `toContain`. The two constants not containing each
+    // other (below) is a weaker claim than it looks: the template could still
+    // set the closing mark after the derivation and present the assumption as
+    // quoted text, with every plain `toContain` still passing.
+    expect(lead.textContent).toContain(`“${CLEARANCE_LEAD_ATC}”`)
+    expect(lead.textContent).toContain(`“${SPEED_REDUCTION_AIM}”`)
+    expect(lead.textContent).toContain(LEAD_DISTANCE_NOTE)
+    expect([...lead.querySelectorAll('cite')].map((c) => c.textContent)).toEqual([
+      CLEARANCE_LEAD_SOURCE,
+      SPEED_REDUCTION_SOURCE,
+    ])
+    // The miles are a derivation from an assumed groundspeed, and the FAA says
+    // nothing about groundspeed here. Folding it into either cited span would
+    // present the assumption as the citation — the failure the outbound-timing
+    // split above exists to prevent, repeated for the distance.
+    expect(CLEARANCE_LEAD_ATC).not.toContain(LEAD_DISTANCE_NOTE)
+    expect(SPEED_REDUCTION_AIM).not.toContain(LEAD_DISTANCE_NOTE)
+    expect(LEAD_DISTANCE_NOTE).toContain(`${NOMINAL_GROUNDSPEED_KT} kt`)
+    expect(LEAD_DISTANCE_NOTE.toLowerCase()).toContain('assumption')
+    expect(CLEARANCE_LEAD_ATC).not.toMatch(/kt|groundspeed/i)
+    expect(SPEED_REDUCTION_AIM).not.toMatch(/kt|groundspeed/i)
+  })
+
+  // The scale is the one aviation fact on this screen a student reads off the
+  // instrument rather than out of the prose: two dots a side means each is worth
+  // half of FULL_SCALE_NM. That makes it a user-visible fact under the citation
+  // convention, and a `source` constant nothing renders satisfies none of it —
+  // `FULL_SCALE_SOURCE` had no consumer at all before this.
+  it('cites the CDI scale beside the needle, with the mode caveat outside the quote', () => {
+    const { el } = setup('cockpit')
+    const cdi = el.querySelector('.entry-cdi')!
+    expect(cdi.textContent).toContain(`“${CDI_SCALE_AIM}”`)
+    expect(cdi.textContent).toContain(`“${CDI_ARMING_AIM}”`)
+    expect(cdi.textContent).toContain(CDI_SCALE_NOTE)
+    expect([...cdi.querySelectorAll('cite')].map((c) => c.textContent)).toEqual([
+      FULL_SCALE_SOURCE,
+      CDI_ARMING_SOURCE,
+    ])
+
+    // ⚠️ Sub-paragraph granularity is the convention, and the arming sentence is
+    // one level deeper than the citation used to claim. Walking the `<ol>`
+    // nesting of the fetched AIM page puts "…'arm' annunciation 30 NM straight
+    // line distance…" at path [2, 5, 5, 3] over levels one→four = b.5(e)(3);
+    // `b.5(e)` alone is the ~10-item list "Procedures for Accomplishing GPS
+    // Approaches", so a student following the `<cite>` landed on the list. This
+    // pins the DEPTH rather than the string: flattening it back to the container
+    // is the regression, and it is exactly what the shape check catches.
+    expect(CDI_ARMING_SOURCE, 'cite the sub-item, not the list containing it').toMatch(
+      /^AIM 1-1-17 b\.5\(e\)\(\d+\)$/,
+    )
+
+    // The AIM sentences cite the VALUE and the arming CONDITIONS. Terminal mode
+    // for a hold is this drill's assumption — the AIM is talking about departures
+    // and DPs — so it stays outside both quoted spans, exactly as
+    // LEAD_DISTANCE_NOTE does for the groundspeed and OUTBOUND_TIMING_NOTE does
+    // for the per-entry split.
+    expect(CDI_SCALE_AIM).not.toContain(CDI_SCALE_NOTE)
+    expect(CDI_ARMING_AIM).not.toContain(CDI_SCALE_NOTE)
+    expect(CDI_SCALE_AIM).not.toMatch(/hold|assum/i)
+    expect(CDI_ARMING_AIM).not.toMatch(/hold|assum/i)
+    expect(CDI_SCALE_NOTE.toLowerCase()).toContain('assumption')
+  })
+
+  // The withdrawn inference (docs/content-audit.md, 2026-08-07). The screen used
+  // to justify terminal scaling by "the 6–10 NM window sits well inside the 30 NM
+  // at which terminal scaling arms" — comparing distance to a HOLDING FIX against
+  // b.5(e)'s distance to an AIRPORT/HELIPORT REFERENCE POINT, with the approach
+  // loaded and armed. Neither condition follows from the drill's distance, so the
+  // claim was false and uncited, and a student reads it off the screen.
+  //
+  // This guards the *shape* of the correction, not just the deleted words: the
+  // 30 NM may only appear tied to its reference point, and the drill's own window
+  // may not be offered as the reason the mode is honest.
+  //
+  // Scanned off the RENDERED paragraph, not off the two constants it was built
+  // from: the screen composes `.entry-cdi` from five strings, so a scan of two
+  // of them lets the withdrawn claim back in through a sixth — a scope narrower
+  // than the claim, which is the failure mode CLAUDE.md records for the prose
+  // and README globs. What a student reads is the unit under test.
+  it('does not offer the drill’s distance as a reason for terminal scaling', () => {
+    const { el } = setup('cockpit')
+    const prose = el.querySelector('.entry-cdi')!.textContent ?? ''
+    expect(prose.length, 'the CDI footnote rendered empty').toBeGreaterThan(200)
+    expect(prose).not.toMatch(/sits well inside/i)
+    // Every mention of the threshold carries what it is measured from.
+    for (const m of prose.matchAll(/30 NM/gi)) {
+      const after = prose.slice(m.index!, m.index! + 120)
+      expect(after).toMatch(/airport(\/heliport)? reference point/i)
+    }
+    // The quotation is the only place the arming conditions are asserted, and it
+    // is verbatim: the note may restate them but must not be the sole carrier.
+    expect(CDI_ARMING_AIM).toMatch(/airport\/heliport reference point/)
+    expect(CDI_ARMING_AIM).toMatch(/loaded in the navigation system/)
+    expect(CDI_ARMING_AIM).toMatch(/Without arming/)
+  })
+
+  // The quotation carries a number, so it can fall out of step with the constant
+  // it is cited for — the same drift `quotes timings that still say what the
+  // generator’s constants claim` guards on the lead-time side.
+  //
+  // Which side of that drift each line catches matters here. `CDI_SCALE_AIM` is
+  // a fixed literal, so re-reading `FULL_SCALE_NM` against it binds. But
+  // `CDI_SCALE_NOTE` is BUILT from these constants, so the three lines that once
+  // re-read `FULL_SCALE_NM`, `FULL_SCALE_NM / DEVIATION_DOTS` and the window
+  // against it restated the template and could not fail — the ledger credited
+  // them with catching a `DEVIATION_DOTS` re-tune, which no expression built
+  // from `DEVIATION_DOTS` can do. Hand-written literals instead, so re-tuning
+  // any of the four constants reds this test and forces the prose to be
+  // re-derived deliberately (it also catches a re-tune that renders a raw float:
+  // at 110 kt the window interpolates as "5.5–9.166666666666666 NM").
+  it('quotes a scale the instrument still draws on', () => {
+    expect(CDI_SCALE_AIM).toContain(`±${FULL_SCALE_NM} NM`)
+    expect(CDI_SCALE_NOTE).toContain('±1 NM')
+    expect(CDI_SCALE_NOTE).toContain('2 dots a side')
+    expect(CDI_SCALE_NOTE).toContain('0.5 NM')
+    expect(CDI_SCALE_NOTE).toContain('6–10 NM')
+  })
+
+  // "Expect it pegged across this drill's 6–10 NM window: unless you are nearly
+  // on the inbound course or its reciprocal, it is" is a claim about the DRAWN
+  // needle, and the test above only string-matches numbers. Re-tune
+  // `FULL_SCALE_NM` to the en route ±5 NM the withdrawn docblock once
+  // contemplated and the needle is essentially never pegged in this window while
+  // the screen goes on telling the student to expect it — negative training with
+  // the suite green. Asserted against the rendered bar, and both ways round, so
+  // it also fails a clamp that pegs everything and never lets go.
+  it('draws the pegged needle its own prose tells the student to expect', () => {
+    const course = 90
+    const full = FULL_SCALE_NM * PX_PER_NM
+    const deflection = (heading: number, distanceNm: number): number => {
+      const el = document.createElement('div')
+      renderHSI(el, { heading, course, nav: { fix: PUBLISHED_HOLDS[0]!.fix, distanceNm } })
+      return Math.abs(Number(el.querySelector('.hsi-cdi-bar')!.getAttribute('x1')) - LAYOUT.cx)
+    }
+    // "nearly on the course or its reciprocal" is asin(full scale / distance),
+    // widest at the near edge of the window. The note claims a narrow band.
+    const band = (Math.asin(FULL_SCALE_NM / MIN_DISTANCE_NM) * 180) / Math.PI
+    expect(band, 'the note promises a pegged needle, not a lively one').toBeLessThan(15)
+
+    for (const distanceNm of [MIN_DISTANCE_NM, MAX_DISTANCE_NM]) {
+      // every heading well clear of 090 and 270 pegs, either side
+      for (const heading of [0, 60, 120, 180, 240, 300]) {
+        expect(deflection(heading, distanceNm), `heading ${heading} at ${distanceNm} NM`).toBeCloseTo(
+          full,
+          6,
+        )
+      }
+      // and on the course it is genuinely centred, so the peg is the geometry
+      // rather than a bar stuck on the outer dot
+      expect(deflection(course, distanceNm), `on course at ${distanceNm} NM`).toBeCloseTo(0, 6)
+    }
+  })
+
+  it('keeps the learn/cockpit aid gating unchanged now the panel carries nav data', () => {
+    const learn = setup('learn')
+    expect(learn.el.querySelector('.hsi-thumb')).not.toBeNull()
+    expect(learn.el.querySelector('.hsi-sector-direct')).not.toBeNull()
+
+    const cockpit = setup('cockpit')
+    expect(cockpit.el.querySelector('.hsi-thumb')).toBeNull()
+    expect(cockpit.el.querySelector('.hsi-sector-direct')).toBeNull()
+
+    // Feedback reveals the sectors — and only the sectors. The thumb band is a
+    // learn-mode aid; answering does not earn it.
+    answerButton(cockpit.el, generateScenario(42).result.primary).click()
+    expect(cockpit.el.querySelector('.hsi-sector-direct')).not.toBeNull()
+    expect(cockpit.el.querySelector('.hsi-thumb')).toBeNull()
+
+    // The nav picture is not an aid: it is the situation, so it survives the
+    // re-render that drops and restores the overlays.
+    expect(cockpit.el.querySelector('.hsi-status')).not.toBeNull()
+    expect(learn.el.querySelector('.hsi-status')).not.toBeNull()
   })
 
   it('shows session and cockpit-benchmark stats', () => {
