@@ -20,7 +20,7 @@
 // the answer is re-derived from the engine, off the `heading`/`holdSpec` the
 // snapshot already records.
 //
-// The scenario TEXT (`clearanceText`, `chartNote`) stays frozen, deliberately.
+// The scenario TEXT (`clearanceText`, `holdNote`) stays frozen, deliberately.
 // It is re-derivable only from `seed`, and `generateScenario` maps a seed through
 // the fixture lists — so after a fixture rename (docs/content-audit.md, the
 // PUBLISHED_HOLDS/FIXES correction) the same seed yields a DIFFERENT hold, and
@@ -168,11 +168,19 @@ function entryMissCard(drill: string, s: Record<string, unknown>): AnkiCard | nu
   const cleared = chosen !== null && (chosen === expected || alternates.includes(chosen))
   const missed = chosen === null || cleared ? '' : `\nYou answered: ${chosen}.`
   // "As published" clearances state neither course nor turns — the snapshot's
-  // plate line is what makes the card answerable away from the drill.
-  const chart = str(s['chartNote'])
-  const chartLine = chart === null ? '' : `\n${chart}`
+  // hold line is what makes the card answerable away from the drill.
+  //
+  // Two spellings, because this is a STORE key matched by string across the
+  // localStorage boundary, exactly like the drill ids: `chartNote` is what every
+  // miss recorded before the hold-line rework carries, and dropping it would
+  // leave those cards showing a clearance with no course and no turn direction.
+  // Aliased rather than migrated — the snapshot is a cache, and a read-side
+  // alias cannot half-fail the way a rewrite of a user's store can. The current
+  // key wins when a hand-edited store carries both.
+  const note = str(s['holdNote']) ?? str(s['chartNote'])
+  const holdLine = note === null ? '' : `\n${note}`
   return {
-    front: `${clearanceText}${chartLine}\nYour heading: ${courseText(heading)} — which entry?`,
+    front: `${clearanceText}${holdLine}\nYour heading: ${courseText(heading)} — which entry?`,
     back: `Correct entry: ${expected}${also}.${missed}`,
     source: also === '' ? ENTRY_MISS_SOURCE : ENTRY_MISS_ALTERNATES_SOURCE,
     tags: ['miss', drill],

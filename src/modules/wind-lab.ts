@@ -301,9 +301,14 @@ export function renderWindLab(el: HTMLElement, options: WindLabOptions = {}): vo
 
   function showScenario(): void {
     const { hold, wind } = lab.scenario
-    // Labelled fictitious for the same reason as entry-drill's chartNote: the
-    // course, turns and legs are invented, and the map draws them north-up like
-    // a plate. Only the wind triangle is being taught here, never the hold.
+    // Labelled fictitious because FIXES is invented wholesale: the course, turns
+    // and legs are made up, and the map draws them north-up like a plate. Only
+    // the wind triangle is being taught here, never the hold.
+    //
+    // Do NOT drop this to match entry-drill's holdNote, which stopped saying
+    // "fictitious" when its pool went mixed. That is the difference: no blanket
+    // claim fits a mixed pool, and every fix here is invented, so the stronger
+    // label is both available and true.
     scenarioEl.textContent =
       `Practice fixture (fictitious fix) — hold at ${hold.fix}: inbound course ` +
       `${courseText(hold.inboundCourse)}, ${hold.turnDirection} turns, 1-minute legs. ` +

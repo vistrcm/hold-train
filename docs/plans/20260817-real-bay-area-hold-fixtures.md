@@ -272,16 +272,42 @@ what makes a single string sufficient.
 - Modify: `src/modules/entry-drill.ts`
 - Modify: `src/modules/entry-drill.test.ts`
 
-- [ ] rename `chartNote` → `holdNote` and update the `EntryScenario.chartNote` field and
+- [x] rename `chartNote` → `holdNote` and update the `EntryScenario.chartNote` field and
       all call sites (`generateScenario`, the render path, tests)
-- [ ] rewrite the rendered string: fix, inbound course (via `courseText`), turn direction,
+- [x] rewrite the rendered string: fix, inbound course (via `courseText`), turn direction,
       leg — no "plate", no "fictitious", no procedure name, no amendment, no cycle
-- [ ] apply the hedge decision flagged in Solution Overview; record which way it went
-- [ ] replace the `/fictitious/i` assertion with a guard that the line **names no
+- [x] apply the hedge decision flagged in Solution Overview; record which way it went
+      — **kept**, as `HOLD_NOTE_HEDGE` (`"Practice data, not current chart data."`), for
+      the plan's own reason: the clearance still says "hold as published". Rendered line:
+      `Hold: ZORVU — inbound course 300°, right turns, 1 minute legs. Practice data, not
+      current chart data.` Ledger entry follows in Task 9.
+- [x] replace the `/fictitious/i` assertion with a guard that the line **names no
       procedure, amendment or chart cycle** (prose scan for plate-identity patterns)
-- [ ] write tests that the line still states fix, course, turns and leg for a sweep of seeds
-- [ ] **mutation-test** the prose scan against a line containing a procedure name
-- [ ] run `npm test` and `npm run typecheck` — must pass before task 4
+- [x] write tests that the line still states fix, course, turns and leg for a sweep of seeds
+- [x] **mutation-test** the prose scan against a line containing a procedure name
+- [x] run `npm test` and `npm run typecheck` — must pass before task 4
+
+➕ **`holdNote` is a STORE key, not just a field** — `recordMiss` writes it verbatim to
+localStorage and `missesToCards` reads it back by string (the runtime-only coupling class
+`CLAUDE.md` flags for the drill ids). Renaming it alone would have left every miss already
+recorded on a user's machine exporting an "as published" clearance with no course and no
+turn direction — unanswerable, which is the one thing snapshotting the line exists to
+prevent. `anki-export.ts` therefore reads `holdNote ?? chartNote`, aliased rather than
+migrated (a read-side alias cannot half-fail the way a rewrite of a user's store can), and
+two tests pin it: the legacy key still renders, and the current key wins when both are
+present. Mutation-confirmed both ways.
+
+➕ Renamed the DOM/CSS carrier too (`.entry-chart` → `.entry-hold`, `chartEl` → `holdEl`),
+so the plate vocabulary is gone from the render path as well as the prose. Not touched by
+any stylesheet guard — `styles.test.ts`'s `context` is about `.entry-answers-label`.
+
+➕ Corrected three comments that pointed at `chartNote` and would have argued a later
+session wrong: `wind-lab.ts` and `wind-lab.test.ts` justified wind lab's *own* "fictitious"
+label by saying entry-drill labels the same shape that way (no longer true — wind lab keeps
+it because `FIXES` is invented wholesale, which is a different and still-valid reason), and
+`clearance.ts` claimed the rendered line is labelled fictitious regardless. Also fixed the
+two now-stale `chartNote` symbol references in `CLAUDE.md`; the fixture-name **invariant**
+in that bullet is Task 9's to reword.
 
 ### Task 4: Extend `PUBLISHED_HOLDS` with the real researched holds
 

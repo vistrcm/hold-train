@@ -218,11 +218,11 @@ export interface EntryScenario {
   distanceNm: number
   clearanceText: string
   /**
-   * What the plate says, for "as published" clearances only. ATC omits course
+   * The hold's geometry, for "as published" clearances only. ATC omits course
    * and turn direction there (JO 7110.65 4-6-4) because the pilot reads them
    * off the chart — without this the entry is not determinable from the prompt.
    */
-  chartNote?: string
+  holdNote?: string
   holdSpec: HoldSpec
   /** Engine answer key: primary entry, boundary alternates, sector arcs. */
   result: EntryResult
@@ -277,27 +277,44 @@ export function generateScenario(seed: number): EntryScenario {
     result: determineEntry(heading, holdSpec),
   }
   if (holdSpec.fixKind === 'charted') {
-    scenario.chartNote = chartNote(holdSpec)
+    scenario.holdNote = holdNote(holdSpec)
   }
   return scenario
 }
 
 /**
- * The plate line a pilot would read for an "as published" clearance.
+ * The hedge decision, resolved: the line keeps one clause.
  *
- * Labelled as a practice plate on purpose: the course, turns and leg length come
- * from the invented PUBLISHED_HOLDS fixtures, not from a chart. Presenting them
- * as charted data would be negative training if a fixture name ever collides
- * with a real fix — which it has.
+ * The clearance it accompanies says "hold as published", which is itself a mild
+ * authority claim, and the geometry behind the line is best-effort research
+ * (docs/bay-area-holds.md) with no cycle, currency or amendment behind it. One
+ * clause is what that costs to say. It claims nothing per-hold, which is the
+ * property that lets a single string serve a MIXED pool.
  */
-export function chartNote(holdSpec: HoldSpec): string {
+const HOLD_NOTE_HEDGE = 'Practice data, not current chart data.'
+
+/**
+ * The hold a pilot would read off the chart for an "as published" clearance.
+ *
+ * No plate framing, and deliberately so: PUBLISHED_HOLDS is a mixed pool of
+ * invented fixtures and real Bay Area names, so no per-hold claim survives —
+ * "fictitious fix" is true of ZORVU and false of OYOSO. What the line states is
+ * the geometry and a hedge that is true of every member.
+ *
+ * It must never name a procedure, runway, amendment or chart cycle. The app
+ * renders no plate, so that identity would be invented for real and invented
+ * names alike, and it is the one claim here a student can act on: an approach
+ * can be looked up, and the looked-up chart would disagree. Guarded by `the hold
+ * line names no procedure, amendment or chart cycle` in entry-drill.test.ts.
+ */
+export function holdNote(holdSpec: HoldSpec): string {
   const leg =
     holdSpec.leg.unit === 'min'
       ? `${holdSpec.leg.value} minute legs`
       : `${holdSpec.leg.value} NM legs`
   return (
-    `Practice plate (fictitious fix) — ${holdSpec.fix}: inbound course ` +
-    `${courseText(holdSpec.inboundCourse)}, ${holdSpec.turnDirection} turns, ${leg}.`
+    `Hold: ${holdSpec.fix} — inbound course ${courseText(holdSpec.inboundCourse)}, ` +
+    `${holdSpec.turnDirection} turns, ${leg}. ${HOLD_NOTE_HEDGE}`
   )
 }
 
@@ -402,8 +419,11 @@ export function createEntryDrill(options: EntryDrillOptions = {}): EntryDrillCon
           heading: scenario.heading,
           holdSpec: scenario.holdSpec,
           clearanceText: scenario.clearanceText,
-          // Without the plate line an "as published" card is unanswerable.
-          chartNote: scenario.chartNote,
+          // Without the hold line an "as published" card is unanswerable. This
+          // key is read back by `missesToCards` across the localStorage
+          // boundary, so it was `chartNote` until the hold-line rework and that
+          // spelling still sits in users' stores — see the legacy read there.
+          holdNote: scenario.holdNote,
           chosen,
           expected: scenario.result.primary,
           alternates: scenario.result.alternates,
@@ -456,7 +476,7 @@ export function renderEntryDrill(el: HTMLElement, options: EntryDrillOptions = {
         <button class="entry-mode" data-mode="cockpit" aria-pressed="${mode === 'cockpit'}">Cockpit · ${COCKPIT_TARGET_SECONDS} s</button>
       </div>
       <p class="entry-clearance"></p>
-      <p class="entry-chart" hidden></p>
+      <p class="entry-hold" hidden></p>
       <p class="entry-scenario"></p>
       <div class="entry-hsi"></div>
       <!-- The label is what tells the row apart from the panel above it: the
@@ -485,7 +505,7 @@ export function renderEntryDrill(el: HTMLElement, options: EntryDrillOptions = {
   `
 
   const clearanceEl = el.querySelector<HTMLElement>('.entry-clearance')!
-  const chartEl = el.querySelector<HTMLElement>('.entry-chart')!
+  const holdEl = el.querySelector<HTMLElement>('.entry-hold')!
   const scenarioEl = el.querySelector<HTMLElement>('.entry-scenario')!
   const hsiEl = el.querySelector<HTMLElement>('.entry-hsi')!
   const mapEl = el.querySelector<HTMLElement>('.entry-map')!
@@ -529,10 +549,10 @@ export function renderEntryDrill(el: HTMLElement, options: EntryDrillOptions = {
 
   function showScenario(): void {
     clearanceEl.textContent = `“${drill.scenario.clearanceText}”`
-    // "As published" is silent on course and turns; the plate supplies them.
-    const note = drill.scenario.chartNote
-    chartEl.textContent = note ?? ''
-    chartEl.hidden = note === undefined
+    // "As published" is silent on course and turns; the hold line supplies them.
+    const note = drill.scenario.holdNote
+    holdEl.textContent = note ?? ''
+    holdEl.hidden = note === undefined
     // Where the aircraft is. "Tracking direct" is not scene-setting: it is the
     // assumption `courseDeviation` derives the TO/FROM flag from, so a student
     // reading the needle is told it rather than left to infer it. Distance goes

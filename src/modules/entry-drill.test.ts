@@ -789,16 +789,16 @@ describe('renderEntryDrill screen', () => {
     ).toBe('true')
   })
 
-  it('shows the plate line for an "as published" clearance', () => {
+  it('shows the hold line for an "as published" clearance', () => {
     const { el } = setup('cockpit', CHARTED_SEED)
-    const chart = el.querySelector<HTMLElement>('.entry-chart')!
-    expect(chart.hidden).toBe(false)
-    expect(chart.textContent).toContain(generateScenario(CHARTED_SEED).chartNote!)
+    const hold = el.querySelector<HTMLElement>('.entry-hold')!
+    expect(hold.hidden).toBe(false)
+    expect(hold.textContent).toContain(generateScenario(CHARTED_SEED).holdNote!)
   })
 
-  it('hides the plate line when the clearance states course and turns', () => {
+  it('hides the hold line when the clearance states course and turns', () => {
     const { el } = setup('cockpit', 0)
-    expect(el.querySelector<HTMLElement>('.entry-chart')!.hidden).toBe(true)
+    expect(el.querySelector<HTMLElement>('.entry-hold')!.hidden).toBe(true)
   })
 
   // --- the aircraft's position reaches the panel ------------------------------
@@ -1100,7 +1100,7 @@ describe('every scenario is answerable from what the pilot is shown', () => {
   /** Turn direction a pilot could read off the prompt alone. */
   function turnDirectionShown(seed: number): 'left' | 'right' {
     const s = generateScenario(seed)
-    const shown = `${s.clearanceText} ${s.chartNote ?? ''}`
+    const shown = `${s.clearanceText} ${s.holdNote ?? ''}`
     return /left turns/.test(shown) ? 'left' : 'right'
   }
 
@@ -1111,29 +1111,97 @@ describe('every scenario is answerable from what the pilot is shown', () => {
     }
   })
 
-  it('charted holds carry the plate line; spoken clearances do not need one', () => {
+  it('charted holds carry the hold line; spoken clearances do not need one', () => {
     for (let seed = 0; seed < 500; seed++) {
       const s = generateScenario(seed)
       if (s.holdSpec.fixKind === 'charted') {
-        expect(s.chartNote, `seed ${seed}`).toContain(courseText(s.holdSpec.inboundCourse))
-        expect(s.chartNote, `seed ${seed}`).toContain(`${s.holdSpec.turnDirection} turns`)
+        const { fix, inboundCourse, turnDirection, leg } = s.holdSpec
+        // All four geometry fields, because all four are what "as published"
+        // leaves unsaid — a line missing the leg is as unanswerable as one
+        // missing the course.
+        expect(s.holdNote, `seed ${seed}`).toContain(fix)
+        expect(s.holdNote, `seed ${seed}`).toContain(courseText(inboundCourse))
+        expect(s.holdNote, `seed ${seed}`).toContain(`${turnDirection} turns`)
+        expect(s.holdNote, `seed ${seed}`).toContain(
+          leg.unit === 'min' ? `${leg.value} minute legs` : `${leg.value} NM legs`,
+        )
       } else {
-        expect(s.chartNote, `seed ${seed}`).toBeUndefined()
+        expect(s.holdNote, `seed ${seed}`).toBeUndefined()
       }
     }
   })
 
-  // The plate line is the one place the drill shows course/turn/leg data as if
-  // it came off a chart, but PUBLISHED_HOLDS is invented practice data. Fixture
-  // names have collided with real waypoints before (CEDES, SUNOL and TRACY are
-  // real NorCal fixes, TRACY beside KTCY), so the rendered line must say it is
-  // fictitious — a student must never memorize invented data for a fix they fly.
-  it('marks the plate line as a practice plate, never as a real chart', () => {
+  // The hold line is the one place the drill shows course/turn/leg data outside
+  // the radio call, and PUBLISHED_HOLDS is about to become a MIXED pool —
+  // invented fixtures alongside real Bay Area names. So no blanket per-hold
+  // claim survives: "fictitious fix" is true of ZORVU and false of OYOSO.
+  //
+  // What must never appear is a PLATE IDENTITY — a procedure name, a runway, an
+  // amendment or a chart cycle. The app renders no plate, so that identity would
+  // be invented for every member of the pool, real name or not, and it is the
+  // one kind of claim a student can act on: an approach can be looked up by name
+  // and the looked-up chart would disagree. Geometry here is best-effort
+  // practice data (docs/bay-area-holds.md) and says so; a plate identity would
+  // dress it as a specific chart product.
+  //
+  // The scan bans the identity, NOT the word "chart": the line's own hedge says
+  // it is not current chart data, and a blanket /chart/i ban would forbid exactly
+  // the disclaimer that keeps the geometry honest.
+  const PLATE_IDENTITY: ReadonlyArray<readonly [string, RegExp]> = [
+    ['procedure name', /\b(ILS|LOC|LDA|SDF|RNAV|GPS|VOR\/DME|VORTAC|TACAN|HILPT)\b/i],
+    ['approach or procedure', /\b(approach|procedure|SID|STAR|missed)\b/i],
+    ['runway', /\b(RWY|runway)\s*\d/i],
+    ['amendment', /\b(amdt|amendment|orig)\b/i],
+    ['chart cycle', /\b(airac|cycle|eff|effective)\b/i],
+    ['effective date', /\b\d{1,2}\s*[A-Z]{3}\s*\d{2,4}\b/i],
+    ['plate framing', /\bplate\b|\bchart(ed)?\s*:/i],
+  ]
+
+  /** The plate-identity kinds a line claims; empty is the only passing value. */
+  function plateIdentity(line: string): string[] {
+    return PLATE_IDENTITY.filter(([, re]) => re.test(line)).map(([kind]) => kind)
+  }
+
+  it('the hold line names no procedure, amendment or chart cycle', () => {
     for (let seed = 0; seed < 500; seed++) {
       const s = generateScenario(seed)
       if (s.holdSpec.fixKind === 'charted') {
-        expect(s.chartNote, `seed ${seed}`).toMatch(/practice plate/i)
-        expect(s.chartNote, `seed ${seed}`).toMatch(/fictitious/i)
+        expect(plateIdentity(s.holdNote!), `seed ${seed}: ${s.holdNote}`).toEqual([])
+      }
+    }
+  })
+
+  // Every regex above is load-bearing: each defect is paired with the kind it
+  // must be caught AS, so one over-broad pattern cannot stand in for the rest
+  // and a deleted pattern reds here rather than going quietly uncovered. The
+  // last two are the wordings this repo actually shipped — the old chartNote
+  // line, and the "Chart: CEDES — …" snapshot still in anki-export.test.ts.
+  it('the plate-identity scan is not vacuous', () => {
+    const defects: ReadonlyArray<readonly [string, string]> = [
+      ['procedure name', 'Hold: OYOSO — ILS or LOC RWY 12L holding.'],
+      ['approach or procedure', 'Hold: OYOSO — hold as depicted on the missed approach.'],
+      ['runway', 'Hold: OYOSO — RWY 30 holding, 4 NM legs.'],
+      ['amendment', 'Hold: OYOSO — inbound course 116°, left turns, 4 NM legs. Amdt 2B.'],
+      ['chart cycle', 'Hold: OYOSO — inbound course 116°. AIRAC cycle 2608.'],
+      ['effective date', 'Hold: OYOSO — inbound course 116°, eff 14 AUG 2026.'],
+      ['plate framing', 'Practice plate (fictitious fix) — OYOSO: inbound course 116°.'],
+      ['plate framing', 'Chart: CEDES — inbound course 300°, left turns, 1 minute legs.'],
+    ]
+    for (const [kind, line] of defects) {
+      expect(plateIdentity(line), line).toContain(kind)
+    }
+  })
+
+  // The hedge decision the plan left open (Task 3), resolved as: KEEP it. The
+  // clearance still says "hold as published", which is itself a mild authority
+  // claim, and the geometry behind the line is best-effort — so the line carries
+  // one clause saying so. Written out here rather than imported, because the
+  // wording IS the claim: a silent reword reds this instead of shipping.
+  it('hedges the hold line as practice data, not chart data', () => {
+    for (let seed = 0; seed < 500; seed++) {
+      const s = generateScenario(seed)
+      if (s.holdSpec.fixKind === 'charted') {
+        expect(s.holdNote, `seed ${seed}`).toMatch(/not current chart data/i)
       }
     }
   })

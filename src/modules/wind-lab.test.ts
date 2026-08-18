@@ -324,7 +324,9 @@ describe('renderWindLab (screen)', () => {
 
   // The scenario line states course, turns and legs for a named fix and the map
   // draws it north-up like a plate, but every one of those numbers is invented.
-  // entry-drill's chartNote labels the same shape fictitious; this one must too.
+  // The entry drill's line stopped saying "fictitious" when its pool went mixed
+  // (real Bay Area names alongside the invented fixtures); FIXES did not, so
+  // this screen keeps the stronger label rather than following it.
   it('labels the scenario line as a practice fixture, not charted data', () => {
     for (const seed of [0, 5, 17, 42]) {
       const { el } = setup(seed)

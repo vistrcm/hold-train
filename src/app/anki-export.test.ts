@@ -197,9 +197,26 @@ describe('missesToCards', () => {
     expect(c.front).toContain('040°')
   })
 
-  it('carries the plate line so an "as published" miss stays answerable', () => {
-    // The clearance states neither course nor turn direction; without the
-    // chart line the card cannot be answered away from the drill.
+  it('carries the hold line so an "as published" miss stays answerable', () => {
+    // The clearance states neither course nor turn direction; without the hold
+    // line the card cannot be answered away from the drill.
+    const scenario = {
+      ...(entryMiss.scenario as object),
+      clearanceText: 'Hold northeast of CEDES as published, expect further clearance at 0710.',
+      holdNote: 'Hold: CEDES — inbound course 300°, left turns, 1 minute legs.',
+    }
+    const c = missesToCards([{ ...entryMiss, scenario }])[0]!
+    expect(c.front).toContain('left turns')
+    expect(c.front).toContain('300°')
+  })
+
+  // `chartNote` was this key's name until the 2026-08-17 hold-line rework. It is
+  // a STORE key, matched by string across the localStorage boundary exactly like
+  // the drill ids, so every miss already recorded on a user's machine still
+  // spells it the old way — and dropping the read would leave those cards
+  // showing an "as published" clearance with no course and no turn direction,
+  // i.e. unanswerable, which is the whole reason the line is snapshotted.
+  it('reads the legacy chartNote key so misses recorded before the rename survive', () => {
     const scenario = {
       ...(entryMiss.scenario as object),
       clearanceText: 'Hold northeast of CEDES as published, expect further clearance at 0710.',
@@ -208,6 +225,19 @@ describe('missesToCards', () => {
     const c = missesToCards([{ ...entryMiss, scenario }])[0]!
     expect(c.front).toContain('left turns')
     expect(c.front).toContain('300°')
+  })
+
+  // The new key wins: a snapshot carrying both (a hand-edited store, or a future
+  // migration that copies rather than moves) must not print the stale line.
+  it('prefers the current hold line when a snapshot carries both keys', () => {
+    const scenario = {
+      ...(entryMiss.scenario as object),
+      holdNote: 'Hold: CEDES — inbound course 300°, left turns, 1 minute legs.',
+      chartNote: 'Chart: CEDES — inbound course 120°, right turns, 4 NM legs.',
+    }
+    const c = missesToCards([{ ...entryMiss, scenario }])[0]!
+    expect(c.front).toContain('left turns')
+    expect(c.front).not.toContain('right turns')
   })
 
   it('converts an entry miss recorded by the real entry drill (store round-trip)', () => {
@@ -219,7 +249,7 @@ describe('missesToCards', () => {
     drill.answer(wrong)
     const c = missesToCards(store.loadState().misses)[0]!
     expect(c.front).toContain(drill.scenario.clearanceText)
-    expect(c.front).toContain(drill.scenario.chartNote!)
+    expect(c.front).toContain(drill.scenario.holdNote!)
     expect(c.back).toContain(drill.scenario.result.primary)
   })
 

@@ -154,9 +154,9 @@ button {
   color: var(--text);
 }
 
-/* What the plate says for an "as published" clearance — not spoken by ATC, so
-   it reads as chart data rather than as part of the radio call. */
-.entry-chart {
+/* The hold's geometry for an "as published" clearance — not spoken by ATC, so
+   it reads as looked-up data rather than as part of the radio call. */
+.entry-hold {
   font-size: var(--fs-sm);
   color: var(--text-dim);
   border-left: 3px solid var(--border);

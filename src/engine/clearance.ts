@@ -198,8 +198,10 @@ export function clearanceText(fields: ClearanceFields): string {
 // original "plausible NorCal names" wording walked into: CEDES (Livermore),
 // SUNOL and TRACY are all real fixes, and TRACY sits beside KTCY. Verify a new
 // fixture name returns no waypoint record (opennav.com/waypoint/US/<NAME>)
-// before adding it. The rendered plate line is labelled fictitious regardless —
-// see chartNote in src/modules/entry-drill.ts.
+// before adding it. The rendered line states the geometry and hedges it as
+// practice data — see holdNote in src/modules/entry-drill.ts. It no longer calls
+// the fix fictitious, so that hedge is not a licence to add a name a student
+// might look up: the disjointness rules above are what carry that.
 const VOR_NAMES = ['Manteca', 'Linden', 'Sacramento', 'Modesto', 'Panoche'] as const
 const NDB_NAMES = ['Amber', 'Delta', 'Cooper'] as const
 
