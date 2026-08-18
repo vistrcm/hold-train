@@ -417,3 +417,111 @@ describe('PUBLISHED_HOLDS practice fixtures', () => {
     }
   })
 })
+
+describe('PUBLISHED_HOLDS geometry agrees with the written bank', () => {
+  // The pool is mixed by design: a fixture MAY carry a real fix name. What it
+  // may not do is teach different geometry for a name the written test already
+  // charts — two screens contradicting each other under one fix name is worse
+  // than approximate data, and no amount of caveating makes it visible. That is
+  // the HAIRE defect (docs/content-audit.md): "hold northeast of HAIRE as
+  // published" once taught 210°/left against the charted 231°/right.
+  //
+  // Until Task 4 appends the real holds there is no overlap, so the check
+  // against the live list below is vacuous. The synthetic cases underneath it
+  // are what keep the guard honest in the meantime.
+  type Fixture = (typeof PUBLISHED_HOLDS)[number]
+
+  const isRecord = (v: unknown): v is Record<string, unknown> =>
+    typeof v === 'object' && v !== null
+
+  /**
+   * Every field a fixture teaches except its name, as dotted paths. Harvested
+   * from the object rather than hand-listed: a subset comparison is precisely
+   * how one field of a pair drifts while the other stays guarded, so a fifth
+   * field added to the fixture shape is compared by default. One level of
+   * nesting is flattened, which is all `leg` needs.
+   */
+  const geometryFields = (hold: Fixture): ReadonlyArray<readonly [string, unknown]> =>
+    Object.entries(hold as Record<string, unknown>)
+      .filter(([key]) => key !== 'fix')
+      .flatMap(([key, value]) =>
+        isRecord(value)
+          ? Object.entries(value).map(([sub, v]) => [`${key}.${sub}`, v] as const)
+          : [[key, value] as const],
+      )
+
+  const valueAt = (hold: unknown, path: string): unknown =>
+    path.split('.').reduce<unknown>((v, key) => (isRecord(v) ? v[key] : undefined), hold)
+
+  /** One string per contradicted field, so a mismatch names what disagrees. */
+  const geometryConflicts = (fixtures: readonly Fixture[]): string[] => {
+    const conflicts: string[] = []
+    for (const fixture of fixtures) {
+      const charted = CHART_HOLDS.find((h) => h.fix === fixture.fix)
+      if (!charted) continue
+      for (const [path, value] of geometryFields(fixture)) {
+        const chartedValue = valueAt(charted, path)
+        if (value !== chartedValue) {
+          conflicts.push(
+            `${fixture.fix}: ${path} is ${String(value)}, chart says ${String(chartedValue)}`,
+          )
+        }
+      }
+    }
+    return conflicts
+  }
+
+  /**
+   * A fixture-shaped copy of a charted hold — the only legal way to reuse a
+   * charted name. Built field by field on purpose: `Fixture` is the exact
+   * element type, so a field added to the pool reds `tsc` here rather than
+   * quietly producing a twin that carries less than the real thing.
+   */
+  const chartedTwin = (fix: string): Fixture => {
+    const charted = CHART_HOLDS.find((h) => h.fix === fix)
+    if (!charted) {
+      throw new Error(`CHART_HOLDS no longer carries ${fix}; point these cases at another charted fix`)
+    }
+    return {
+      fix: charted.fix,
+      inboundCourse: charted.inboundCourse,
+      turnDirection: charted.turnDirection,
+      leg: { ...charted.leg },
+    }
+  }
+
+  it('never contradicts a charted hold it shares a name with', () => {
+    expect(geometryConflicts(PUBLISHED_HOLDS)).toEqual([])
+  })
+
+  it('permits a fixture that reuses a charted name with identical geometry', () => {
+    // The invariant that replaces the old blanket name ban: sharing a name is
+    // fine, sharing it with different numbers is not. A guard that rejected the
+    // overlap outright would red here and make Task 4 impossible.
+    expect(geometryConflicts([chartedTwin('OYOSO')])).toEqual([])
+  })
+
+  // One mutation per field, not one fixture with everything wrong: a single
+  // all-fields-wrong pair still reds a guard that only compares inboundCourse,
+  // which is the subset hole these cases exist to close.
+  const MISMATCHES: ReadonlyArray<readonly [string, (h: Fixture) => Fixture]> = [
+    ['inboundCourse', (h) => ({ ...h, inboundCourse: normalizeDeg(h.inboundCourse + 30) })],
+    ['turnDirection', (h) => ({ ...h, turnDirection: h.turnDirection === 'left' ? 'right' : 'left' })],
+    ['leg.unit', (h) => ({ ...h, leg: { unit: h.leg.unit === 'nm' ? 'min' : 'nm', value: h.leg.value } })],
+    ['leg.value', (h) => ({ ...h, leg: { ...h.leg, value: h.leg.value + 1 } })],
+  ]
+
+  it.each(MISMATCHES)('catches a fixture contradicting the chart on %s', (field, contradict) => {
+    const conflicts = geometryConflicts([contradict(chartedTwin('OYOSO'))])
+    expect(conflicts).toHaveLength(1)
+    expect(conflicts[0]).toContain(field)
+  })
+
+  it('compares every field a fixture carries, not a hand-listed subset', () => {
+    for (const hold of PUBLISHED_HOLDS) {
+      const compared = new Set(geometryFields(hold).map(([path]) => path.replace(/\..*$/, '')))
+      const carried = Object.keys(hold).filter((key) => key !== 'fix')
+      expect([...compared].sort(), hold.fix).toEqual(carried.sort())
+    }
+  })
+})

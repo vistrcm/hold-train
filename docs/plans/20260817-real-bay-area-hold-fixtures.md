@@ -248,15 +248,15 @@ geometry, mark it as such, and move on. The one thing that must be right is a
 **Files:**
 - Modify: `src/engine/clearance.test.ts`
 
-- [ ] write the guard: any `PUBLISHED_HOLDS` fixture sharing a `fix` with a `CHART_HOLDS`
+- [x] write the guard: any `PUBLISHED_HOLDS` fixture sharing a `fix` with a `CHART_HOLDS`
       entry must match it on `inboundCourse`, `turnDirection`, `leg.unit` **and**
       `leg.value` (all four, per Technical Details)
-- [ ] write a test asserting the guard is not vacuous — i.e. it fails on a synthetic
+- [x] write a test asserting the guard is not vacuous — i.e. it fails on a synthetic
       overlapping pair with mismatched geometry, so it cannot silently pass when no
       overlap exists yet
-- [ ] **mutation-test**: temporarily add `OYOSO` to `PUBLISHED_HOLDS` with wrong geometry,
+- [x] **mutation-test**: temporarily add `OYOSO` to `PUBLISHED_HOLDS` with wrong geometry,
       confirm the named test reds, revert
-- [ ] run `npm test` and `npm run typecheck` — must pass before task 3
+- [x] run `npm test` and `npm run typecheck` — must pass before task 3
 
 ### Task 3: Rework `chartNote` into `holdNote` — remove plate framing
 
