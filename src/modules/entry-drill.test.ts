@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createStore, type Store } from '../app/store'
-import { generateClearance, PUBLISHED_HOLDS } from '../engine/clearance'
+import { generateClearance, PUBLISHED_HOLDS, RESEARCHED_HOLDS } from '../engine/clearance'
 import {
   determineEntry,
   ENTRIES,
@@ -1091,6 +1091,37 @@ describe('renderEntryDrill screen', () => {
   })
 })
 
+// The hold line is the one place the drill shows course/turn/leg data outside
+// the radio call, and PUBLISHED_HOLDS is a MIXED pool — invented fixtures
+// alongside real Bay Area names. So no blanket per-hold
+// claim survives: "fictitious fix" is true of ZORVU and false of OYOSO.
+//
+// What must never appear is a PLATE IDENTITY — a procedure name, a runway, an
+// amendment or a chart cycle. The app renders no plate, so that identity would
+// be invented for every member of the pool, real name or not, and it is the
+// one kind of claim a student can act on: an approach can be looked up by name
+// and the looked-up chart would disagree. Geometry here is best-effort
+// practice data (docs/bay-area-holds.md) and says so; a plate identity would
+// dress it as a specific chart product.
+//
+// The scan bans the identity, NOT the word "chart": the line's own hedge says
+// it is not current chart data, and a blanket /chart/i ban would forbid exactly
+// the disclaimer that keeps the geometry honest.
+const PLATE_IDENTITY: ReadonlyArray<readonly [string, RegExp]> = [
+  ['procedure name', /\b(ILS|LOC|LDA|SDF|RNAV|GPS|VOR\/DME|VORTAC|TACAN|HILPT)\b/i],
+  ['approach or procedure', /\b(approach|procedure|SID|STAR|missed)\b/i],
+  ['runway', /\b(RWY|runway)\s*\d/i],
+  ['amendment', /\b(amdt|amendment|orig)\b/i],
+  ['chart cycle', /\b(airac|cycle|eff|effective)\b/i],
+  ['effective date', /\b\d{1,2}\s*[A-Z]{3}\s*\d{2,4}\b/i],
+  ['plate framing', /\bplate\b|\bchart(ed)?\s*:/i],
+]
+
+/** The plate-identity kinds a line claims; empty is the only passing value. */
+function plateIdentity(line: string): string[] {
+  return PLATE_IDENTITY.filter(([, re]) => re.test(line)).map(([kind]) => kind)
+}
+
 // Regression: an "as published" clearance is legitimately silent on inbound
 // course and turn direction (JO 7110.65 4-6-4) — the pilot reads them off the
 // plate. Cockpit mode shows no thumb overlay, so without the plate line the
@@ -1130,37 +1161,6 @@ describe('every scenario is answerable from what the pilot is shown', () => {
       }
     }
   })
-
-  // The hold line is the one place the drill shows course/turn/leg data outside
-  // the radio call, and PUBLISHED_HOLDS is a MIXED pool — invented fixtures
-  // alongside real Bay Area names. So no blanket per-hold
-  // claim survives: "fictitious fix" is true of ZORVU and false of OYOSO.
-  //
-  // What must never appear is a PLATE IDENTITY — a procedure name, a runway, an
-  // amendment or a chart cycle. The app renders no plate, so that identity would
-  // be invented for every member of the pool, real name or not, and it is the
-  // one kind of claim a student can act on: an approach can be looked up by name
-  // and the looked-up chart would disagree. Geometry here is best-effort
-  // practice data (docs/bay-area-holds.md) and says so; a plate identity would
-  // dress it as a specific chart product.
-  //
-  // The scan bans the identity, NOT the word "chart": the line's own hedge says
-  // it is not current chart data, and a blanket /chart/i ban would forbid exactly
-  // the disclaimer that keeps the geometry honest.
-  const PLATE_IDENTITY: ReadonlyArray<readonly [string, RegExp]> = [
-    ['procedure name', /\b(ILS|LOC|LDA|SDF|RNAV|GPS|VOR\/DME|VORTAC|TACAN|HILPT)\b/i],
-    ['approach or procedure', /\b(approach|procedure|SID|STAR|missed)\b/i],
-    ['runway', /\b(RWY|runway)\s*\d/i],
-    ['amendment', /\b(amdt|amendment|orig)\b/i],
-    ['chart cycle', /\b(airac|cycle|eff|effective)\b/i],
-    ['effective date', /\b\d{1,2}\s*[A-Z]{3}\s*\d{2,4}\b/i],
-    ['plate framing', /\bplate\b|\bchart(ed)?\s*:/i],
-  ]
-
-  /** The plate-identity kinds a line claims; empty is the only passing value. */
-  function plateIdentity(line: string): string[] {
-    return PLATE_IDENTITY.filter(([, re]) => re.test(line)).map(([kind]) => kind)
-  }
 
   it('the hold line names no procedure, amendment or chart cycle', () => {
     for (let seed = 0; seed < 500; seed++) {
@@ -1222,6 +1222,99 @@ describe('every scenario is answerable from what the pilot is shown', () => {
     expect(s.clearanceText).not.toContain('radial')
   })
 })
+
+// The acceptance criteria of the mixed-pool change: real Bay Area names have to
+// reach the SCREEN (a pool nothing draws from buys the student nothing), and
+// nothing a screen renders about a drill hold may name a plate.
+//
+// The scan above runs on the generated string. That is the narrower claim, and
+// this repo's recurring defect is a scope narrower than the claim reading as
+// coverage: a screen wrapping the line in framing of its own ("Plate: …", a
+// heading naming an approach) leaves every holdNote assertion green. So the
+// same scan runs again over the rendered element, and over the clearance text —
+// the one hold-bearing string the CLEARANCE-COPY screen renders, which is what
+// makes the claim "no screen" rather than "not the drill's own line".
+//
+// What it deliberately does NOT do is scan a whole screen. The drill's footnote
+// quotes AIM 1-1-17 verbatim ("published IFR charted departures", "When an
+// approach has been loaded…"), so a screen-wide ban reds on a citation and the
+// only way back to green is weakening the patterns until they catch nothing.
+// The unit is the strings that speak about the hold.
+describe('the mixed fixture pool reaches the screen', () => {
+  // A charted clearance is one fix kind in four and `pick` is uniform, so this
+  // is ~500 charted draws over 18 fixtures — every one of them drawn many times
+  // over. The number is a claim about draw FREQUENCY, not shared with the
+  // 500-seed sweeps above, and it has to grow if the pool ever does.
+  const SWEEP = 2000
+
+  /**
+   * Computed per call rather than at describe scope: a mutation that makes
+   * generation throw would otherwise die during collection, and the file would
+   * report "no tests" with every guard below silently absent.
+   */
+  function chartedDraws(): Array<{ seed: number; s: ReturnType<typeof generateScenario> }> {
+    return Array.from({ length: SWEEP }, (_, seed) => ({ seed, s: generateScenario(seed) })).filter(
+      ({ s }) => s.holdSpec.fixKind === 'charted',
+    )
+  }
+
+  it('draws every researched Bay Area fix across a wide seed sweep', () => {
+    // Harvested from the list, never hand-written: a hand-typed roster measures
+    // only the fixtures that existed when it was typed, and the next hold added
+    // ships undrawn.
+    expect(RESEARCHED_HOLDS.length, 'no researched holds to draw').toBeGreaterThan(0)
+    const drawn = new Set(chartedDraws().map(({ s }) => s.holdSpec.fix))
+    const missing = RESEARCHED_HOLDS.map((h) => h.fix).filter((f) => !drawn.has(f))
+    expect(missing, `not drawn in ${SWEEP} seeds`).toEqual([])
+  })
+
+  it('renders a real Bay Area fix and its researched geometry on the drill screen', () => {
+    const real = new Map(RESEARCHED_HOLDS.map((h) => [h.fix, h]))
+    const hit = chartedDraws().find(({ s }) => real.has(s.holdSpec.fix))
+    expect(hit, `no researched hold drawn in ${SWEEP} seeds`).toBeDefined()
+    const { seed, s } = hit!
+    // Read back from the fixture table, not from the scenario the screen was
+    // built from: expecting `holdSpec` back is the renderer and the expectation
+    // flipping together, and it would pass on a pool that drew the wrong
+    // geometry for a real place — the one defect a real name makes serious.
+    const hold = real.get(s.holdSpec.fix)!
+    const el = document.createElement('div')
+    renderEntryDrill(el, { mode: 'cockpit', seed, store: testStore(), now: () => 0 })
+    const line = el.querySelector<HTMLElement>('.entry-hold')!
+    expect(line.hidden, `seed ${seed}`).toBe(false)
+    const text = line.textContent ?? ''
+    expect(text, `seed ${seed}`).toContain(hold.fix)
+    expect(text, `seed ${seed}`).toContain(courseText(hold.inboundCourse))
+    expect(text, `seed ${seed}`).toContain(`${hold.turnDirection} turns`)
+    expect(text, `seed ${seed}`).toContain(
+      hold.leg.unit === 'min' ? `${hold.leg.value} minute legs` : `${hold.leg.value} NM legs`,
+    )
+  })
+
+  it('the hold line as rendered names no procedure, amendment or chart cycle', () => {
+    // A dozen charted seeds, rendered: enough to cross both halves of the mixed
+    // pool, and the framing this catches would be in the template rather than in
+    // any one seed's data.
+    const seeds = chartedDraws().slice(0, 12)
+    expect(seeds.length, 'no charted seeds rendered').toBe(12)
+    for (const { seed } of seeds) {
+      const el = document.createElement('div')
+      renderEntryDrill(el, { mode: 'cockpit', seed, store: testStore(), now: () => 0 })
+      const text = el.querySelector<HTMLElement>('.entry-hold')!.textContent ?? ''
+      expect(plateIdentity(text), `seed ${seed}: ${text}`).toEqual([])
+    }
+  })
+
+  it('the clearance text every screen speaks names no procedure, amendment or chart cycle', () => {
+    // Swept over ALL seeds, not just charted ones: the ad-hoc branch interpolates
+    // a VOR_NAMES entry into the same sentence, and that list went mixed too.
+    for (let seed = 0; seed < SWEEP; seed++) {
+      const { clearanceText } = generateScenario(seed)
+      expect(plateIdentity(clearanceText), `seed ${seed}: ${clearanceText}`).toEqual([])
+    }
+  })
+})
+
 
 describe('entryDrillScreen', () => {
   it('registers under entry-drill and renders', () => {

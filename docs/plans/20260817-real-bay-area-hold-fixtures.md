@@ -515,13 +515,63 @@ coverage claim is real and not an artifact of the pool being small.
 
 ### Task 8: Verify acceptance criteria
 
-- [ ] verify the entry drill renders real Bay Area fixes across a wide seed sweep
-- [ ] verify no screen names a procedure, amendment or chart cycle for a drill hold
-- [ ] verify no fixture contradicts `CHART_HOLDS` geometry
-- [ ] verify wind-lab data and labelling are untouched
-- [ ] run the full suite: `npm test`
-- [ ] run `npm run typecheck`
-- [ ] confirm every new guard was mutation-tested (Tasks 2, 3, 6)
+**Files:**
+- Modify: `src/modules/entry-drill.test.ts` (the two criteria that were true only by
+  inspection are now asserted)
+
+- [x] verify the entry drill renders real Bay Area fixes across a wide seed sweep — all
+      **14** researched fixes are drawn inside the first 500 seeds, and seed 20 renders
+      `Hold: HAIRE — inbound course 231°, right turns, 4 NM legs. Practice data, not
+      current chart data.` Nothing pinned this, so two tests now do: `draws every
+      researched Bay Area fix across a wide seed sweep` (harvested from
+      `RESEARCHED_HOLDS`, never hand-listed, with the list's own length asserted
+      non-empty) and `renders a real Bay Area fix and its researched geometry on the
+      drill screen`, which reads the expected four fields back out of the **fixture
+      table** rather than out of the scenario the screen was built from — echoing
+      `holdSpec` is renderer and expectation flipping together, and would pass on a pool
+      that drew wrong geometry for a real place. The drill's one existing hold-line DOM
+      tie is `CHARTED_SEED = 4`, which draws the **invented** QUIBO, so no test showed a
+      real name on screen at all
+- [x] verify no screen names a procedure, amendment or chart cycle for a drill hold —
+      clean on both screens, and widened from "the drill's own string" to "every string a
+      screen speaks about the hold": `PLATE_IDENTITY`/`plateIdentity` hoisted to module
+      scope (one copy, per the file's own closing note) and re-run over the **rendered**
+      `.entry-hold` element and over `clearanceText` across 2000 seeds. Clearance-copy
+      states no hold geometry at all — it renders `clearanceText` plus copy-form
+      vocabulary ("as published", "per chart", "a charted hold means per chart"), which is
+      JO 7110.65 phraseology and correctly untouched by a scan that bans the plate
+      identity rather than the word "chart". ⚠️ A **whole-screen** scan was tried and
+      rejected as unviable, recorded so the next session does not re-attempt it: the
+      drill's footnote quotes AIM 1-1-17 verbatim ("published IFR charted departures",
+      "When an approach has been loaded…"), so a screen-wide ban reds on a citation and
+      the only route back to green is weakening the patterns until they catch nothing —
+      the "widen the whitelist until it accepts anything" trap
+- [x] verify no fixture contradicts `CHART_HOLDS` geometry — **3** names overlap
+      (`ALTAM` was held back in Task 4) and each matches on all four fields:
+      `OYOSO` 116/left/4nm, `HAIRE` 231/right/4nm, `UHHUT` 255/right/4nm, fixture against
+      chart
+- [x] verify wind-lab data and labelling are untouched — **every** changed line in
+      `src/modules/wind-lab.ts` on this branch is a comment (`git diff master...HEAD`
+      filtered of `//` lines is empty); `FIXES` is byte-identical to master
+      (`KELVO`, `MORVA`, `GUSTO`, `PLIXA`, `CRABB`) and the scenario line still reads
+      `Practice fixture (fictitious fix) — hold at …`
+- [x] run the full suite: `npm test` — 799 passed (795 + the 4 added here), 29 files
+- [x] run `npm run typecheck` — clean
+- [x] confirm every new guard was mutation-tested (Tasks 2, 3, 6) — **re-run against the
+      final tree**, not taken from the earlier entries, since Task 2's mutation predates
+      the data that now makes it load-bearing. Task 2: `OYOSO` moved to 120/right/5nm reds
+      `never contradicts a charted hold it shares a name with` (and the dossier guard —
+      both witness that geometry). Task 3: a procedure name and amendment appended to
+      `HOLD_NOTE_HEDGE` reds `the hold line names no procedure, amendment or chart cycle`.
+      Task 6: the hold line rebuilt off the seed reds `exports a miss recorded against a
+      hold the fixture pool no longer carries`. The 4 guards added here were
+      mutation-tested too, each isolating: dropping one hold from `PUBLISHED_HOLDS` reds
+      only the sweep; hiding the line for researched fixes only reds only the render tie;
+      a procedure name in the spoken clearance reds only the clearance-text scan; and —
+      the decisive one — the screen wrapping the line as `` `Plate: ${note}` `` reds
+      **only** the new rendered-DOM scan while the pre-existing string scan stays green
+      at 78/79, which is what proves the widening is load-bearing rather than decorative.
+      `git status` clean after every revert
 
 ### Task 9: [Final] Update documentation
 
