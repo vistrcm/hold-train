@@ -228,20 +228,20 @@ hold whose published geometry cannot be pinned down — record the real name wit
 geometry, mark it as such, and move on. The one thing that must be right is a
 `CHART_HOLDS` collision (see Task 2).
 
-- [ ] research published holds (HILPT and missed-approach) at the seven fields; record
+- [x] research published holds (HILPT and missed-approach) at the seven fields; record
       fix name, inbound course, turn direction, leg length for each
-- [ ] verify each candidate navaid still exists and record its status; note any that are
+- [x] verify each candidate navaid still exists and record its status; note any that are
       decommissioned (keeping a decommissioned name is acceptable per scope — recording
       it *as* decommissioned is not optional)
-- [ ] mark every entry's geometry **confidence** (researched / approximate / invented), so
+- [x] mark every entry's geometry **confidence** (researched / approximate / invented), so
       a later reader can tell which is which without redoing the work
-- [ ] record provenance per entry (where the geometry came from, date looked up), plus an
+- [x] record provenance per entry (where the geometry came from, date looked up), plus an
       explicit header stating this dossier is a research artifact and **not** current
       chart data
-- [ ] cross-check every researched fix against `CHART_HOLDS` and flag any name collisions,
+- [x] cross-check every researched fix against `CHART_HOLDS` and flag any name collisions,
       which Task 2's guard will constrain
-- [ ] confirm no researched name collides with wind-lab's `FIXES`
-- [ ] no code changes in this task — dossier only
+- [x] confirm no researched name collides with wind-lab's `FIXES`
+- [x] no code changes in this task — dossier only
 
 ### Task 2: Add the geometry-consistency guard (before any data changes)
 
@@ -285,6 +285,11 @@ what makes a single string sufficient.
 
 ### Task 4: Extend `PUBLISHED_HOLDS` with the real researched holds
 
+The 14 researched holds and their geometry are in `docs/bay-area-holds.md`
+("Recommendations for Tasks 4 and 5"). Four of them (`OYOSO`, `HAIRE`, `UHHUT`, `ALTAM`)
+collide with `CHART_HOLDS` by name and already match it exactly on all four geometry
+fields, so Task 2's guard becomes load-bearing the moment any of them is added.
+
 **Files:**
 - Modify: `src/engine/clearance.ts`
 - Modify: `src/engine/clearance.test.ts`
@@ -305,6 +310,19 @@ what makes a single string sufficient.
 - [ ] run `npm test` and `npm run typecheck` — must pass before task 5
 
 ### Task 5: Widen `VOR_NAMES` and `NDB_NAMES` with real Bay Area stations
+
+⚠️ **Task 1 finding — `Manteca` is decommissioned and already shipped.** `VOR_NAMES` carries
+`Manteca` today; ECA has no record in CIFP 2608 and was decommissioned 2018-03-29 under
+VOR MON (`docs/bay-area-holds.md`). Pre-existing, not introduced here, and harmless for
+entry training — but keep or drop it *deliberately* and say so in the comment.
+
+⚠️ **Task 1 finding — there is no `Stockton` VOR.** The plan's candidate list names
+"Stockton (SCK)"; no such VHF navaid exists in CIFP 2608 (only `ISCK`, the KSCK localizer).
+The station that served Stockton *was* Manteca. Do not add it.
+
+⚠️ **Task 1 finding — no NDBs remain in the region**, so the Task 5 `NDB_NAMES` decision has
+only two real options: keep the invented names (recommended) or use historical ones.
+
 
 **Files:**
 - Modify: `src/engine/clearance.ts`
