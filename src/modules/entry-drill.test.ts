@@ -1115,6 +1115,16 @@ const PLATE_IDENTITY: ReadonlyArray<readonly [string, RegExp]> = [
   ['chart cycle', /\b(airac|cycle|eff|effective)\b/i],
   ['effective date', /\b\d{1,2}\s*[A-Z]{3}\s*\d{2,4}\b/i],
   ['plate framing', /\bplate\b|\bchart(ed)?\s*:/i],
+  // Not a plate identity, but the same class of claim and the reason the
+  // previous wording was deleted: the pool is MIXED, so no blanket per-hold
+  // provenance claim is true of it — "fictitious fix" is true of ZORVU and
+  // false of OYOSO, a real KTCY IAF. Without this row the exact string this
+  // branch removed ("Hold: OYOSO (fictitious fix) — …") matches none of the
+  // patterns above and passes the whole suite, asserting that a real fix the
+  // student flies does not exist. The hedge the line DOES carry is a claim
+  // about the data ("Practice data, not current chart data"), not about the
+  // place, which is why it survives this scan.
+  ['per-hold provenance claim', /\b(fictitious|fictional|invented|made[- ]up|real|actual)\b/i],
 ]
 
 /** The plate-identity kinds a line claims; empty is the only passing value. */
@@ -1186,6 +1196,11 @@ describe('every scenario is answerable from what the pilot is shown', () => {
       ['effective date', 'Hold: OYOSO — inbound course 116°, eff 14 AUG 2026.'],
       ['plate framing', 'Practice plate (fictitious fix) — OYOSO: inbound course 116°.'],
       ['plate framing', 'Chart: CEDES — inbound course 300°, left turns, 1 minute legs.'],
+      // The wording this branch deleted, pointed at the half it is false of.
+      ['per-hold provenance claim', 'Hold: OYOSO (fictitious fix) — inbound course 116°.'],
+      // And the other direction: claiming the real half is real is equally a
+      // per-hold claim, and equally false of ZORVU sitting beside it.
+      ['per-hold provenance claim', 'Hold: OYOSO (a real Bay Area fix) — inbound course 116°.'],
     ]
     for (const [kind, line] of defects) {
       expect(plateIdentity(line), line).toContain(kind)

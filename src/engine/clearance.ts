@@ -493,6 +493,22 @@ function normalizeEfc(text: string): string {
   return text.trim().toUpperCase().replace(/Z$/, '')
 }
 
+/**
+ * A fix as typed, for comparison: case-folded, and internal runs of whitespace
+ * collapsed to one space.
+ *
+ * The collapse is not decoration. VOR_NAMES went mixed and five of its entries
+ * are now two words — `Point Reyes`, `Scaggs Island`, `San Francisco`,
+ * `San Jose`, `El Nido` — so a double space between them is a plausible typo in
+ * a free-text field, and grading a correctly copied fix wrong is exactly the
+ * negative training this drill exists to prevent. What is NOT normalised away
+ * is the space itself: `PointReyes` stays wrong, because a student who cannot
+ * hear the word boundary has not copied the fix.
+ */
+function normalizeFix(text: string): string {
+  return text.trim().toLowerCase().replace(/\s+/g, ' ')
+}
+
 /** Grades a copied clearance field by field against what was actually said. */
 export function gradeCopiedClearance(
   user: CopiedClearance,
@@ -502,7 +518,7 @@ export function gradeCopiedClearance(
     { field: 'direction', correct: user.direction === expected.direction },
     {
       field: 'fix',
-      correct: user.fix.trim().toLowerCase() === expected.fix.trim().toLowerCase(),
+      correct: normalizeFix(user.fix) === normalizeFix(expected.fix),
     },
     gradeHoldingCourse(user, expected),
     gradeLegLength(user, expected),

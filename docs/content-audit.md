@@ -2276,8 +2276,9 @@ CLAUDE.md rule.
   ```
 
   The first two are not hypothetical: `:nth-of-type`/`:not` are the ordinary way to reach one `<p>` in
-  a stack of them, and this section is exactly a stack of them (`.entry-clearance`, `.entry-chart`,
-  `.entry-scenario`, then the label).
+  a stack of them, and this section is exactly a stack of them (`.entry-clearance`, `.entry-hold`
+  — named `.entry-chart` when this was written, renamed 2026-08-17 — `.entry-scenario`, then the
+  label).
 - Fix: `reaches` now splits its tokens. A **name** (`/^[.#]?[\w-]+$/`) is decidable and an unlisted one
   still proves a non-match; `*` matches anything; every other token is undecidable and **does not
   block**, so the compound counts as reaching the element and the existing specificity throw refuses
@@ -2519,9 +2520,17 @@ procedure, amendment or chart cycle` in `entry-drill.test.ts`, which scans the *
 as well as the returned string: the string scan alone stayed green at 78/79 against a screen
 wrapping the same note as `` `Plate: ${note}` ``.
 
-**Also changed.** `VOR_NAMES` went from invented station names to sixteen real Bay Area /
-Central Valley VORs. Manteca (ECA) is kept knowingly though it was decommissioned 2018-03-29
-under VOR MON and is absent from CIFP 2608: it predates the pool going mixed, a hold at a closed
+**Also changed.** `VOR_NAMES` grew from five real NorCal stations to sixteen. It was **always**
+real names — Manteca/ECA, Linden/LIN, Sacramento/SAC, Modesto/MOD and Panoche/PXN are all
+actual navaids, marked "already shipped" in the dossier's own navaid table, and
+`src/engine/clearance.ts` says so outright ("The VORs are real NorCal navaids **and always have
+been**"). That is *why* this list survived every audit the 5-letter fixtures failed: an
+ATC-assigned hold at a real station claims nothing published, because the radial, turns and leg
+are drawn per scenario. (Corrected 2026-08-18: this paragraph first read "went from invented
+station names", repeating a deleted comment that had mislabelled the list. Left standing would
+have invited a re-audit of a list that never carried the defect — or a reinstated ban.)
+
+Manteca (ECA) is kept knowingly though it was decommissioned 2018-03-29 under VOR MON and is absent from CIFP 2608: it predates the pool going mixed, a hold at a closed
 station still teaches the right entry, and dropping it would be the one deletion in an otherwise
 additive change — recorded here rather than rediscovered a third time. `NDB_NAMES` stays
 invented, deliberately: no NDB remains in the Bay Area or Central Valley, so there is no current

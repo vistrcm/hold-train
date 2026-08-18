@@ -13,9 +13,24 @@ not a defect here".
 ## What this is for
 
 `PUBLISHED_HOLDS`, `VOR_NAMES` and `NDB_NAMES` in `src/engine/clearance.ts` feed the entry
-drill and clearance-copy screens. Today every 5-letter fixture is invented. This dossier
-supplies **real Bay Area names** so entry practice rehearses the airspace the student
-actually flies, per `docs/plans/20260817-real-bay-area-hold-fixtures.md`.
+drill and clearance-copy screens. When this was researched every 5-letter fixture was
+invented. This dossier supplied the **real Bay Area names** that shipped on 2026-08-17, so
+entry practice rehearses the airspace the student actually flies, per
+`docs/plans/completed/20260817-real-bay-area-hold-fixtures.md`.
+
+> **Implemented 2026-08-17.** 14 of the 18 researched holds shipped into `RESEARCHED_HOLDS`;
+> `WHYEE`, `IPDEW` and `ORANG` are held back as `CIFP-only` and `ALTAM` for duplicating
+> ZELAT's shape. 11 VOR names were added, `NDB_NAMES` kept invented, Manteca retained
+> knowingly. The ⚠️ sections below are preserved as the reasoning of the day, not as open
+> questions — each records its outcome inline.
+
+> **This file's format is load-bearing.** `src/engine/clearance.test.ts` imports it with
+> `?raw` and parses two of its tables: hold rows (exactly 10 pipe-cells, keyed off the
+> confidence column, course `\d{1,3}°`, leg `\d+ NM|min`) and the navaid table (exactly 8
+> cells, first cell a 3-letter ident, status matched on the literal phrases `in CIFP 2608`
+> and `DECOMMISSIONED`). Adding a column, reflowing a table or rewording a status cell will
+> red `npm test`, and a hold-shaped row that will not parse **throws** rather than being
+> skipped. Edit the prose freely; change the table shapes deliberately.
 
 **The name is the deliverable; the geometry is best-effort.** The app renders no plates and
 names no procedures — it teaches entry geometry, and a stale hold still trains the correct
@@ -189,9 +204,9 @@ the decode is not a guess.
 
 ### ⚠️ Manteca (ECA) is decommissioned and the app ships it today
 
-`VOR_NAMES` in `src/engine/clearance.ts` currently reads
-`['Manteca', 'Linden', 'Sacramento', 'Modesto', 'Panoche']`. **Manteca is the one name in
-that list that no longer exists.** ECA has no record of any kind in CIFP 2608, and it was
+`VOR_NAMES` in `src/engine/clearance.ts` read
+`['Manteca', 'Linden', 'Sacramento', 'Modesto', 'Panoche']` when this was written (it now
+carries sixteen). **Manteca is the one name in that list that no longer exists.** ECA has no record of any kind in CIFP 2608, and it was
 decommissioned **2018-03-29** under the VOR MON program (secondary source; the primary
 finding here is the CIFP absence, and an FAA 8260-2 form dated 2017-06-22 carries the note
 "ECA VOR BEING DECOMMISSIONED", consistent with a 2018 shutdown).
@@ -201,6 +216,11 @@ urgent: an ATC-assigned hold at a station that closed in 2018 still teaches the 
 But it should be a deliberate choice rather than an accident. Recommendation: keep or drop
 it on training-value grounds (the plan's "Judgment calls left to the pilot" covers exactly
 this), and if kept, say in the comment that it is retained knowingly.
+
+**Resolved 2026-08-17: kept.** The comment is written in `clearance.ts`, and the exemption is
+guarded in both directions — `RETAINED_DECOMMISSIONED = ['Manteca']` in `clearance.test.ts`
+requires this row to still say `DECOMMISSIONED` *and* requires the pool to still draw the
+name, so the list cannot decay into an excuse for stations nobody speaks.
 
 ### ⚠️ There is no Stockton VOR
 
@@ -217,7 +237,9 @@ and the Central Valley. Widening the box to 34°–42°N, 118°–125°W returns
 proved non-vacuous — a zero result from a filter that can only ever return zero is not a
 finding.
 
-Consequence for Task 5: **there is no real Bay Area NDB name to adopt.** The realistic
+Consequence for Task 5 (**resolved 2026-08-17: kept invented**, and guarded from the other
+side — `invents its NDB names rather than reusing a real station`): **there is no real Bay
+Area NDB name to adopt.** The realistic
 options are to keep the invented `NDB_NAMES` (`Amber`, `Delta`, `Cooper`) or to use
 historical ones. Keeping them is recommended — the drill still needs an NDB scenario to
 exercise the bearing-vs-radial distinction, and inventing a name for a station class that no
@@ -247,6 +269,10 @@ wind-lab's `FIXES` are untouched and stay invented. Its guards must keep passing
 these now-real clearance lists — nothing here shares a name with them.
 
 ## Recommendations for Tasks 4 and 5
+
+**Shipped 2026-08-17 as written** (minus the four held back, noted below). Retained as the
+record of what was proposed and why; the live geometry is the 8-column table above, which is
+the copy `clearance.test.ts` checks the code against.
 
 Not binding on the implementer; this is what the research supports.
 

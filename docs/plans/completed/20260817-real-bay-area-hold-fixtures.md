@@ -385,10 +385,23 @@ onto a real waypoint (`BRIXO`→`TRACY`); a real-looking name in the researched 
 dossier row; an out-of-range course; and the dossier scan parsing nothing at all, which
 reds rather than passing vacuously.
 
-⚠️ Every seed's heading and answer survived unchanged (787/787 green, including
-`keeps every existing seed on its original heading and answer`): growing the pool changes
-which *index* `pick` lands on but consumes the same number of `rng()` calls, and the drill
-heading comes from a separately-seeded stream.
+⚠️ Every seed's **heading** survived unchanged: growing the pool changes which *index* `pick`
+lands on but consumes the same number of `rng()` calls, and the drill heading comes from a
+separately-seeded stream.
+
+> **Corrected 2026-08-18 (code review).** As first written this said "heading and answer",
+> citing `keeps every existing seed on its original heading and answer`. The heading half is
+> right and was measured; the answer half is wrong, and the cited test does not witness it —
+> its two pinned seeds (7 and 42) are a VOR and an NDB draw, i.e. the **ad-hoc** branch, whose
+> course is drawn from the rng stream and so is genuinely pool-independent. A **charted** seed
+> takes its course from the fixture table, so growing that table 4 → 18 moves it. Replayed
+> over seeds 0–999: of the 240 charted seeds, heading changed for **0**, the drawn fix for
+> **231**, and the entry answer for **175**. That is accepted, not a defect — the plan's own
+> Technical Details already say pool growth changes which hold a seed draws, and recorded
+> misses are unaffected because `missesToCards` rebuilds the answer from the **snapshot's**
+> `holdSpec`, never by regenerating from the seed. The claim as written would have told a
+> later session that growing a fixture pool is answer-preserving, which is exactly the
+> assumption the snapshot-freeze design exists so nobody has to make.
 
 ### Task 5: Widen `VOR_NAMES` and `NDB_NAMES` with real Bay Area stations
 

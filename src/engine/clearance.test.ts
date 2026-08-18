@@ -267,6 +267,22 @@ describe('gradeCopiedClearance', () => {
     expect(grade.fields.find((f) => f.field === 'fix')!.correct).toBe(true)
   })
 
+  it('accepts a multi-word station name typed with a stray inner space', () => {
+    // Newly reachable: VOR_NAMES went mixed and five entries are two words, so
+    // the free-text field now takes input a single-word pool never produced.
+    const twoWord: ClearanceFields = { ...vorTimed, fix: 'Point Reyes' }
+    const grade = gradeCopiedClearance({ ...perfectCopy, fix: '  point  reyes ' }, twoWord)
+    expect(grade.fields.find((f) => f.field === 'fix')!.correct).toBe(true)
+  })
+
+  it('still rejects a multi-word station name with the word boundary missing', () => {
+    // The collapse must not become "ignore whitespace": a student who did not
+    // hear two words has not copied the fix.
+    const twoWord: ClearanceFields = { ...vorTimed, fix: 'Point Reyes' }
+    const grade = gradeCopiedClearance({ ...perfectCopy, fix: 'pointreyes' }, twoWord)
+    expect(grade.fields.find((f) => f.field === 'fix')!.correct).toBe(false)
+  })
+
   it('flags a wrong holding direction', () => {
     const grade = gradeCopiedClearance({ ...perfectCopy, direction: 'E' }, vorTimed)
     const f = grade.fields.find((x) => x.field === 'direction')!
@@ -414,6 +430,65 @@ describe('mulberry32 — seeded PRNG (drill scenario reproducibility)', () => {
   })
 })
 
+/** The dossier's own confidence legend — the column that marks a hold row. */
+const CONFIDENCE = ['researched', 'CIFP-only', 'approximate', 'invented']
+
+/** Markdown emphasis and code ticks are formatting, not value. */
+const plainCell = (cell: string): string => cell.replace(/[`*]/g, '').trim()
+
+interface DossierRow {
+  fix: string
+  inboundCourse: number
+  turnDirection: string
+  leg: { unit: string; value: number }
+  confidence: string
+}
+
+/**
+ * The dossier's hold rows, keyed off the confidence column rather than off a
+ * table caption: the dossier also carries a navaid table, a decode-validation
+ * table and a recommendations table, all of which name fixes in their first
+ * column.
+ *
+ * A row that looks like a hold row and will not parse THROWS rather than being
+ * skipped — a skip is fail-open, the same way a truncated source scan reads as
+ * a clean one. Because it throws, it is computed on first CALL and memoised
+ * rather than at describe scope: one reflowed markdown row would otherwise
+ * throw during COLLECTION and take the whole file down as "no tests", with
+ * every guard below silently absent — and a red suite that names nothing is not
+ * a guard (CLAUDE.md, palette.test.ts's `tints`). The sibling dossier sweep in
+ * entry-drill.test.ts (`chartedDraws`) is deferred for the same reason.
+ *
+ * Module scope rather than describe scope because TWO describes need it: the
+ * researched half checks its geometry against these rows, and the invented half
+ * checks that it names none of them.
+ */
+let holdRowsCache: readonly DossierRow[] | undefined
+function holdRows(): readonly DossierRow[] {
+  holdRowsCache ??= DOSSIER.split('\n').flatMap((line) => {
+    const cells = line.split('|')
+    if (cells.length !== 10) return []
+    const confidence = plainCell(cells[7]!)
+    if (!CONFIDENCE.includes(confidence)) return []
+    const course = /^(\d{1,3})°$/.exec(plainCell(cells[3]!))
+    const leg = /^(\d+)\s*(NM|min)$/.exec(plainCell(cells[5]!))
+    const turnDirection = plainCell(cells[4]!)
+    if (!course || !leg || !['left', 'right'].includes(turnDirection)) {
+      throw new Error(`unparseable hold row in docs/bay-area-holds.md: ${line}`)
+    }
+    return [
+      {
+        fix: plainCell(cells[1]!),
+        inboundCourse: Number(course[1]),
+        turnDirection,
+        leg: { unit: leg[2]!.toLowerCase(), value: Number(leg[1]) },
+        confidence,
+      },
+    ]
+  })
+  return holdRowsCache
+}
+
 describe('PUBLISHED_HOLDS practice fixtures', () => {
   // The pool is MIXED: invented fixtures alongside real Bay Area / Central
   // Valley fixes. The old guard here — "never reuses the name of a fix charted
@@ -452,7 +527,7 @@ describe('PUBLISHED_HOLDS practice fixtures', () => {
     }
   })
 
-  it('no invented fixture lands on a real waypoint', () => {
+  it('no invented fixture lands on a waypoint a past audit caught', () => {
     // Unchanged in substance and deliberately kept: the ban was wrong as a
     // blanket rule over a mixed pool, and still right over the invented half.
     // An invented hold at a real fix teaches made-up course and turn data for
@@ -460,9 +535,48 @@ describe('PUBLISHED_HOLDS practice fixtures', () => {
     // <NAME>: CEDES (Livermore), SUNOL and TRACY are real fixes and TRACY sits
     // beside KTCY; WINDY (Newman, CA), DRIFT and TIMBR are the wind-lab
     // repeat of the same defect. The names in INVENTED_HOLDS return none.
+    //
+    // This list is a record of names already caught, so it can only ever cover
+    // the past. The two checks below are the ones that grow.
     const real = ['CEDES', 'SUNOL', 'TRACY', 'JEMKO', 'WINDY', 'DRIFT', 'TIMBR']
     for (const hold of INVENTED_HOLDS) {
       expect(real, `fixture ${hold.fix}`).not.toContain(hold.fix)
+    }
+  })
+
+  it('no invented fixture lands on a real fix the dossier records', () => {
+    // The gap the hand-written list above cannot close, and the one this branch
+    // opened: docs/bay-area-holds.md now hands an editor 22 real Bay Area fix
+    // names, only 14 of which shipped — WHYEE, IPDEW and ORANG were held back
+    // for having a CIFP record but no plate witness, ALTAM for duplicating
+    // ZELAT's shape, and four more are holds named by a navaid ident rather
+    // than a 5-letter fix. Copying any of them into INVENTED_HOLDS with made-up
+    // numbers routes around every other guard here:
+    // the dossier check sweeps RESEARCHED_HOLDS only, and the CHART_HOLDS check
+    // bites only on a name the written bank happens to carry. That is the HAIRE
+    // defect exactly — inventing facts ABOUT a real place — reachable on the one
+    // branch whose whole claim is that this class is now guarded.
+    //
+    // The witness is the dossier itself, so it grows with the research rather
+    // than with somebody remembering to extend a literal.
+    const researched = new Set(holdRows().map((r) => r.fix))
+    expect(researched.size, 'dossier hold table parsed').toBeGreaterThan(0)
+    for (const hold of INVENTED_HOLDS) {
+      expect([...researched], `invented fixture ${hold.fix} is a real fix`).not.toContain(hold.fix)
+    }
+  })
+
+  it('no invented fixture reuses a charted name, even with matching geometry', () => {
+    // Rule 3 as CLAUDE.md states it. The geometry check in the describe below
+    // permits a fixture that shares a charted name and agrees with it on every
+    // field — that permission is for the RESEARCHED half, where the agreement is
+    // what makes the shared name honest. An INVENTED hold cannot earn it: its
+    // numbers were made up, so matching the chart would be coincidence, and the
+    // next edit to either list turns it into a contradiction under one name.
+    const charted = new Set(CHART_HOLDS.map((h) => h.fix))
+    expect(charted.size, 'CHART_HOLDS parsed').toBeGreaterThan(0)
+    for (const hold of INVENTED_HOLDS) {
+      expect([...charted], `invented fixture ${hold.fix} is charted`).not.toContain(hold.fix)
     }
   })
 })
@@ -471,60 +585,16 @@ describe('PUBLISHED_HOLDS practice fixtures', () => {
  * The real half's geometry, against the file it was researched from.
  *
  * A real fix name is a claim about a real place, and CHART_HOLDS constrains
- * only the four names the written bank happens to carry. For the other ten the
- * dossier is the only witness, so the check is the same shape: the app may not
- * state geometry for a real fix that its own provenance record contradicts.
+ * only the three names the pool and the written bank share. For the other
+ * eleven the dossier is the only witness, so the check is the same shape: the
+ * app may not state geometry for a real fix that its own provenance record
+ * contradicts.
  */
 describe('RESEARCHED_HOLDS agrees with docs/bay-area-holds.md', () => {
-  /** The dossier's own confidence legend — the column that marks a hold row. */
-  const CONFIDENCE = ['researched', 'CIFP-only', 'approximate', 'invented']
-
-  /** Markdown emphasis and code ticks are formatting, not value. */
-  const plain = (cell: string): string => cell.replace(/[`*]/g, '').trim()
-
-  interface DossierRow {
-    fix: string
-    inboundCourse: number
-    turnDirection: string
-    leg: { unit: string; value: number }
-    confidence: string
-  }
-
-  /**
-   * Hold rows, keyed off the confidence column rather than off a table caption:
-   * the dossier also carries a navaid table, a decode-validation table and a
-   * recommendations table, all of which name fixes in their first column.
-   *
-   * A row that looks like a hold row and will not parse THROWS rather than
-   * being skipped — a skip is fail-open, the same way a truncated source scan
-   * reads as a clean one.
-   */
-  const HOLD_ROWS: readonly DossierRow[] = DOSSIER.split('\n').flatMap((line) => {
-    const cells = line.split('|')
-    if (cells.length !== 10) return []
-    const confidence = plain(cells[7]!)
-    if (!CONFIDENCE.includes(confidence)) return []
-    const course = /^(\d{1,3})°$/.exec(plain(cells[3]!))
-    const leg = /^(\d+)\s*(NM|min)$/.exec(plain(cells[5]!))
-    const turnDirection = plain(cells[4]!)
-    if (!course || !leg || !['left', 'right'].includes(turnDirection)) {
-      throw new Error(`unparseable hold row in docs/bay-area-holds.md: ${line}`)
-    }
-    return [
-      {
-        fix: plain(cells[1]!),
-        inboundCourse: Number(course[1]),
-        turnDirection,
-        leg: { unit: leg[2]!.toLowerCase(), value: Number(leg[1]) },
-        confidence,
-      },
-    ]
-  })
-
   it('states the researched course, turns and leg for every real fixture', () => {
     expect(RESEARCHED_HOLDS.length).toBeGreaterThan(0)
     for (const hold of RESEARCHED_HOLDS) {
-      const rows = HOLD_ROWS.filter((r) => r.fix === hold.fix)
+      const rows = holdRows().filter((r) => r.fix === hold.fix)
       // Exactly one: the dossier records two geometries for OAK (one per
       // procedure), and shipping a fix whose provenance is ambiguous is the
       // confusion the dossier exists to prevent, so it reds rather than
@@ -543,9 +613,15 @@ describe('RESEARCHED_HOLDS agrees with docs/bay-area-holds.md', () => {
         turnDirection: row.turnDirection,
         leg: row.leg,
       })
-      // A real name whose dossier row says the numbers were made up is the
-      // original defect wearing the guard's own paperwork.
-      expect(row.confidence, hold.fix).not.toBe('invented')
+      // `researched` exactly, not merely "not invented". RESEARCHED_HOLDS's
+      // docblock says every entry here is researched confidence, and names
+      // WHYEE, IPDEW and ORANG as held back for having a CIFP record but no
+      // plate witness — all three are `CIFP-only` rows sitting in this same
+      // file. A `not.toBe('invented')` guard lets any of them be promoted with
+      // the suite green, publishing unverified geometry for a real fix under a
+      // guard whose name claims it checked the provenance. WHYEE's own row says
+      // its hold course "was not legible", so this is the one that matters.
+      expect(row.confidence, hold.fix).toBe('researched')
     }
   })
 })
@@ -640,16 +716,27 @@ describe('VOR_NAMES agrees with docs/bay-area-holds.md', () => {
  * exhaustiveness hole this repo keeps re-finding (TIERS, OVERLAY_ALPHA).
  */
 describe('generateClearance — ad-hoc holds at named stations', () => {
-  const seeds = Array.from({ length: 1000 }, (_, i) => i)
-  const adHoc = seeds.map((s) => generateClearance(s)).filter((r) => r.holdSpec.fixKind !== 'charted')
+  const SWEEP = 1000
+
+  /**
+   * Computed per call rather than at describe scope. `generateClearance` throws
+   * on a fixture whose course leaves [0, 360) — which is exactly what `every
+   * fixture carries geometry the clearance engine can speak` exists to name —
+   * and a throw during COLLECTION reports the file as "no tests", taking that
+   * guard down with it. Same reason as `holdRows` above.
+   */
+  const adHocDraws = () =>
+    Array.from({ length: SWEEP }, (_, i) => generateClearance(i)).filter(
+      (r) => r.holdSpec.fixKind !== 'charted',
+    )
 
   it('draws every station in the pool', () => {
-    const drawn = new Set(adHoc.map((r) => r.holdSpec.fix))
+    const drawn = new Set(adHocDraws().map((r) => r.holdSpec.fix))
     expect(drawn).toEqual(new Set<string>([...VOR_NAMES, ...NDB_NAMES]))
   })
 
   it('speaks every station name cleanly', () => {
-    for (const { clearance, holdSpec, expectedFields } of adHoc) {
+    for (const { clearance, holdSpec, expectedFields } of adHocDraws()) {
       // A name is read aloud: words, single-spaced, nothing stray around them.
       expect(holdSpec.fix, JSON.stringify(holdSpec.fix)).toMatch(/^[A-Z][a-z]+( [A-Z][a-z]+)*$/)
       const station = holdSpec.fixKind === 'NDB' ? 'NDB' : 'VOR'
@@ -660,6 +747,7 @@ describe('generateClearance — ad-hoc holds at named stations', () => {
   })
 
   it('assigns its own course, turns and legs rather than a published pattern', () => {
+    const adHoc = adHocDraws()
     const coursesByFix = new Map<string, Set<number>>()
     for (const { clearance, holdSpec, expectedFields } of adHoc) {
       expect(clearance.text, holdSpec.fix).not.toContain('as published')
