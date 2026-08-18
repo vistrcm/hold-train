@@ -9,6 +9,11 @@ import DOSSIER from '../../docs/bay-area-holds.md?raw'
 // Wind lab's fixture pool is invented wholesale, so it answers to the same
 // dossier check as INVENTED_HOLDS — see INVENTED_FIXTURE_NAMES below.
 import { FIXES as WIND_LAB_FIXES } from '../modules/wind-lab'
+// Namespace import alongside the named ones below, for the same reason
+// wind-lab.test.ts takes one: `clearance.ts fixture lists are disjoint from
+// each other` claims to cover EVERY list this module exports, and three named
+// imports would leave a fourth free to collide with the suite green.
+import * as CLEARANCE from './clearance'
 import {
   INVENTED_HOLDS,
   NDB_NAMES,
@@ -448,28 +453,52 @@ interface DossierRow {
 }
 
 /**
- * A pipe row's cells with markdown formatting stripped; [] for a non-row.
+ * A markdown table row's raw cells, bounded by the empty outer cells every
+ * caller below indexes from; [] for a line that is not a row at all.
  *
- * TRIMMED before the test, because the recognizer is the one path into
- * `holdRows()` that fails OPEN and an anchored `startsWith('|')` is how a row
- * reaches it. Markdown lets a table row carry leading whitespace (up to three
- * spaces at top level, arbitrarily much inside a list item), and an indented
- * row read as "not a row at all" returns [] — so `looksLikeHoldRow` never sees
- * it and the throw below, which exists precisely so a hold row cannot be
- * skipped, never fires. Indenting a SHIPPED fixture's row is still loud (the
- * per-fixture `toHaveLength(1)`); indenting a HELD-BACK one (WHYEE, IPDEW,
- * ORANG, ALTAM) is silent, and those rows are the entire witness for `no
- * invented fixture lands on a real fix the dossier records` — the HAIRE defect
- * with the evidence quietly removed. The navaid parser never anchored on the
- * leading pipe and so never had this hole; this is the two agreeing.
+ * This is the one path into `holdRows()` and `NAVAID_ROWS` that fails OPEN. A
+ * line read as "not a row" returns [], so `looksLikeHoldRow` never sees it and
+ * the throw below — which exists precisely so a hold row cannot be skipped —
+ * never fires. A dropped row silently stops defending its fix while the suite
+ * stays green: dropping a SHIPPED fixture's row is still loud (the per-fixture
+ * `toHaveLength(1)`), but the HELD-BACK rows — WHYEE, IPDEW, ORANG, ALTAM —
+ * are the entire witness for `no invented fixture lands on a real fix the
+ * dossier records`, i.e. the HAIRE defect with the evidence quietly removed.
  *
- * Trimming cannot shift a cell index: whitespace outside the outer pipes lands
- * in the leading/trailing empty cells, which `plainCell` already trims.
+ * So the recognizer has to accept every line MARKDOWN calls a table row, not
+ * the subset this dossier happens to be written in today. Two spellings are
+ * optional in that grammar, and each was an escape:
+ *  - LEADING WHITESPACE (up to three spaces at top level, arbitrarily much
+ *    inside a list item);
+ *  - the OUTER PIPES, which GFM lets a row omit on either side. A plain reflow
+ *    — and `startsWith('|')` dropped such a row outright. Mutation-confirmed
+ *    2026-08-18: rewriting WHYEE's row without its outer pipes and renaming a
+ *    wind-lab fixture to WHYEE shipped invented course, turns and legs for a
+ *    real Bay Area fix under wind lab's own "fictitious fix" label, 804/804
+ *    green. Re-adding the two pipes reds it.
+ * Both are NORMALISED AWAY rather than tested for, so cell indices are the same
+ * whichever spelling the file uses: the line is trimmed and re-bounded with the
+ * outer pipes it may have dropped. Do not restate this as a list of two
+ * spellings to check — the mechanism is that the row must be normalised to one
+ * shape before it is recognised, and a third optional spelling would then be a
+ * change to this function rather than a hole in every caller.
+ *
+ * Over-collecting is the accepted direction, and it is why the only non-row is
+ * a line carrying no `|` at all: a prose line containing one now splits into
+ * cells and is discarded by `looksLikeHoldRow` or the ident test — discarded
+ * after being looked at, rather than never looked at. A false red costs a
+ * minute; a silent skip is the defect.
  */
-const rowCells = (line: string): readonly string[] => {
+const rawCells = (line: string): readonly string[] => {
   const trimmed = line.trim()
-  return trimmed.startsWith('|') ? trimmed.split('|').map(plainCell) : []
+  if (!trimmed.includes('|')) return []
+  const lead = trimmed.startsWith('|') ? '' : '|'
+  const tail = trimmed.endsWith('|') ? '' : '|'
+  return `${lead}${trimmed}${tail}`.split('|')
 }
+
+/** `rawCells` with the markdown emphasis the hold table writes its cells in. */
+const rowCells = (line: string): readonly string[] => rawCells(line).map(plainCell)
 
 /** Either of the two hold-row signals holdRows()'s docblock sets out below. */
 const looksLikeHoldRow = (cells: readonly string[]): boolean =>
@@ -570,6 +599,92 @@ const INVENTED_FIXTURE_NAMES: ReadonlyArray<{ list: string; name: string }> = [
   ...NDB_NAMES.map((n) => ({ list: 'NDB_NAMES', name: n.toUpperCase() })),
   ...WIND_LAB_FIXES.map((f) => ({ list: 'wind-lab FIXES', name: f.toUpperCase() })),
 ]
+
+/**
+ * Every fixture list `clearance.ts` exports, kept PER LIST — wind-lab.test.ts's
+ * `clearanceFixtureNames` collapses the same harvest into one Set because it
+ * only asks "is this name used elsewhere", while the claim below is about which
+ * list a name came from and so cannot lose that.
+ *
+ * Upper-cased for the `INVENTED_FIXTURE_NAMES` reason: NDB_NAMES are title case
+ * and fixes are idents, so 'Zorvu' and 'ZORVU' are one place however typed.
+ *
+ * Throws on an element that is neither a string nor an object with a string
+ * `fix`, rather than skipping it: a list this harvest cannot read contributes
+ * nothing and would be reported as checked. Over-collecting a non-fixture array
+ * export is the accepted trade in the other direction.
+ */
+function clearanceFixtureLists(): ReadonlyArray<{ list: string; names: readonly string[] }> {
+  return Object.entries(CLEARANCE).flatMap(([list, value]) => {
+    if (!Array.isArray(value)) return []
+    const names = (value as readonly unknown[]).map((item) => {
+      if (typeof item === 'string') return item.toUpperCase()
+      const fix: unknown = (item as { fix?: unknown } | null)?.fix
+      if (typeof fix !== 'string') {
+        throw new Error(`clearance.${list} holds an element this harvest cannot read a name from`)
+      }
+      return fix.toUpperCase()
+    })
+    return [{ list, names }]
+  })
+}
+
+/**
+ * CLAUDE.md's all-pairs rule — "a new name in any list must also be disjoint
+ * from every other fixture list" — pointed at this module's own lists.
+ *
+ * The pairs that cross a module boundary were guarded (wind-lab.test.ts's `no
+ * fixture collides with a practice hold used elsewhere in the app` checks FIXES
+ * against every clearance export) and the pairs inside this module were not, so
+ * a scope narrower than the claim read as coverage yet again. Mutation-confirmed
+ * 2026-08-18: `NDB_NAMES = ['Amber', 'Delta', 'Zorvu']` shipped 804/804 green,
+ * because the title-case station regex accepts `Zorvu`, the dossier records no
+ * such fix or station, and nothing compared the NDB list to INVENTED_HOLDS. The
+ * student then meets ZORVU as a charted hold at 300°/right AND as "the Zorvu
+ * NDB" on an ATC-assigned bearing — the WINDY/DRIFT/TIMBR defect pointed inward,
+ * one name over two geometries with no way to tell which is which.
+ *
+ * Name-SHAPE guards elsewhere block most of these pairs incidentally (fixtures
+ * match /^[A-Z]{5}$/, stations a title-case regex); that is exactly why this is
+ * asserted rather than assumed, since the one pair the shapes do not separate is
+ * a title-case NDB name against a five-letter fix.
+ */
+describe('clearance.ts fixture lists are disjoint from each other', () => {
+  it('gives no name to two lists', () => {
+    // PUBLISHED_HOLDS is the one exemption and is RE-ASSERTED rather than
+    // assumed, so it cannot decay into a hole: it IS the concatenation, so every
+    // name in it collides with INVENTED_HOLDS or RESEARCHED_HOLDS by
+    // construction, and skipping it on any weaker ground would skip a real list.
+    expect(PUBLISHED_HOLDS).toEqual([...INVENTED_HOLDS, ...RESEARCHED_HOLDS])
+    const owner = new Map<string, string>()
+    for (const { list, names } of clearanceFixtureLists()) {
+      if (list === 'PUBLISHED_HOLDS') continue
+      for (const name of names) {
+        const held = owner.get(name)
+        expect(held, `${name} is in both ${held} and ${list}`).toBeUndefined()
+        owner.set(name, list)
+      }
+    }
+  })
+
+  // Anti-vacuity, the same shape as the two harvests already in this suite: the
+  // loop above is green over an empty harvest, which is what a renamed export or
+  // an unrecognised element shape leaves. One known name per list pins that each
+  // is actually reaching the check — the object lists by `.fix`, the plain-string
+  // lists by value.
+  it('harvests every list it claims to cover', () => {
+    const byName = new Map(clearanceFixtureLists().map((l) => [l.list, l.names]))
+    for (const [list, known] of [
+      ['INVENTED_HOLDS', 'ZORVU'],
+      ['RESEARCHED_HOLDS', 'OYOSO'],
+      ['PUBLISHED_HOLDS', 'ZORVU'],
+      ['VOR_NAMES', 'OAKLAND'],
+      ['NDB_NAMES', 'AMBER'],
+    ] as const) {
+      expect(byName.get(list), `${list} not harvested`).toContain(known)
+    }
+  })
+})
 
 describe('PUBLISHED_HOLDS practice fixtures', () => {
   // The pool is MIXED: invented fixtures alongside real Bay Area / Central
@@ -761,14 +876,29 @@ describe('VOR_NAMES agrees with docs/bay-area-holds.md', () => {
   }
 
   /**
-   * Navaid rows: six cells whose first is a three-letter ident. The dossier's
-   * other tables are 2, 3, 4, 8 and 9 cells wide, so nothing else parses as
-   * one, and the header and separator rows fail the ident test rather than
-   * being skipped by position. A parse that breaks fails CLOSED — every
-   * assertion below needs a row in order to pass.
+   * Navaid rows: eight RAW cells (six of content between the empty outer pair,
+   * the same convention `holdRows()` and the dossier's own "format is load-
+   * bearing" note count in) whose first content cell is a three-letter ident.
+   * No other table in the file is that shape, and the header and separator rows
+   * fail the ident test rather than being skipped by position.
+   *
+   * Recognition runs through the shared `rawCells`, NOT a bare `split('|')`.
+   * Requiring exactly 8 raw cells silently IMPLIES the outer pipes, so this
+   * parser had `rowCells`'s fail-open hole too, one table over — a pipe-less
+   * GFM navaid row splits to six and is skipped, which retires `invents its NDB
+   * names rather than reusing a real station` for that station without a red
+   * test. Mutation-confirmed 2026-08-18 on the `SCK` "Stockton" row, the one
+   * navaid row no VOR_NAMES entry depends on and so the one whose loss is
+   * otherwise silent: pipe-less, with 'Stockton' added to NDB_NAMES, 65/65
+   * green. The two parsers now share one normaliser rather than agreeing by
+   * accident.
+   *
+   * Past recognition this parser fails CLOSED — every assertion below needs a
+   * row in order to pass — which is why it may return [] where `holdRows()`
+   * must throw.
    */
   const NAVAID_ROWS: readonly NavaidRow[] = DOSSIER.split('\n').flatMap((line) => {
-    const cells = line.split('|')
+    const cells = rawCells(line)
     if (cells.length !== 8) return []
     const ident = plain(cells[1]!)
     if (!/^[A-Z]{3}$/.test(ident)) return []

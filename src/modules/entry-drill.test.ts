@@ -1311,8 +1311,19 @@ describe('the mixed fixture pool reaches the screen', () => {
     const { seed, s } = hit!
     // Read back from the fixture table, not from the scenario the screen was
     // built from: expecting `holdSpec` back is the renderer and the expectation
-    // flipping together, and it would pass on a pool that drew the wrong
-    // geometry for a real place — the one defect a real name makes serious.
+    // flipping together, so what this pins is the RENDERED hold line against
+    // RESEARCHED_HOLDS — a charted branch that reciprocated the course, printed
+    // the wrong field, or carried one fixture's geometry under another's name.
+    //
+    // It does NOT catch a pool that states wrong geometry for a real place, and
+    // must not be cited for that: `PUBLISHED_HOLDS` is `[...INVENTED_HOLDS,
+    // ...RESEARCHED_HOLDS]` by reference, so `real.get(s.holdSpec.fix)` returns
+    // the very object the scenario was built from and both sides move together.
+    // Mutation-confirmed 2026-08-18: setting OYOSO to 120°/right leaves this
+    // file 79/79 green. The wrong-geometry case is `RESEARCHED_HOLDS agrees with
+    // docs/bay-area-holds.md` and the CHART_HOLDS check, both in
+    // clearance.test.ts — the provenance guards, which compare against a witness
+    // OUTSIDE the pool.
     const hold = real.get(s.holdSpec.fix)!
     const el = document.createElement('div')
     renderEntryDrill(el, { mode: 'cockpit', seed, store: testStore(), now: () => 0 })

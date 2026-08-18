@@ -2654,8 +2654,12 @@ much inside a list item — so a reflow or a table moved under a bullet is an or
 contrived one. Indenting a **shipped** fixture's row is loud (the per-fixture `toHaveLength(1)`);
 indenting a **held-back** one — `WHYEE`, `IPDEW`, `ORANG`, `ALTAM` — is silent, and those rows are
 the entire witness for `no invented fixture lands on a real fix the dossier records`, i.e. the HAIRE
-defect with the evidence quietly removed. The navaid parser in the same file splits on `|` without
-anchoring and never had the hole, so the two now agree. Fixed by trimming before the test, which
+defect with the evidence quietly removed. ~~The navaid parser in the same file splits on `|` without
+anchoring and never had the hole, so the two now agree.~~ **Amended 2026-08-18 — both halves of that
+sentence are wrong.** The navaid parser requires exactly 8 raw cells, which silently *implies* the
+outer pipes, so it had the same hole one table over; and the fix below closed the indentation
+spelling only, leaving the outer-pipe spelling open in both. See the correction entry at the end of
+this file. Fixed by trimming before the test, which
 cannot shift a cell index because whitespace outside the outer pipes lands in the leading/trailing
 empty cells that `plainCell` already trims.
 
@@ -2673,3 +2677,70 @@ content decision, not a review edit.
 **Mutation-confirmed 2026-08-18**, each against the real tree: indenting `WHYEE`'s dossier row by two
 spaces silently dropped it from `holdRows()` before the fix and is parsed after it; pinning seed 4's
 *answer* reds against the shipped pool, which is why only its heading is asserted.
+
+## 2026-08-18 — the dossier row recognizer still failed open, and the all-pairs rule was unasserted
+
+Second review pass of the mixed-pool branch. Two guard holes, each mutation-confirmed against the
+real tree before and after the fix.
+
+**Fixed: `rowCells` dropped any table row written without its outer pipes.** The recognizer read a
+row as a row only when the trimmed line began with `|`, but GFM lets a row omit the leading and
+trailing pipe on either side — an ordinary reflow. Such a row returned `[]`, so `looksLikeHoldRow`
+never saw it and the throw that exists precisely so a hold row cannot be skipped never fired.
+Rewriting `WHYEE`'s dossier row without its two outer pipes and renaming wind lab's `MORVA` to
+`WHYEE` shipped invented course, turn direction and legs for a real Bay Area fix under wind lab's
+own *"fictitious fix"* label at **804/804 green** — the `WINDY`/`DRIFT`/`TIMBR` defect, reachable
+through one markdown formatting edit, on the branch whose headline guard exists to prevent exactly
+it. The same hole sat in the navaid parser, which the prior entry (amended above) claimed was free
+of it: `cells.length !== 8` on a bare `split('|')` implies the outer pipes just as surely, and a
+pipe-less navaid row splits to six and is skipped. Clean witness — the `SCK` "Stockton" row is the
+one navaid row no `VOR_NAMES` entry depends on, so dropping it is otherwise silent: pipe-less `SCK`
+plus `NDB_NAMES = ['Amber', 'Delta', 'Stockton']` passed 65/65, teaching bearing phraseology at a
+place the dossier records as a station, under the guard named for that check.
+
+Fixed by NORMALISING rather than testing: one shared `rawCells` trims the line and re-bounds it with
+the outer pipes it may have dropped, so cell indices are identical whichever spelling the file uses,
+and the only non-row is a line carrying no `|` at all. Both parsers call it, so they now agree by
+construction rather than by the coincidence the amended sentence asserted. Over-collecting is the
+accepted direction — a prose line containing a `|` is now discarded *after* being looked at by
+`looksLikeHoldRow` or the ident test, rather than never looked at.
+
+Note the shape of the miss, which is this repo's recurring one: the previous fix enumerated the one
+optional spelling it had thought of (leading whitespace) and its docblock called that path closed.
+The mechanism is that markdown has *several* optional spellings of a table row and the recognizer
+must accept all of them; stating the mechanism instead of the enumeration is what makes the third
+spelling a change to one function rather than a hole in every caller.
+
+**Fixed: `clearance.ts`'s own fixture lists were never compared to each other.** CLAUDE.md states the
+all-pairs rule — "a new name in any list must also be disjoint from every other fixture list" — and
+the pairs crossing a module boundary were guarded (`wind-lab.test.ts`'s `no fixture collides with a
+practice hold used elsewhere in the app` checks `FIXES` against every clearance export). The pairs
+*inside* `clearance.ts` were not, so a scope narrower than the claim read as coverage again.
+`NDB_NAMES = ['Amber', 'Delta', 'Zorvu']` shipped **804/804 green**: the title-case station regex
+accepts `Zorvu`, the dossier records no such fix or station, and nothing compared the NDB list to
+`INVENTED_HOLDS`. The student then meets ZORVU as a charted hold at 300°/right *and* as "the Zorvu
+NDB" on an assigned bearing — one name over two invented geometries, the `WINDY`/`DRIFT`/`TIMBR`
+defect pointed inward. Name-shape guards separate most of these pairs incidentally (fixtures are
+`/^[A-Z]{5}$/`, stations title case), which is exactly why the one pair they do not separate went
+unnoticed. Now `clearance.ts fixture lists are disjoint from each other`, harvesting per list from
+the module namespace so a fifth list is covered by default, with `PUBLISHED_HOLDS` the sole
+exemption and its `[...INVENTED_HOLDS, ...RESEARCHED_HOLDS]` identity re-asserted inside the test so
+the exemption cannot decay into a hole. Anti-vacuity pin: `harvests every list it claims to cover`.
+
+**Corrected, not fixed: a comment misattributing which failure mode a test catches.** `renders a real
+Bay Area fix and its researched geometry on the drill screen` (`entry-drill.test.ts`) claimed it
+"would pass on a pool that drew the wrong geometry for a real place — the one defect a real name
+makes serious". It is the other way round: that is precisely what it passes on. `PUBLISHED_HOLDS` is
+`[...INVENTED_HOLDS, ...RESEARCHED_HOLDS]` **by reference**, so `real.get(s.holdSpec.fix)` returns
+the very object the scenario was built from and both sides of the comparison move together — setting
+`OYOSO` to 120°/right leaves that file 79/79 green. What it really pins is the *rendered* hold line
+against `RESEARCHED_HOLDS`: a charted branch that reciprocated the course, printed the wrong field,
+or carried one fixture's geometry under another's name. Worth keeping, but per CLAUDE.md a comment
+that misattributes which assertion catches which failure mode is worse than no comment — it argues
+the next session into deleting the guard that works. The wrong-geometry case is `RESEARCHED_HOLDS
+agrees with docs/bay-area-holds.md` and the `CHART_HOLDS` check, which compare against a witness
+*outside* the pool.
+
+**Reviewed and not changed:** the HSI nav status line width, already recorded as accepted above — it
+is a content decision (pass the ident, which the dossier carries for every station), not a review
+edit, and nothing on this pass changes that reasoning.
