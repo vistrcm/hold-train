@@ -73,6 +73,12 @@ regression test in the matching `*.test.ts`).
    dTPP 2607 values (231°/right/4 NM) for the KTCY RNAV (GPS) RWY 12 missed hold the
    student actually flies. The fixture is renamed `BRIXO`. Regression test in
    `clearance.test.ts`: fixture names are disjoint from `CHART_HOLDS`.
+   **Amended 2026-08-17** — see "Deliberate reversal" at the end of this file. The *defect*
+   here is confirmed and unchanged: inventing 210°/left for a fix the student flies as
+   231°/right is negative training. The *remedy* is superseded. Renaming the fixture was
+   treating the collision as a naming problem when it was a geometry problem; `HAIRE` is now
+   back in `PUBLISHED_HOLDS` carrying the charted 231°/right/4 NM, and the disjointness test
+   named here has been replaced by a field-by-field agreement check against `CHART_HOLDS`.
 10. **Citation precision gaps left by item 7.** `entry.ts` still rendered
     `AIM 5-3-8 j8` for the ±5° tolerance (now `j8(d)`) and `wind.ts` rendered
     `AIM 5-3-8 j8` for triple drift (now `j8(c)`), both user-visible.
@@ -306,6 +312,14 @@ predates the 2026-08-02 rejoin-direction correction, on the same terms as the
   "marks the plate line as a practice plate, never as a real chart" and "no fixture
   reuses a real NorCal fix name the student might fly" in
   `src/modules/entry-drill.test.ts`.
+  **Amended 2026-08-17** — see "Deliberate reversal" at the end of this file. The defect
+  stands: `Chart: TRACY — inbound course 120°, left turns` invented facts about a real place
+  and asserted them as a chart. Two conclusions drawn from it do not. The blanket ban on real
+  names is withdrawn for the clearance pools (it is kept for the invented half and for
+  wind-lab); and the plate framing is gone entirely rather than relabelled — a per-hold claim
+  like "fictitious fix" cannot be made over a mixed pool, so `chartNote` is now `holdNote`,
+  which states geometry, hedges it as practice data and names no procedure or cycle. CEDES,
+  SUNOL and TRACY remain out of the pool, now as *unresearched* names rather than as real ones.
 - **Fixed: the TO/FROM drill printed a 0° course** (`src/modules/clearance-copy.ts`).
   The radial explanation interpolated `${inbound}°` raw instead of `courseText`, so
   the 180° radial — 73 of the first 5000 seeds — read "inbound course 0°" in the one
@@ -406,6 +420,14 @@ predates the 2026-08-02 rejoin-direction correction, on the same terms as the
   tests: "no fixture reuses a real waypoint name", "no fixture collides with a
   hold charted in the written bank" and "labels the scenario line as a practice
   fixture, not charted data" in `src/modules/wind-lab.test.ts`.
+  **Amended 2026-08-17** — see "Deliberate reversal" at the end of this file. This entry is
+  **unchanged in force**: `FIXES` is invented wholesale, so every guard named here still
+  applies to it, including the real-waypoint ban and the "fictitious fix" label the entry
+  drill has since dropped. What is superseded is only the implication that the same rule
+  binds the clearance pools. Its "every fixture list needs its own guard" lesson was widened
+  again on 2026-08-17: the cross-list check now harvests clearance.ts's array exports from
+  the module namespace, since a hand-list covering `PUBLISHED_HOLDS` alone left `VOR_NAMES`
+  and `NDB_NAMES` — the lists that just gained real names — free to collide.
 - **Fixed: the wind lab advised a next-circuit time off a circuit that never
   closed** (`src/modules/wind-lab.ts`). `nextOutboundSeconds` applied the AIM
   5-3-8 j4 ground-speed-ratio adjustment to `sim.inboundSeconds`
@@ -2435,3 +2457,91 @@ CLAUDE.md rule.
   the thing above the label — is outside this guard's two-rule model and would collapse the
   separation with the ratio still reading 1.5rem against 0.5rem. `.entry-hsi` carries no rule at all
   today. Same class as the containing-block caveat already recorded in the guard's Scope comment.
+
+## Deliberate reversal — 2026-08-17 (real fixture names, geometry-consistency invariant)
+
+This entry **reverses a rule this ledger established and then patched three times**, argued in
+place per the amend-in-place convention: entries 9 (`HAIRE`), the CEDES/SUNOL/TRACY fix and the
+wind-lab `WINDY`/`DRIFT`/`TIMBR` fix each carry an amendment note pointing here. None of those
+three defects is withdrawn — every one of them was real and the fixes stand. What is withdrawn
+is the **rule** they were generalised into.
+
+**The rule that is gone: "a practice fixture name may never be a real waypoint."** It was a
+proxy, and a bad one. Read the three defects it was patched for and the common factor is not
+the name:
+
+- `HAIRE` taught 210°/left/1-min for a fix charted 231°/right/4 NM.
+- `TRACY` rendered invented course and turns as `Chart: TRACY — …`, a chart line for a real
+  place beside the student's home field.
+- `WINDY` rendered the same for a real waypoint at Newman, CA, with no label at all.
+
+In all three the defect is **inventing facts about a real place and asserting them**, never
+naming one. The proxy fails in both directions. It is *too weak*, because it checks no geometry:
+a name ban is satisfied by `QUIBO` carrying whatever numbers someone typed, and satisfied
+equally by a future real name someone forgets to look up. And it is *too strong*, because it
+forbids the thing that makes the drill worth doing — rehearsing entries at OYOSO, HAIRE and
+UHHUT, the holds this student actually flies out of KTCY, KLVK and KOAK. Three patches without
+the underlying confusion moving is itself the signal: the invariant was aimed at the wrong noun.
+
+**What replaces it** (`src/engine/clearance.ts`, all asserted in `src/engine/clearance.test.ts`):
+
+1. **Geometry consistency.** A fixture sharing a name with `CHART_HOLDS` must agree with it on
+   **every** field a fixture carries — `inboundCourse`, `turnDirection`, `leg.unit`,
+   `leg.value` — harvested off the object rather than hand-listed, since a subset comparison is
+   how one field of a pair drifts while the other stays guarded (`compares every field a
+   fixture carries, not a hand-listed subset`). This is the `HAIRE` defect stated directly: the
+   app may not teach two different holds under one fix name, which is worse than approximate
+   data because no amount of caveating makes it visible. `OYOSO`, `HAIRE` and `UHHUT` are the
+   live overlap. `geometryConflicts([])` is `[]`, so the check is vacuous over a pool that
+   overlaps nowhere — which is what it was until the real fixtures landed — hence `actually
+   shares a name with a charted hold, so the check above is not vacuous`.
+2. **Provenance.** A researched fixture must match its row in `docs/bay-area-holds.md` (FAA CIFP
+   cycle 2608 plus same-cycle d-TPP plates, confidence and lookup date per row). For the ten
+   names `CHART_HOLDS` does not carry, that dossier is the only witness, so the check is the
+   same shape as (1) pointed at it. Where CIFP and the plate disagreed the plate won — `HAXEK`
+   is 113.5° in CIFP and depicted 113°, the only such case — because the plate is what a
+   student reads.
+3. **The old ban, kept where it was always right.** An invented name must still return no
+   waypoint record at `opennav.com/waypoint/US/<NAME>`, and must still be disjoint from
+   `CHART_HOLDS`. Both apply to wind-lab's `FIXES` whole, which is invented wholesale and
+   unchanged by this work.
+
+**What this does not claim.** Nothing here is current chart data and no AIRAC/cycle/amendment
+machinery was introduced — a stale hold still trains the correct entry, which is the point of
+the app. The rendered line (`holdNote`, `src/modules/entry-drill.ts`) is where that restraint
+shows: `chartNote`'s plate framing is **deleted rather than relabelled**, because "Practice
+plate (fictitious fix)" is a per-hold claim, true of `ZORVU` and false of `OYOSO`, and no
+per-hold claim survives a mixed pool. The line now states fix, course, turns and legs, hedges
+the lot with "Practice data, not current chart data", and names no procedure, runway, amendment
+or chart cycle — that identity is the one claim a student could act on, since an approach can
+be looked up and the looked-up chart would disagree. Guarded by `the hold line names no
+procedure, amendment or chart cycle` in `entry-drill.test.ts`, which scans the **rendered DOM**
+as well as the returned string: the string scan alone stayed green at 78/79 against a screen
+wrapping the same note as `` `Plate: ${note}` ``.
+
+**Also changed.** `VOR_NAMES` went from invented station names to sixteen real Bay Area /
+Central Valley VORs. Manteca (ECA) is kept knowingly though it was decommissioned 2018-03-29
+under VOR MON and is absent from CIFP 2608: it predates the pool going mixed, a hold at a closed
+station still teaches the right entry, and dropping it would be the one deletion in an otherwise
+additive change — recorded here rather than rediscovered a third time. `NDB_NAMES` stays
+invented, deliberately: no NDB remains in the Bay Area or Central Valley, so there is no current
+name to adopt, and *adopting* a defunct station would be a new claim — not the same act as
+keeping one that predates the rule.
+
+**History safety.** A recorded miss is a cache, not a record, and `missesToCards` re-resolves it
+against the live pool — so changing the fixture pool could have rewritten what a student was
+asked. It does not: a miss whose snapshot names a hold the pool no longer carries still exports
+the hold it was recorded against, because the entry answer is rebuilt from the snapshot's
+`holdSpec` (falling back to the snapshot when the hold no longer resolves) and the scenario text
+stays frozen — it is re-derivable only from `seed`, which maps *through* the fixture lists, so
+after a pool change the same seed yields a different hold and the card would swap the question
+the user actually missed. Pinned by `exports a miss recorded against a hold the fixture pool no
+longer carries` (`anki-export.test.ts`), whose stale snapshot differs from every live fixture in
+geometry, not just in name; mutation-confirmed by rebuilding the line off the seed.
+
+**Mutation-confirmed 2026-08-17**, against the final tree rather than at the time each guard was
+written: moving `OYOSO` to 120°/right/5 NM reds `never contradicts a charted hold it shares a
+name with` and the dossier guard; a procedure name and amendment appended to the hedge reds `the
+hold line names no procedure, amendment or chart cycle`; the hold line rebuilt off the seed reds
+the Anki history guard; dropping one hold from `PUBLISHED_HOLDS` reds only the seed sweep. Suite
+799 passed, `tsc --noEmit` clean.

@@ -575,21 +575,42 @@ coverage claim is real and not an artifact of the pool being small.
 
 ### Task 9: [Final] Update documentation
 
-- [ ] update `CLAUDE.md` — the Conventions bullet on practice fixtures states the now-
+- [x] update `CLAUDE.md` — the Conventions bullet on practice fixtures states the now-
       superseded "must be disjoint from real waypoints" rule for the clearance lists;
       replace it with the geometry-consistency invariant, say that those pools are now
-      **mixed** invented + real, and keep the old rule intact for wind-lab
-- [ ] update `README.md` Source policy — "Entry-drill, clearance-copy and wind-lab
+      **mixed** invented + real, and keep the old rule intact for wind-lab. Done: the
+      bullet now names all three replacement rules scoped to the half each is right
+      about, records the ban as **deliberately reversed** ("do not reinstate it on sight
+      of a real name") with the reason it was a proxy, and keeps the opennav check plus
+      `CHART_HOLDS` disjointness over the invented half and over `FIXES` whole. Also
+      picked up Task 7's widening: the cross-list guard harvests clearance.ts's array
+      exports from the module namespace, with its anti-vacuity pin named
+- [x] update `README.md` Source policy — "Entry-drill, clearance-copy and wind-lab
       scenarios are seeded practice fixtures: the fix names are invented" is now only
       partly true: entry-drill and clearance-copy draw from a mixed pool, wind-lab is
-      unchanged. Reword rather than delete, and check the entry-drill bullet's plate
-      wording while there
-- [ ] add a `docs/content-audit.md` entry recording this as a **deliberate reversal** with
+      unchanged. Reworded, not deleted: mixed pool named with its CIFP 2608 provenance,
+      wind-lab split out as still invented wholesale and still labelled "fictitious
+      fix", "a real name here is familiarity, not chart authority" stated outright, and
+      the enforced invariant (field-by-field agreement with the charted hold) replacing
+      the old "a name that collided with a real waypoint is the defect" line. The plate
+      wording was the stale claim it warned about — `Practice plate (fictitious fix)` no
+      longer exists in shipping code at all, so that sentence is gone and the hold
+      line's actual hedge is quoted instead
+- [x] add a `docs/content-audit.md` entry recording this as a **deliberate reversal** with
       its rationale, per the ledger's amend-in-place convention — including why banning
-      real names was the wrong invariant and what replaced it
-- [ ] verify `README.md`'s module → exam-phase table still matches `PHASE_PREP`
-      (asserted by `dashboard.test.ts`)
-- [ ] move this plan to `docs/plans/completed/`
+      real names was the wrong invariant and what replaced it. Added "Deliberate reversal
+      — 2026-08-17", arguing the proxy fails in **both** directions (too weak: a name ban
+      checks no geometry; too strong: it forbids the one thing the drill is for) and that
+      three patches without the confusion moving is the signal the invariant named the
+      wrong noun. Amend-in-place honoured: entries 9 (`HAIRE`), CEDES/SUNOL/TRACY and the
+      wind-lab `WINDY`/`DRIFT`/`TIMBR` fix each carry a dated note pointing here —
+      **none** of the three defects withdrawn, only the rule generalised from them, and
+      the wind-lab one explicitly marked *unchanged in force*
+- [x] verify `README.md`'s module → exam-phase table still matches `PHASE_PREP`
+      (asserted by `dashboard.test.ts`) — `matches PHASE_PREP row for row` green, run
+      both in the full suite and on its own file. The Source-policy edit is below the
+      table and touched no row; 799 passed / 29 files, `npm run typecheck` clean
+- [x] move this plan to `docs/plans/completed/`
 
 ## Post-Completion
 
