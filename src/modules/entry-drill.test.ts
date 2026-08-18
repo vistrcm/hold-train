@@ -131,17 +131,35 @@ describe('scenario distance to the fix', () => {
    * user's deck to a different question. The distance draw is therefore
    * APPENDED after the heading draw, and this is what pins that.
    *
-   * Both halves are hand-derived, not only read back:
-   *  - headings, from `mulberry32(seed ^ 0x9e3779b9)` — seed 7 → 353,
-   *    seed 42 → 173;
-   *  - answers, from the heading against the fixture hold. Seed 7 is inbound
-   *    080 with right turns, and 353 − 080 = 273°, inside the 180°–290°
-   *    parallel sector of a standard pattern. Seed 42 is inbound 250 with left
-   *    turns, and 173 − 250 = 283°, inside the mirrored 250°–360° direct
-   *    sector. That is also the plan's before/after check on the answer key:
-   *    distance is display state and must not reach `determineEntry`.
+   * The HEADING is the invariant, and it is the only one: it comes from the
+   * decorrelated `mulberry32(seed ^ 0x9e3779b9)` stream, so it survives any
+   * change to the fixture pools. Seeds 7 → 353 and 42 → 173 are hand-derived
+   * from that generator rather than read back. Seed 4 → 78 is the other kind of
+   * evidence and the kind this particular claim wants: it was measured on
+   * `master`, BEFORE the fixture pool grew, and is asserted here to still hold
+   * after — which is what "keeps its ORIGINAL heading" actually means.
+   *
+   * The two ANSWERS pinned below are legitimate but DO NOT generalise, and the
+   * distinction is the whole reason this title no longer says "and answer".
+   * Seeds 7 and 42 are a VOR and an NDB draw — the ad-hoc ATC branch, whose
+   * course is drawn from the rng stream and so is pool-independent by
+   * construction. Seed 7 is inbound 080 with right turns, and 353 − 080 =
+   * 273°, inside the 180°–290° parallel sector of a standard pattern; seed 42
+   * is inbound 250 with left turns, and 173 − 250 = 283°, inside the mirrored
+   * 250°–360° direct sector.
+   *
+   * A CHARTED seed takes its course from `PUBLISHED_HOLDS` instead, so growing
+   * that pool moves its answer: over seeds 0–999 the 2026-08-17 widening from 4
+   * to 18 holds left every one of the 240 charted headings alone while changing
+   * 231 drawn fixes and 175 answers (docs/content-audit.md, 2026-08-18). That is
+   * ACCEPTED, not a defect — recorded misses are safe because `missesToCards`
+   * rebuilds from the snapshot's `holdSpec`, never by regenerating from a seed.
+   * Seed 4 is charted and pinned on its heading alone, so the claim in the
+   * title is witnessed across the branch of the generator that can move.
+   * Asserting its answer here would pin the fixture table, not the stream, and
+   * would red on every future pool change with a message about history loss.
    */
-  it('keeps every existing seed on its original heading and answer', () => {
+  it('keeps every existing seed on its original heading', () => {
     const a = generateScenario(7)
     expect(a.heading).toBe(353)
     expect(a.result.primary).toBe('parallel')
@@ -149,6 +167,9 @@ describe('scenario distance to the fix', () => {
     const b = generateScenario(42)
     expect(b.heading).toBe(173)
     expect(b.result.primary).toBe('direct')
+
+    // Charted draw: heading only, for the reason set out above.
+    expect(generateScenario(4).heading).toBe(78)
   })
 
   it('places the aircraft inside the ATC lead window on every seed', () => {

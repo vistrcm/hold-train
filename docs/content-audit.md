@@ -1541,11 +1541,17 @@ recorded here on the same terms as a wrong sentence.
   drawn from a **second `rng()` call appended after** the heading draw, so every existing seed keeps
   its heading and its answer. That last one is the "rewrites history" harm: stored misses and Anki
   cards are keyed by seed, and shifting the stream would swap the question the student actually
-  missed. Pinned by `keeps every existing seed on its original heading and answer` in
+  missed. Pinned by `keeps every existing seed on its original heading` in
   `src/modules/entry-drill.test.ts`, whose expectations are hand-derived on both halves — headings
   from `mulberry32(seed ^ 0x9e3779b9)`, answers from the heading against the fixture hold (seed 7:
   inbound 080 right, 353 − 080 = 273° in the 180°–290° parallel sector; seed 42: inbound 250 left,
   173 − 250 = 283° in the mirrored 250°–360° direct sector).
+  ⚠️ **Amended 2026-08-18:** "and its answer" is wrong as a general claim, and the test name quoted
+  here has been narrowed to match. The heading half is right and holds against any fixture-pool
+  change. The answer half holds only for the **ad-hoc** branch, which is all this pin samples —
+  seeds 7 and 42 are a VOR and an NDB draw, whose course comes from the rng stream. A **charted**
+  seed reads its course from `PUBLISHED_HOLDS`, so a pool change moves its answer. See the
+  correction entry at the foot of this ledger.
 - **Screen wiring** (`src/modules/entry-drill.ts`). `drawHSI` passes `headingBug: heading` (parked
   on the nose — realistic and intentional, so the HDG box, the bug and the heading readout all show
   the same number) and `nav: { fix: holdSpec.fix, distanceNm }`. The `.entry-lead` footnote carrying
@@ -2610,3 +2616,60 @@ reds `no invented fixture lands on a real fix the dossier records`; rewording a 
 `CIFP only` and typing a `|` into `OYOSO`'s provenance cell each throw rather than skip; dropping
 wind lab's list from `INVENTED_FIXTURE_NAMES` reds `sweeps a name from every invented fixture list
 it claims to cover`. Suite 804 passed, `tsc --noEmit` clean.
+
+
+## 2026-08-18 — a seed-stability pin that over-claimed, and the last silent skip in the dossier parser
+
+Second review pass over the mixed-fixture-pool branch. Two guards whose **names** claimed more than
+their assertions held — the same class the entries above keep recording, found twice more.
+
+**`keeps every existing seed on its original heading and answer` never sampled the half the branch
+changed.** The pin exists because stored misses and Anki cards are keyed by seed, so shifting the
+rng stream rewrites a user's deck. Its two seeds are 7 and 42, and both are *ad-hoc* draws — a VOR
+and an NDB — whose inbound course comes out of the rng stream and is therefore pool-independent by
+construction. A **charted** seed reads its course from `PUBLISHED_HOLDS` instead, so growing that
+table 4 → 18 moves it. Measured against `master` over the charted seeds in 0–39: headings held at
+78/149/95/126 for all four, while seed 4 went `ZORVU` 300° teardrop → `QUIBO` 120° direct, seed 20
+`QUIBO` direct → `HAIRE` parallel, and seed 36 `ZORVU` parallel → `VAXNU` direct. Over seeds 0–999
+that is 0 headings, 231 fixes and 175 answers changed. The behaviour is **accepted** — `missesToCards`
+rebuilds a recorded miss from the snapshot's `holdSpec`, never by regenerating from the seed — but
+the title asserted the opposite invariant, and this repo's own rule is that a name misattributing
+what an assertion catches is worse than no name: it would have told a later session that growing a
+fixture pool is answer-preserving, which is precisely the assumption the snapshot-freeze design
+exists so nobody has to make. The completed plan file already carried this correction from the first
+review pass; the **test itself and this ledger did not**, which is the half a reader actually meets.
+Fixed by narrowing the title to `keeps every existing seed on its original heading`, rewriting the
+docblock to say which branch each pinned answer belongs to and why it does not generalise, and
+adding a **charted** seed (4, heading only) so the "every existing seed" claim is witnessed across
+the branch of the generator that can actually move. Its answer is deliberately *not* pinned: that
+would pin the fixture table rather than the stream and red on every future pool change with a
+message about history loss. Amended in place above; CLAUDE.md's citation updated with it.
+
+**`rowCells` read an indented markdown row as "not a row at all".** The entry above widened
+`holdRows()` to recognise a hold row two ways and to throw past the recognizer, on the stated ground
+that a skip is fail-open. One skip survived, one function upstream: `rowCells` returned `[]` unless
+`line.startsWith('|')`, so a row carrying leading whitespace never reached `looksLikeHoldRow` and
+the throw never fired. Markdown permits that indentation — three spaces at top level, arbitrarily
+much inside a list item — so a reflow or a table moved under a bullet is an ordinary edit, not a
+contrived one. Indenting a **shipped** fixture's row is loud (the per-fixture `toHaveLength(1)`);
+indenting a **held-back** one — `WHYEE`, `IPDEW`, `ORANG`, `ALTAM` — is silent, and those rows are
+the entire witness for `no invented fixture lands on a real fix the dossier records`, i.e. the HAIRE
+defect with the evidence quietly removed. The navaid parser in the same file splits on `|` without
+anchoring and never had the hole, so the two now agree. Fixed by trimming before the test, which
+cannot shift a cell index because whitespace outside the outer pipes lands in the leading/trailing
+empty cells that `plainCell` already trims.
+
+Noted and **not** changed: the HSI nav status line gives `nav.fix` no width budget, and this branch
+took its worst case from `Sacramento` (10 chars) to `San Francisco` / `Scaggs Island` (13). Centred
+at `cx = 120` at `STATUS_SIZE = 11`, a 13-character proportional string reaches x ≈ 155, and a
+7-character `10.0 NM` right-anchored at 201 in the monospaced digit font starts at x ≈ 155 — so at
+the single top-of-window reading the two strings touch, with roughly 5 units of clearance lost.
+Sub-pixel and font-dependent rather than an overlap that hides a digit, so it is recorded rather
+than patched. The clean fix is not a nudge: `NavState.fix` is documented as "Ident of the fix" and a
+real G1000 status line shows `SGD`, not a spelled-out station name, so the VOR/NDB branch should
+pass an ident — which the dossier's navaid table already records for every station. That is a
+content decision, not a review edit.
+
+**Mutation-confirmed 2026-08-18**, each against the real tree: indenting `WHYEE`'s dossier row by two
+spaces silently dropped it from `holdRows()` before the fix and is parsed after it; pinning seed 4's
+*answer* reds against the shipped pool, which is why only its heading is asserted.

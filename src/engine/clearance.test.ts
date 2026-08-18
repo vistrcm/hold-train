@@ -447,9 +447,29 @@ interface DossierRow {
   confidence: string
 }
 
-/** A pipe row's cells with markdown formatting stripped; [] for a non-row. */
-const rowCells = (line: string): readonly string[] =>
-  line.startsWith('|') ? line.split('|').map(plainCell) : []
+/**
+ * A pipe row's cells with markdown formatting stripped; [] for a non-row.
+ *
+ * TRIMMED before the test, because the recognizer is the one path into
+ * `holdRows()` that fails OPEN and an anchored `startsWith('|')` is how a row
+ * reaches it. Markdown lets a table row carry leading whitespace (up to three
+ * spaces at top level, arbitrarily much inside a list item), and an indented
+ * row read as "not a row at all" returns [] — so `looksLikeHoldRow` never sees
+ * it and the throw below, which exists precisely so a hold row cannot be
+ * skipped, never fires. Indenting a SHIPPED fixture's row is still loud (the
+ * per-fixture `toHaveLength(1)`); indenting a HELD-BACK one (WHYEE, IPDEW,
+ * ORANG, ALTAM) is silent, and those rows are the entire witness for `no
+ * invented fixture lands on a real fix the dossier records` — the HAIRE defect
+ * with the evidence quietly removed. The navaid parser never anchored on the
+ * leading pipe and so never had this hole; this is the two agreeing.
+ *
+ * Trimming cannot shift a cell index: whitespace outside the outer pipes lands
+ * in the leading/trailing empty cells, which `plainCell` already trims.
+ */
+const rowCells = (line: string): readonly string[] => {
+  const trimmed = line.trim()
+  return trimmed.startsWith('|') ? trimmed.split('|').map(plainCell) : []
+}
 
 /** Either of the two hold-row signals holdRows()'s docblock sets out below. */
 const looksLikeHoldRow = (cells: readonly string[]): boolean =>
