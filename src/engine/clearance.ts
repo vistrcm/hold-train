@@ -191,12 +191,55 @@ export function clearanceText(fields: ClearanceFields): string {
 // always have been: an ATC-assigned hold at a real station claims nothing
 // published, because the radial, turn direction and leg are drawn per scenario
 // rather than presented as the station's own geometry. That is why this list
-// survived every audit the 5-letter fixtures did not. The NDB names are
-// invented — no NDB remains in the region at all (docs/bay-area-holds.md), so
-// there is no real name to adopt, and the drill still needs an NDB scenario to
-// exercise the bearing-vs-radial distinction.
-const VOR_NAMES = ['Manteca', 'Linden', 'Sacramento', 'Modesto', 'Panoche'] as const
-const NDB_NAMES = ['Amber', 'Delta', 'Cooper'] as const
+// survived every audit the 5-letter fixtures did not.
+//
+// What a name here DOES claim is that there is a station to tune, so every one
+// is checked against the navaid table in docs/bay-area-holds.md — presence in
+// CIFP 2608, which is what "still commissioned" means for a navaid. The eleven
+// added alongside the original five are every current station that table
+// records; a bigger pool is more seed variety at no cost, since none of them
+// carries geometry.
+//
+// Manteca (ECA) is KEPT KNOWINGLY though it is gone: decommissioned 2018-03-29
+// under VOR MON, absent from CIFP 2608, and shipped here long before the pool
+// went mixed. A hold at a station that closed in 2018 still teaches the right
+// entry, and dropping it would be the one deletion in an otherwise additive
+// change — so it stays, recorded rather than rediscovered a third time. It is
+// also the only name in the dossier's table marked that way, and
+// clearance.test.ts requires the row to still say so.
+//
+// There is no "Stockton" VOR to add, though the airport is on the list this
+// pool serves: no such VHF navaid exists in CIFP 2608, and the station that
+// served KSCK was Manteca.
+//
+// The NDB names stay INVENTED, deliberately. No NDB remains anywhere in the Bay
+// Area or the Central Valley (docs/bay-area-holds.md), so there is no current
+// name to adopt; the alternative was a historical one, rejected because
+// ADOPTING a defunct station is a new claim where an obviously invented name
+// already works — which is not the same act as keeping one that predates the
+// rule, above. The drill needs these names only to carry an NDB scenario, which
+// exists to exercise the bearing-vs-radial distinction. clearance.test.ts
+// checks them against the same navaid table from the other side: none of them
+// may be a real station.
+export const VOR_NAMES = [
+  'Manteca',
+  'Linden',
+  'Sacramento',
+  'Modesto',
+  'Panoche',
+  'Woodside',
+  'Sausalito',
+  'Point Reyes',
+  'Salinas',
+  'Oakland',
+  'Avenal',
+  'Scaggs Island',
+  'San Francisco',
+  'San Jose',
+  'Concord',
+  'El Nido',
+] as const
+export const NDB_NAMES = ['Amber', 'Delta', 'Cooper'] as const
 
 interface PracticeHold {
   fix: string

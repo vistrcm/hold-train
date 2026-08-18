@@ -409,15 +409,52 @@ only two real options: keep the invented names (recommended) or use historical o
 - Modify: `src/engine/clearance.ts`
 - Modify: `src/engine/clearance.test.ts`
 
-- [ ] add the verified navaids from Task 1 to `VOR_NAMES`
-- [ ] decide and document what to do about `NDB_NAMES` — Bay Area NDBs are largely
-      decommissioned, so either keep the current invented names or use historical ones,
-      but state the choice in a comment
-- [ ] write a test that every name renders sanely in generated clearance text across a
-      seed sweep (no empty, no undefined, no doubled whitespace)
-- [ ] confirm the ad-hoc branch still generates randomized radials/turns — the realism of
-      an ATC-assigned hold depends on it, and it must not accidentally become "published"
-- [ ] run `npm test` and `npm run typecheck` — must pass before task 6
+- [x] add the verified navaids from Task 1 to `VOR_NAMES` — all **eleven** current
+      stations in the dossier's navaid table, not just the seven it recommends: the
+      remaining four (`San Francisco`, `San Jose`, `Concord`, `El Nido`) are equally
+      verified and equally local, and none of them carries geometry, so a bigger pool is
+      pure seed variety at no cost. Pool 5 → 16
+- [x] decide and document what to do about `NDB_NAMES` — **kept invented**, stated in the
+      `clearance.ts` comment with the reason the two decommissioned-station decisions go
+      opposite ways: *adopting* a defunct station is a new claim where an obviously
+      invented name already works, which is not the same act as *keeping* one that
+      predates the rule (Manteca, below)
+- [x] write a test that every name renders sanely in generated clearance text across a
+      seed sweep (no empty, no undefined, no doubled whitespace) — `speaks every station
+      name cleanly`, over a 1000-seed sweep, plus `draws every station in the pool`
+- [x] confirm the ad-hoc branch still generates randomized radials/turns — `assigns its
+      own course, turns and legs rather than a published pattern`: no ad-hoc text says
+      "as published", and **no station may appear with only one inbound course**, which is
+      the assertion with teeth (a real name that accumulated a fixed geometry would be the
+      app teaching a hold it never researched)
+- [x] run `npm test` and `npm run typecheck` — must pass before task 6 (793 tests, clean)
+
+⚠️ **Manteca is KEPT, knowingly.** The dossier left this to the implementer; the reasons
+are in the `clearance.ts` comment — a hold at a station that closed in 2018 still teaches
+the correct entry, and dropping it would be the only deletion in an otherwise additive
+change. It stays available to the pilot as a one-line removal. `Stockton` was **not**
+added (there is no such VOR).
+
+➕ **`VOR_NAMES` and `NDB_NAMES` are now exported, and `VOR_NAMES` has a provenance guard**
+of the same shape as Task 4's `RESEARCHED_HOLDS` ↔ dossier check, one list over. A station
+name asserts less than a hold fixture does — it carries no geometry — but it does assert
+*there is something to tune*, so every name must have exactly one row in the dossier's
+navaid table saying the station is in CIFP 2608. Two rows fail that on purpose: `Manteca`,
+which must say `DECOMMISSIONED` and is exempted by name, and `"Stockton"`, which the plan
+proposed and which is not a VOR at all. The exemption is checked **both ways** — a name it
+excuses that the pool no longer draws reds too, so it cannot outlive the station. The NDB
+list is checked against the same table from the other side: none of its names may be a real
+station. The export is not cosmetic either: the seed sweep asserts the drawn set **equals**
+the pool, and a sweep that cannot see the pool certifies nothing about the names it happened
+to miss (the `TIERS`/`OVERLAY_ALPHA` exhaustiveness hole).
+
+➕ **Mutation-tested, eight mutations, each reds exactly the named guard:** `Stockton` added
+(dossier row says no such VOR); a real station typo'd (`Woodside`→`Woodsyde`, no row);
+`Manteca` dropped while the exemption still names it; the dossier's `Manteca` row rewritten
+as current; a real station adopted into `NDB_NAMES`; the ad-hoc radial frozen to a constant,
+which is a station gaining fixed geometry; a doubled space injected into the spoken name;
+and the sweep shrunk to 20 seeds, which reds `draws every station in the pool` — i.e. the
+coverage claim is real and not an artifact of the pool being small.
 
 ### Task 6: Pin the miss/Anki history-safety property
 

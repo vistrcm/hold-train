@@ -8,8 +8,10 @@ import { CHART_HOLDS } from '../content/questions'
 import DOSSIER from '../../docs/bay-area-holds.md?raw'
 import {
   INVENTED_HOLDS,
+  NDB_NAMES,
   PUBLISHED_HOLDS,
   RESEARCHED_HOLDS,
+  VOR_NAMES,
   clearanceText,
   generateClearance,
   gradeCopiedClearance,
@@ -545,6 +547,137 @@ describe('RESEARCHED_HOLDS agrees with docs/bay-area-holds.md', () => {
       // original defect wearing the guard's own paperwork.
       expect(row.confidence, hold.fix).not.toBe('invented')
     }
+  })
+})
+
+/**
+ * The station names, against the file their existence was checked in.
+ *
+ * VOR_NAMES makes a claim the fixture holds do not: that there is a station to
+ * tune. Its geometry is drawn per scenario and asserts nothing, so the name is
+ * the whole claim — and the dossier's navaid table (presence in CIFP 2608,
+ * which is what "still commissioned" means for a navaid) is the witness for it.
+ * Same shape as the RESEARCHED_HOLDS check above, one list over: the app may
+ * not name a station its own provenance record says is not there.
+ */
+describe('VOR_NAMES agrees with docs/bay-area-holds.md', () => {
+  /** Markdown emphasis, code ticks, and the scare quotes on a non-station. */
+  const plain = (cell: string): string => cell.replace(/[`*"]/g, '').trim()
+
+  /**
+   * Stations drawn although they no longer exist. Manteca (ECA) was
+   * decommissioned 2018-03-29 under VOR MON and shipped here long before this
+   * pool went mixed; the decision to keep it is recorded in clearance.ts. The
+   * exemption is checked BOTH ways — a name here the pool no longer draws reds
+   * too, so it cannot decay into a list excusing stations nobody speaks.
+   */
+  const RETAINED_DECOMMISSIONED = ['Manteca']
+
+  interface NavaidRow {
+    ident: string
+    name: string
+    status: string
+  }
+
+  /**
+   * Navaid rows: six cells whose first is a three-letter ident. The dossier's
+   * other tables are 2, 3, 4, 8 and 9 cells wide, so nothing else parses as
+   * one, and the header and separator rows fail the ident test rather than
+   * being skipped by position. A parse that breaks fails CLOSED — every
+   * assertion below needs a row in order to pass.
+   */
+  const NAVAID_ROWS: readonly NavaidRow[] = DOSSIER.split('\n').flatMap((line) => {
+    const cells = line.split('|')
+    if (cells.length !== 8) return []
+    const ident = plain(cells[1]!)
+    if (!/^[A-Z]{3}$/.test(ident)) return []
+    return [{ ident, name: plain(cells[2]!), status: plain(cells[6]!) }]
+  })
+
+  it('names only stations the dossier records as current', () => {
+    expect(VOR_NAMES.length).toBeGreaterThan(0)
+    for (const name of VOR_NAMES) {
+      const rows = NAVAID_ROWS.filter((r) => r.name === name)
+      expect(rows, `${name} in docs/bay-area-holds.md`).toHaveLength(1)
+      const { status } = rows[0]!
+      if (RETAINED_DECOMMISSIONED.includes(name)) {
+        expect(status, name).toMatch(/DECOMMISSIONED/)
+        continue
+      }
+      // "in CIFP 2608" is the dossier's phrase for a station that is still
+      // there. The two rows lacking it are the decommissioned one and
+      // "Stockton", which the plan proposed and which is not a VOR at all.
+      expect(status, name).toContain('in CIFP 2608')
+    }
+  })
+
+  it('excuses only decommissioned stations the pool actually draws', () => {
+    for (const name of RETAINED_DECOMMISSIONED) {
+      expect(VOR_NAMES, `${name} is excused but no longer shipped`).toContain(name)
+    }
+  })
+
+  it('invents its NDB names rather than reusing a real station', () => {
+    // The other direction, and the reason the NDB list stays invented: no NDB
+    // remains in the region, so an NDB name that IS a real station here would
+    // be a VOR wearing the wrong kind — bearing-to-the-station phraseology
+    // taught at a place that speaks radials.
+    expect(NAVAID_ROWS.length, 'dossier navaid table parsed').toBeGreaterThan(0)
+    const stations = NAVAID_ROWS.map((r) => r.name)
+    for (const name of NDB_NAMES) {
+      expect(stations, `${name} is a real station`).not.toContain(name)
+    }
+  })
+})
+
+/**
+ * The ad-hoc ATC branch, swept over seeds.
+ *
+ * Every station name reaches the student inside spoken phraseology, so the
+ * sweep checks what an ear would catch — over the WHOLE pool, because a sweep
+ * that happens to miss a name certifies nothing about it. The drawn set is
+ * asserted equal to the pool rather than merely non-empty, which is the
+ * exhaustiveness hole this repo keeps re-finding (TIERS, OVERLAY_ALPHA).
+ */
+describe('generateClearance — ad-hoc holds at named stations', () => {
+  const seeds = Array.from({ length: 1000 }, (_, i) => i)
+  const adHoc = seeds.map((s) => generateClearance(s)).filter((r) => r.holdSpec.fixKind !== 'charted')
+
+  it('draws every station in the pool', () => {
+    const drawn = new Set(adHoc.map((r) => r.holdSpec.fix))
+    expect(drawn).toEqual(new Set<string>([...VOR_NAMES, ...NDB_NAMES]))
+  })
+
+  it('speaks every station name cleanly', () => {
+    for (const { clearance, holdSpec, expectedFields } of adHoc) {
+      // A name is read aloud: words, single-spaced, nothing stray around them.
+      expect(holdSpec.fix, JSON.stringify(holdSpec.fix)).toMatch(/^[A-Z][a-z]+( [A-Z][a-z]+)*$/)
+      const station = holdSpec.fixKind === 'NDB' ? 'NDB' : 'VOR'
+      expect(clearance.text, holdSpec.fix).toContain(`of the ${holdSpec.fix} ${station} on the `)
+      expect(clearance.text, holdSpec.fix).not.toMatch(/ {2}|undefined|NaN/)
+      expect(expectedFields.fix, holdSpec.fix).toBe(holdSpec.fix)
+    }
+  })
+
+  it('assigns its own course, turns and legs rather than a published pattern', () => {
+    const coursesByFix = new Map<string, Set<number>>()
+    for (const { clearance, holdSpec, expectedFields } of adHoc) {
+      expect(clearance.text, holdSpec.fix).not.toContain('as published')
+      expect(['radial', 'bearing'], holdSpec.fix).toContain(expectedFields.courseKind)
+      expect(expectedFields.leg, holdSpec.fix).not.toBe('published')
+      expect(typeof expectedFields.courseDegrees, holdSpec.fix).toBe('number')
+      const courses = coursesByFix.get(holdSpec.fix) ?? new Set<number>()
+      courses.add(holdSpec.inboundCourse)
+      coursesByFix.set(holdSpec.fix, courses)
+    }
+    // No station may accumulate a de facto published geometry. The realism of
+    // an ATC-assigned hold is precisely that the same VOR comes with a
+    // different radial every time — a real name with a fixed course would be
+    // the app teaching a hold it never researched.
+    for (const [fix, courses] of coursesByFix) {
+      expect(courses.size, `${fix} always holds on the same course`).toBeGreaterThan(1)
+    }
+    expect(new Set(adHoc.map((r) => r.holdSpec.turnDirection))).toEqual(new Set(['right', 'left']))
   })
 })
 
