@@ -490,13 +490,28 @@ coverage claim is real and not an artifact of the pool being small.
 **Files:**
 - Modify: `src/modules/wind-lab.test.ts` (only if its guards need widening)
 
-- [ ] confirm wind-lab's existing guards still pass: `FIXES` names remain invented,
-      disjoint from `CHART_HOLDS` and from the now-real clearance lists
-- [ ] confirm the wind-lab scenario line still carries its "fictitious" labelling — it
-      keeps invented data, so unlike the entry drill it *should* keep saying so
-- [ ] widen the cross-list disjointness guard if it hand-lists the clearance lists rather
-      than importing them
-- [ ] run `npm test` and `npm run typecheck` — must pass before task 8
+- [x] confirm wind-lab's existing guards still pass: `FIXES` names remain invented,
+      disjoint from `CHART_HOLDS` and from the now-real clearance lists — all 34 passed
+      unchanged against the widened pools; no `FIXES` name collides with the 14 researched
+      holds or the real navaid names
+- [x] confirm the wind-lab scenario line still carries its "fictitious" labelling — it
+      keeps invented data, so unlike the entry drill it *should* keep saying so. Present at
+      `wind-lab.ts:313` and asserted by `labels the scenario line as a practice fixture,
+      not charted data`, whose comment already records why this screen diverges from the
+      drill's mixed-pool wording
+- [x] widen the cross-list disjointness guard if it hand-lists the clearance lists rather
+      than importing them — it imported `PUBLISHED_HOLDS` **only**, so `VOR_NAMES` and
+      `NDB_NAMES` were unchecked while the comment claimed "every fixture list": a scope
+      narrower than the claim reading as coverage. Now harvested from the module namespace
+      (`clearanceFixtureNames`), exhaustive over `clearance.ts`'s array exports by
+      construction, upper-cased so `Oakland`/`OAKLAND` collide, and throwing on an element
+      shape it cannot read a name from rather than silently contributing nothing.
+      **Mutation-tested**: `FIXES` seeded with `Oakland` (VOR), `AMBER` (NDB) and `OMWAP`
+      (researched hold) each red the named guard, and the old `PUBLISHED_HOLDS`-only body
+      passes 35/35 against the `AMBER` collision — the widening is load-bearing. Breaking
+      the harvest to skip string lists reds the new anti-vacuity test, which is what stops
+      the guard going green over an empty set
+- [x] run `npm test` and `npm run typecheck` — must pass before task 8 (795 tests, clean)
 
 ### Task 8: Verify acceptance criteria
 

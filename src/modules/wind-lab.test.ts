@@ -9,7 +9,7 @@ import {
 } from '../engine/sim'
 import { groundSpeeds, inboundCrab, outboundHeading, outboundTimeSeconds } from '../engine/wind'
 import { CHART_HOLDS } from '../content/questions'
-import { PUBLISHED_HOLDS } from '../engine/clearance'
+import * as clearance from '../engine/clearance'
 import {
   ACS_SOURCE,
   FIXES,
@@ -20,6 +20,35 @@ import {
   type PilotNumbers,
   type WindLabDebrief,
 } from './wind-lab'
+
+/**
+ * Every fixture name `clearance.ts` exports, upper-cased so 'Oakland' and
+ * 'OAKLAND' collide — two invented holds at one place is the defect whatever
+ * case they were typed in.
+ *
+ * Throws on an array export whose elements are neither strings nor objects with
+ * a string `fix`: such a list contributes nothing to the set, so a silent skip
+ * would be a fixture list this guard reports as checked and never reads. Over-
+ * collecting a non-fixture array is the accepted trade in the other direction.
+ */
+function clearanceFixtureNames(): Set<string> {
+  const names = new Set<string>()
+  for (const [list, value] of Object.entries(clearance)) {
+    if (!Array.isArray(value)) continue
+    for (const item of value) {
+      if (typeof item === 'string') {
+        names.add(item.toUpperCase())
+        continue
+      }
+      const fix: unknown = (item as { fix?: unknown } | null)?.fix
+      if (typeof fix !== 'string') {
+        throw new Error(`clearance.${list} holds an element this harvest cannot read a name from`)
+      }
+      names.add(fix.toUpperCase())
+    }
+  }
+  return names
+}
 
 /** In-memory store so tests never touch jsdom localStorage. */
 function testStore(): Store {
@@ -121,10 +150,30 @@ describe('generateWindScenario', () => {
   // entry-drill practice plate and as some other course/turn here, and has no
   // way to know which invented hold is which. Names must be disjoint across
   // every fixture list, not just against real-world data.
+  //
+  // The claim is "every fixture list" and the check used to be PUBLISHED_HOLDS
+  // alone, which read as coverage while VOR_NAMES and NDB_NAMES — fixture lists
+  // in the same module, drawn by the same generator — went unchecked. Harvested
+  // from the module namespace rather than hand-listed for the reason the
+  // hand-list was wrong in the first place: a fifth list added to clearance.ts
+  // is covered by default, where three named imports would leave it free to
+  // collide with the suite green. Exhaustive over that module's array exports
+  // by construction and over nothing else — CHART_HOLDS has its own guard above.
   it('no fixture collides with a practice hold used elsewhere in the app', () => {
-    const published = new Set(PUBLISHED_HOLDS.map((h) => h.fix))
+    const elsewhere = clearanceFixtureNames()
     for (const fix of FIXES) {
-      expect(published.has(fix), `${fix} is also a PUBLISHED_HOLDS fixture`).toBe(false)
+      expect(elsewhere.has(fix.toUpperCase()), `${fix} is also a clearance fixture`).toBe(false)
+    }
+  })
+
+  // Anti-vacuity: the harvest above is green over an empty set, and an empty set
+  // is what a renamed export or an unrecognised element shape would leave it. One
+  // known name per list pins that every shape clearance.ts actually exports is
+  // being read — the object lists by .fix, the plain-string lists by value.
+  it('harvests a name from every clearance fixture list it claims to cover', () => {
+    const names = clearanceFixtureNames()
+    for (const known of ['ZORVU', 'OMWAP', 'OAKLAND', 'AMBER']) {
+      expect(names.has(known), `${known} missing from the harvest`).toBe(true)
     }
   })
 })
