@@ -50,8 +50,11 @@ const TARGET_INBOUND_S = 60
  *
  * Names must also be disjoint from every OTHER fixture list, which the first
  * rename missed: ZORVU, QUIBO and VAXNU are PUBLISHED_HOLDS fixtures, so the
- * same name carried one invented hold on the entry-drill practice plate and a
- * different one here. Guarded by tests in wind-lab.test.ts.
+ * same name carried one invented hold in the entry drill's hold line and a
+ * different one here. Guarded by tests in wind-lab.test.ts — except the check
+ * against docs/bay-area-holds.md, which lives beside that file's parser in
+ * clearance.test.ts (`no invented fixture lands on a real fix the dossier
+ * records`). A name absent from the literal below is not thereby free.
  */
 export const FIXES = ['KELVO', 'MORVA', 'GUSTO', 'PLIXA', 'CRABB'] as const
 

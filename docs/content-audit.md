@@ -2497,15 +2497,17 @@ the underlying confusion moving is itself the signal: the invariant was aimed at
    overlaps nowhere — which is what it was until the real fixtures landed — hence `actually
    shares a name with a charted hold, so the check above is not vacuous`.
 2. **Provenance.** A researched fixture must match its row in `docs/bay-area-holds.md` (FAA CIFP
-   cycle 2608 plus same-cycle d-TPP plates, confidence and lookup date per row). For the ten
+   cycle 2608 plus same-cycle d-TPP plates, confidence and lookup date per row). For the eleven
    names `CHART_HOLDS` does not carry, that dossier is the only witness, so the check is the
    same shape as (1) pointed at it. Where CIFP and the plate disagreed the plate won — `HAXEK`
    is 113.5° in CIFP and depicted 113°, the only such case — because the plate is what a
    student reads.
 3. **The old ban, kept where it was always right.** An invented name must still return no
    waypoint record at `opennav.com/waypoint/US/<NAME>`, and must still be disjoint from
-   `CHART_HOLDS`. Both apply to wind-lab's `FIXES` whole, which is invented wholesale and
-   unchanged by this work.
+   `CHART_HOLDS` and from every fix the dossier records. All three apply to wind-lab's `FIXES`
+   whole, which is invented wholesale and unchanged by this work. **Amended 2026-08-18:** as
+   first shipped, the dossier half of that sentence described a check that did not exist for
+   `FIXES` — see the correction entry below.
 
 **What this does not claim.** Nothing here is current chart data and no AIRAC/cycle/amendment
 machinery was introduced — a stale hold still trains the correct entry, which is the point of
@@ -2554,3 +2556,57 @@ name with` and the dossier guard; a procedure name and amendment appended to the
 hold line names no procedure, amendment or chart cycle`; the hold line rebuilt off the seed reds
 the Anki history guard; dropping one hold from `PUBLISHED_HOLDS` reds only the seed sweep. Suite
 799 passed, `tsc --noEmit` clean.
+
+## Post-completion review fixes — 2026-08-18 (code review iteration 2, real Bay Area fixtures branch)
+
+**The dossier disjointness check swept one of the three invented fixture lists, and three
+documents said it swept them all.** The entry above states rule 3 as "an invented name must be
+disjoint from `CHART_HOLDS` and every fix the dossier records", and CLAUDE.md closed the same
+sentence with "**Both of those still hold over wind lab's `FIXES` whole, which is why its guards
+did not change.**" The `CHART_HOLDS` half did. The dossier half was never asserted anywhere but
+`INVENTED_HOLDS`: `docs/bay-area-holds.md?raw` was imported by `clearance.test.ts` and by nothing
+else, so wind lab's three guards remained a 7-name literal of names already caught, `CHART_HOLDS`
+disjointness, and cross-list disjointness against `clearance.ts`.
+
+That is the `WINDY`/`DRIFT`/`TIMBR` defect at the same list, reachable on the branch whose whole
+claim was that this class is now guarded — and worse there than in `PUBLISHED_HOLDS`, because
+wind lab's scenario line still says **"fictitious fix"** by design. `docs/bay-area-holds.md`
+hands an editor 22 real fix names and ships 14; `WHYEE`, `IPDEW` and `ORANG` are in none of wind
+lab's three guards, so renaming a fixture to one of them published invented course, turns and
+legs for a real Bay Area fix under a label asserting the place does not exist, with all 35
+wind-lab tests green. Confirmed by mutation, not by reading.
+
+The fix is the one the dossier check was built on: **the witness grows with the research, a
+literal grows only when somebody remembers.** `no invented fixture lands on a real fix the
+dossier records` now sweeps `INVENTED_FIXTURE_NAMES` — `INVENTED_HOLDS`, `NDB_NAMES` and wind
+lab's `FIXES`, upper-cased so `Delta` and a fix `DELTA` collide — rather than `INVENTED_HOLDS`
+alone. `VOR_NAMES` is deliberately excluded: those are real stations by design (rule 4). The
+guard stays in `clearance.test.ts` because the dossier parser does, and a second parser is a copy
+that drifts — the `COLOUR_LITERAL` lesson. Its own vacuity hole is pinned by `sweeps a name from
+every invented fixture list it claims to cover`, one known name per list, since the loop is green
+over a list that has been renamed out of the harvest.
+
+**The same parser dropped rows silently while its docblock claimed it threw.** `holdRows()` decided
+hold-row-ness *by the confidence cell* (`if (!CONFIDENCE.includes(confidence)) return []`), so the
+docblock's "a row that looks like a hold row and will not parse THROWS — a skip is fail-open" was
+false of the two likeliest markdown edits: rewording a confidence cell (`researched ✓`, `CIFP
+only`) or typing a `|` into the provenance prose each dropped the row with no throw. That fails
+open in the direction that matters — the dropped fix simply stops being defended by the check
+above, so the witness quietly shrinks. Hold-row-ness is now decided **two** ways, because each
+signal is blind to the edit the other catches: a row carrying a confidence-legend cell (broken by
+anything that moves the cell count off 10), **or** a 10-cell row shaped like one — bare `NNN°`
+course, `left`/`right` turns cell — which is what survives a reworded confidence cell. Past the
+recognizer every failure throws. Neither signal matches the recommendations table, whose lines
+pair two 5-cell halves and carry no confidence cell: that table is a derived summary of the
+shipped 14, so parsing it as a source of record would let the dossier witness itself.
+
+Also corrected: this ledger said "the ten names `CHART_HOLDS` does not carry" where 14 researched
+minus the 3 overlaps (`OYOSO`, `HAIRE`, `UHHUT`) is **eleven**, which is what `clearance.test.ts`
+and CLAUDE.md say; and two comments in `wind-lab.ts`/`wind-lab.test.ts` still pointed at the
+"entry-drill practice plate", a framing this branch deleted.
+
+**Mutation-confirmed 2026-08-18**, each against the real tree: renaming a `FIXES` entry to `WHYEE`
+reds `no invented fixture lands on a real fix the dossier records`; rewording a confidence cell to
+`CIFP only` and typing a `|` into `OYOSO`'s provenance cell each throw rather than skip; dropping
+wind lab's list from `INVENTED_FIXTURE_NAMES` reds `sweeps a name from every invented fixture list
+it claims to cover`. Suite 804 passed, `tsc --noEmit` clean.

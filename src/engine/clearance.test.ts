@@ -6,6 +6,9 @@ import { CHART_HOLDS } from '../content/questions'
 // a real fix name in the pool is a claim about a real place, so the claim and its
 // provenance have to be checked against each other rather than typed twice.
 import DOSSIER from '../../docs/bay-area-holds.md?raw'
+// Wind lab's fixture pool is invented wholesale, so it answers to the same
+// dossier check as INVENTED_HOLDS — see INVENTED_FIXTURE_NAMES below.
+import { FIXES as WIND_LAB_FIXES } from '../modules/wind-lab'
 import {
   INVENTED_HOLDS,
   NDB_NAMES,
@@ -444,15 +447,44 @@ interface DossierRow {
   confidence: string
 }
 
+/** A pipe row's cells with markdown formatting stripped; [] for a non-row. */
+const rowCells = (line: string): readonly string[] =>
+  line.startsWith('|') ? line.split('|').map(plainCell) : []
+
+/** Either of the two hold-row signals holdRows()'s docblock sets out below. */
+const looksLikeHoldRow = (cells: readonly string[]): boolean =>
+  cells.some((c) => CONFIDENCE.includes(c)) ||
+  (cells.length === 10 && /^\d{1,3}°$/.test(cells[3]!) && ['left', 'right'].includes(cells[4]!))
+
 /**
- * The dossier's hold rows, keyed off the confidence column rather than off a
+ * The dossier's hold rows, recognised by their own columns rather than by a
  * table caption: the dossier also carries a navaid table, a decode-validation
  * table and a recommendations table, all of which name fixes in their first
  * column.
  *
  * A row that looks like a hold row and will not parse THROWS rather than being
  * skipped — a skip is fail-open, the same way a truncated source scan reads as
- * a clean one. Because it throws, it is computed on first CALL and memoised
+ * a clean one, and it fails open in the direction that matters: `no invented
+ * fixture lands on a real fix the dossier records` defends exactly the names
+ * this function returns, so a dropped row silently stops defending its fix
+ * while the suite stays green. That is the HAIRE defect with the witness
+ * quietly removed.
+ *
+ * "Looks like a hold row" is therefore decided TWO ways, because each signal is
+ * blind to the edit the other catches, and keying on the confidence cell alone
+ * is how the first version was wrong:
+ *  - a row carrying a confidence-legend cell — broken by a reflowed table, an
+ *    added column, or a `|` typed into the provenance prose, all of which move
+ *    the cell count off 10;
+ *  - a 10-cell row SHAPED like one (bare `NNN°` course cell, a `left`/`right`
+ *    turns cell) — which is what survives a reworded confidence cell
+ *    (`researched ✓`, `CIFP only`), the edit the first signal cannot see.
+ * Neither matches the recommendations table, whose lines pair two 5-cell halves
+ * (11 cells, course at index 2) and carry no confidence cell at all — that
+ * table is a derived summary, so parsing it as a source of record would let the
+ * dossier witness itself.
+ *
+ * Because it throws, it is computed on first CALL and memoised
  * rather than at describe scope: one reflowed markdown row would otherwise
  * throw during COLLECTION and take the whole file down as "no tests", with
  * every guard below silently absent — and a red suite that names nothing is not
@@ -466,19 +498,28 @@ interface DossierRow {
 let holdRowsCache: readonly DossierRow[] | undefined
 function holdRows(): readonly DossierRow[] {
   holdRowsCache ??= DOSSIER.split('\n').flatMap((line) => {
-    const cells = line.split('|')
-    if (cells.length !== 10) return []
-    const confidence = plainCell(cells[7]!)
-    if (!CONFIDENCE.includes(confidence)) return []
-    const course = /^(\d{1,3})°$/.exec(plainCell(cells[3]!))
-    const leg = /^(\d+)\s*(NM|min)$/.exec(plainCell(cells[5]!))
-    const turnDirection = plainCell(cells[4]!)
-    if (!course || !leg || !['left', 'right'].includes(turnDirection)) {
+    const cells = rowCells(line)
+    if (!looksLikeHoldRow(cells)) return []
+    // Past the recognizer every failure is a throw: the row IS a hold row and
+    // the parse is what broke, which is exactly the case a `return []` hides.
+    if (cells.length !== 10) {
+      throw new Error(`hold row with ${cells.length} cells in docs/bay-area-holds.md: ${line}`)
+    }
+    const confidence = cells[7]!
+    const course = cells[3]!.match(/^(\d{1,3})°$/)
+    const leg = cells[5]!.match(/^(\d+)\s*(NM|min)$/)
+    const turnDirection = cells[4]!
+    if (
+      !course ||
+      !leg ||
+      !['left', 'right'].includes(turnDirection) ||
+      !CONFIDENCE.includes(confidence)
+    ) {
       throw new Error(`unparseable hold row in docs/bay-area-holds.md: ${line}`)
     }
     return [
       {
-        fix: plainCell(cells[1]!),
+        fix: cells[1]!,
         inboundCourse: Number(course[1]),
         turnDirection,
         leg: { unit: leg[2]!.toLowerCase(), value: Number(leg[1]) },
@@ -488,6 +529,27 @@ function holdRows(): readonly DossierRow[] {
   })
   return holdRowsCache
 }
+
+/**
+ * Every name in the app that a screen draws and then invents course, turn
+ * direction and legs for. That set spans three modules, which is why it is
+ * built here rather than per-list: the invariant "an invented hold may not sit
+ * on a real fix" is one claim about the app, and the two lists that each had
+ * their own guard did not stop wind lab's FIXES from shipping WINDY, DRIFT and
+ * TIMBR.
+ *
+ * VOR_NAMES is deliberately absent — those are real stations by design, and the
+ * ad-hoc ATC branch draws their radial and legs per scenario, so the name
+ * claims only that there is something to tune (CLAUDE.md rule 4).
+ *
+ * Upper-cased because the dossier writes fix idents that way and NDB_NAMES are
+ * title case: 'Delta' and a fix 'DELTA' are one place, whatever the notation.
+ */
+const INVENTED_FIXTURE_NAMES: ReadonlyArray<{ list: string; name: string }> = [
+  ...INVENTED_HOLDS.map((h) => ({ list: 'INVENTED_HOLDS', name: h.fix.toUpperCase() })),
+  ...NDB_NAMES.map((n) => ({ list: 'NDB_NAMES', name: n.toUpperCase() })),
+  ...WIND_LAB_FIXES.map((f) => ({ list: 'wind-lab FIXES', name: f.toUpperCase() })),
+]
 
 describe('PUBLISHED_HOLDS practice fixtures', () => {
   // The pool is MIXED: invented fixtures alongside real Bay Area / Central
@@ -559,10 +621,33 @@ describe('PUBLISHED_HOLDS practice fixtures', () => {
     //
     // The witness is the dossier itself, so it grows with the research rather
     // than with somebody remembering to extend a literal.
+    //
+    // Swept over EVERY invented fixture list in the app, not just this module's.
+    // Scoping it to INVENTED_HOLDS is the same "a scope narrower than the claim
+    // reads as coverage" hole the cross-list check was widened for: wind lab's
+    // FIXES is the one list that still invents course, turns and legs wholesale
+    // AND labels the result "fictitious fix" on screen, so a rename to WHYEE,
+    // IPDEW or ORANG — dossier fixes held back from shipping, and absent from
+    // wind-lab's hand-written real-name literal, from CHART_HOLDS and from every
+    // clearance export — asserted that a real place does not exist, green.
+    // The guard lives here rather than in wind-lab.test.ts because the dossier
+    // parser does, and a second copy of it is a copy that drifts.
     const researched = new Set(holdRows().map((r) => r.fix))
     expect(researched.size, 'dossier hold table parsed').toBeGreaterThan(0)
-    for (const hold of INVENTED_HOLDS) {
-      expect([...researched], `invented fixture ${hold.fix} is a real fix`).not.toContain(hold.fix)
+    for (const { list, name } of INVENTED_FIXTURE_NAMES) {
+      expect([...researched], `invented fixture ${name} (${list}) is a real fix`).not.toContain(name)
+    }
+  })
+
+  // Anti-vacuity for the sweep above, the same shape as wind-lab.test.ts's
+  // `harvests a name from every clearance fixture list it claims to cover`: the
+  // loop is green over an empty list, so a renamed or dropped export would
+  // silently stop defending a whole pool. One known name per list pins that
+  // each is actually reaching the check.
+  it('sweeps a name from every invented fixture list it claims to cover', () => {
+    const names = new Set(INVENTED_FIXTURE_NAMES.map((f) => f.name))
+    for (const known of ['ZORVU', 'AMBER', 'KELVO']) {
+      expect(names.has(known), `${known} is not swept`).toBe(true)
     }
   })
 

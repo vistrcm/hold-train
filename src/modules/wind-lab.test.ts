@@ -132,6 +132,13 @@ describe('generateWindScenario', () => {
     // Verified against opennav.com/waypoint/US/<NAME> on 2026-07-23: WINDY
     // (Newman, CA), DRIFT and TIMBR (Timber, OR) return waypoint records; the
     // names now in FIXES return none.
+    //
+    // This literal records names already CAUGHT, so it only ever covers the
+    // past — and on its own it did not cover docs/bay-area-holds.md's 22 real
+    // fix names, of which 8 never shipped. The check that grows with the
+    // research is `no invented fixture lands on a real fix the dossier records`
+    // in clearance.test.ts, which sweeps FIXES along with the other two
+    // invented lists; it lives there because the dossier parser does.
     const real = ['WINDY', 'DRIFT', 'TIMBR', 'CEDES', 'SUNOL', 'TRACY', 'JEMKO']
     for (const fix of FIXES) {
       expect(real, `fixture ${fix}`).not.toContain(fix)
@@ -146,8 +153,8 @@ describe('generateWindScenario', () => {
   })
 
   // Both lists invent course, turns and legs independently, so a shared name is
-  // the same defect pointed inward: the student meets ZORVU as 300°/right on the
-  // entry-drill practice plate and as some other course/turn here, and has no
+  // the same defect pointed inward: the student meets ZORVU as 300°/right in the
+  // entry drill's hold line and as some other course/turn here, and has no
   // way to know which invented hold is which. Names must be disjoint across
   // every fixture list, not just against real-world data.
   //
