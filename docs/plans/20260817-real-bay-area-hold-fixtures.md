@@ -320,20 +320,75 @@ fields, so Task 2's guard becomes load-bearing the moment any of them is added.
 - Modify: `src/engine/clearance.ts`
 - Modify: `src/engine/clearance.test.ts`
 
-- [ ] **append** the researched real holds from Task 1; keep `ZORVU`, `QUIBO`, `VAXNU` and
-      `BRIXO` exactly as they are — this is an extension, not a swap
-- [ ] delete the now-wrong "fixture names are disjoint from `CHART_HOLDS`" guard
+- [x] **append** the researched real holds from Task 1; keep `ZORVU`, `QUIBO`, `VAXNU` and
+      `BRIXO` exactly as they are — this is an extension, not a swap. All 14 `researched`
+      holds added (pool 4 → 18); `WHYEE`/`IPDEW`/`ORANG`/`ALTAM` held back per the dossier
+- [x] delete the now-wrong "fixture names are disjoint from `CHART_HOLDS`" guard
       (`clearance.test.ts:414`), replaced in substance by Task 2's geometry check
-- [ ] add/keep a guard that clearance fixtures stay disjoint from wind-lab's `FIXES`
-- [ ] keep the surviving invented fixtures covered by a real-waypoint-collision check —
+- [x] add/keep a guard that clearance fixtures stay disjoint from wind-lab's `FIXES` —
+      **kept where it is**: `no fixture collides with a practice hold used elsewhere in
+      the app` (`wind-lab.test.ts`) imports `PUBLISHED_HOLDS`, so it widened by itself and
+      still passes. A second copy here would drift; Task 7 re-verifies
+- [x] keep the surviving invented fixtures covered by a real-waypoint-collision check —
       the property still holds for them and losing it would let a future invented name
       drift onto a real fix unnoticed
-- [ ] write validation tests for every new hold: `inboundCourse` in `[0,360)`, valid
-      `turnDirection`, valid `leg` unit and positive value
-- [ ] verify Task 2's guard is now genuinely load-bearing (at least one real overlap with
-      `CHART_HOLDS`, e.g. `OYOSO`, exercises it); if no overlap exists, say so explicitly
-      rather than leaving the guard looking active
-- [ ] run `npm test` and `npm run typecheck` — must pass before task 5
+- [x] write validation tests for every new hold: `inboundCourse` in `[0,360)`, valid
+      `turnDirection`, valid `leg` unit and positive value — plus a 5-letter name shape
+      and a `names no fix twice` check (two geometries under one name is the same
+      self-contradiction the `CHART_HOLDS` rule exists for, pointed inward)
+- [x] verify Task 2's guard is now genuinely load-bearing (at least one real overlap with
+      `CHART_HOLDS`, e.g. `OYOSO`, exercises it) — three overlaps (`OYOSO`, `HAIRE`,
+      `UHHUT`), and mutating `OYOSO` to right turns reds `never contradicts a charted hold
+      it shares a name with`. The overlap itself is now asserted, not assumed: see ➕ below
+- [x] run `npm test` and `npm run typecheck` — must pass before task 5 (787 tests, clean)
+
+➕ **`PUBLISHED_HOLDS` is now the concatenation of two exported source lists**,
+`INVENTED_HOLDS` and `RESEARCHED_HOLDS`. Not cosmetic: "keep the invented fixtures covered
+by a real-waypoint check" needs a way to *say which ones are invented*, and a hand-listed
+set of four names in the test file measures only what existed when it was typed — the
+exhaustiveness hole `CLAUDE.md` records for `TIERS`, `OVERLAY_ALPHA` and the rest. The
+split is machine-readable provenance instead, and `every fixture is declared invented or
+researched` closes the one way out (a hold appended straight to the exported array, which
+is the edit the file's previous shape invited) — such a fixture would reach the drill while
+escaping *both* provenance guards. This is the cheap version of the `real: boolean` the
+plan rejected: no new field, no branch, nothing the student can see.
+
+➕ **A real name is a claim about a real place, and `CHART_HOLDS` only constrains four of
+the fourteen.** For the other ten the dossier is the only witness, so
+`RESEARCHED_HOLDS agrees with docs/bay-area-holds.md` parses the dossier's hold tables
+(`?raw`, the README↔`PHASE_PREP` idiom) and pins course, turns and leg per fixture — the
+same shape as the `CHART_HOLDS` check, one witness out. It keys rows off the confidence
+column rather than a table caption (the dossier has four tables whose first column is a fix
+name), **throws** on a hold-shaped row it cannot parse rather than skipping it (a skip is
+fail-open), requires *exactly one* row per shipped fixture (`OAK` has two, and shipping an
+ambiguous provenance is the confusion the dossier exists to prevent), and rejects a row
+marked `invented` — a real name with made-up numbers wearing the guard's own paperwork is
+the original defect.
+
+➕ **Deleted the duplicate real-waypoint guard in `entry-drill.test.ts`** (`no fixture
+reuses a real NorCal fix name the student might fly`). It swept all of `PUBLISHED_HOLDS`,
+which is now a mixed pool where a real name is the *feature*; the surviving check lives in
+`clearance.test.ts` scoped to `INVENTED_HOLDS`, beside the data it constrains. One copy on
+purpose — two hand-written statements of one rule drift, and the half nobody edits waves
+the defect through. Also corrected two comments that would have argued a later session
+wrong: `entry-drill.test.ts`'s "`PUBLISHED_HOLDS` is *about to become* a mixed pool", and
+`hsi.test.ts`'s "`ZORVU` is already a `PUBLISHED_HOLDS` fixture, i.e. already checked to be
+a fictitious waypoint" — true of `ZORVU`, false of the implication, and the next reader
+picking a fixture for that constant now sees which half to pick from.
+
+➕ **Mutation-tested, nine mutations, each reds exactly the named guard and nothing else:**
+researched hold contradicting the dossier (`HAXEK` 113→114); charted overlap contradicting
+`CHART_HOLDS` (`OYOSO` left→right, which reds the dossier check *and* the `CHART_HOLDS`
+check); a hold appended to the exported array in neither provenance list; one fix name
+carrying two geometries; the `CHART_HOLDS` overlap emptied; an invented fixture renamed
+onto a real waypoint (`BRIXO`→`TRACY`); a real-looking name in the researched list with no
+dossier row; an out-of-range course; and the dossier scan parsing nothing at all, which
+reds rather than passing vacuously.
+
+⚠️ Every seed's heading and answer survived unchanged (787/787 green, including
+`keeps every existing seed on its original heading and answer`): growing the pool changes
+which *index* `pick` lands on but consumes the same number of `rng()` calls, and the drill
+heading comes from a separately-seeded stream.
 
 ### Task 5: Widen `VOR_NAMES` and `NDB_NAMES` with real Bay Area stations
 

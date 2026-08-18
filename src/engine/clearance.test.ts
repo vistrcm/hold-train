@@ -1,8 +1,15 @@
 import { describe, it, expect } from 'vitest'
 import { cardinalFromCourse, normalizeDeg, reciprocal } from './geometry'
 import { CHART_HOLDS } from '../content/questions'
+// The research artifact the real fixtures' geometry came from. Same runtime-only
+// doc↔code coupling the README↔PHASE_PREP diff pins, and the same `?raw` idiom:
+// a real fix name in the pool is a claim about a real place, so the claim and its
+// provenance have to be checked against each other rather than typed twice.
+import DOSSIER from '../../docs/bay-area-holds.md?raw'
 import {
+  INVENTED_HOLDS,
   PUBLISHED_HOLDS,
+  RESEARCHED_HOLDS,
   clearanceText,
   generateClearance,
   gradeCopiedClearance,
@@ -406,14 +413,137 @@ describe('mulberry32 — seeded PRNG (drill scenario reproducibility)', () => {
 })
 
 describe('PUBLISHED_HOLDS practice fixtures', () => {
-  // The fixtures invent course, turn direction, and legs. Reusing a real
-  // charted fix's name would state those invented numbers for a hold the
-  // student actually flies — "Hold northeast of HAIRE as published" once
-  // taught 210°/left against the charted 231°/right.
-  it('never reuses the name of a fix charted in the written bank', () => {
-    const charted = new Set(CHART_HOLDS.map((h) => h.fix))
+  // The pool is MIXED: invented fixtures alongside real Bay Area / Central
+  // Valley fixes. The old guard here — "never reuses the name of a fix charted
+  // in the written bank" — is deleted, not weakened. It was a proxy for the
+  // invariant that matters: the defect in every audit entry it was patched for
+  // (HAIRE, CEDES, WINDY/DRIFT/TIMBR) was inventing facts ABOUT a real place,
+  // never naming one, and a name ban checks no geometry at all. Three guards
+  // replace it — the CHART_HOLDS geometry check in the describe below, the
+  // dossier check here, and the real-waypoint check on the invented half.
+
+  it('every fixture is declared invented or researched', () => {
+    // PUBLISHED_HOLDS is built as the concatenation of the two, so what this
+    // catches is a hold appended to the exported array directly — the previous
+    // shape of the file invited exactly that edit, and such a fixture would
+    // escape BOTH provenance guards below while still reaching the drill.
+    expect(PUBLISHED_HOLDS).toEqual([...INVENTED_HOLDS, ...RESEARCHED_HOLDS])
+  })
+
+  it('names no fix twice', () => {
+    // Two rows under one name is two geometries under one name — the same
+    // self-contradiction the CHART_HOLDS check exists for, pointed inward.
+    const fixes = PUBLISHED_HOLDS.map((h) => h.fix)
+    expect([...new Set(fixes)].sort()).toEqual([...fixes].sort())
+  })
+
+  it('every fixture carries geometry the clearance engine can speak', () => {
     for (const hold of PUBLISHED_HOLDS) {
-      expect(charted.has(hold.fix), hold.fix).toBe(false)
+      expect(hold.fix, hold.fix).toMatch(/^[A-Z]{5}$/)
+      expect(Number.isInteger(hold.inboundCourse), hold.fix).toBe(true)
+      expect(hold.inboundCourse, hold.fix).toBeGreaterThanOrEqual(0)
+      expect(hold.inboundCourse, hold.fix).toBeLessThan(360)
+      expect(['left', 'right'], hold.fix).toContain(hold.turnDirection)
+      expect(['min', 'nm'], hold.fix).toContain(hold.leg.unit)
+      expect(Number.isInteger(hold.leg.value), hold.fix).toBe(true)
+      expect(hold.leg.value, hold.fix).toBeGreaterThan(0)
+    }
+  })
+
+  it('no invented fixture lands on a real waypoint', () => {
+    // Unchanged in substance and deliberately kept: the ban was wrong as a
+    // blanket rule over a mixed pool, and still right over the invented half.
+    // An invented hold at a real fix teaches made-up course and turn data for
+    // somewhere the student flies. Verified against opennav.com/waypoint/US/
+    // <NAME>: CEDES (Livermore), SUNOL and TRACY are real fixes and TRACY sits
+    // beside KTCY; WINDY (Newman, CA), DRIFT and TIMBR are the wind-lab
+    // repeat of the same defect. The names in INVENTED_HOLDS return none.
+    const real = ['CEDES', 'SUNOL', 'TRACY', 'JEMKO', 'WINDY', 'DRIFT', 'TIMBR']
+    for (const hold of INVENTED_HOLDS) {
+      expect(real, `fixture ${hold.fix}`).not.toContain(hold.fix)
+    }
+  })
+})
+
+/**
+ * The real half's geometry, against the file it was researched from.
+ *
+ * A real fix name is a claim about a real place, and CHART_HOLDS constrains
+ * only the four names the written bank happens to carry. For the other ten the
+ * dossier is the only witness, so the check is the same shape: the app may not
+ * state geometry for a real fix that its own provenance record contradicts.
+ */
+describe('RESEARCHED_HOLDS agrees with docs/bay-area-holds.md', () => {
+  /** The dossier's own confidence legend — the column that marks a hold row. */
+  const CONFIDENCE = ['researched', 'CIFP-only', 'approximate', 'invented']
+
+  /** Markdown emphasis and code ticks are formatting, not value. */
+  const plain = (cell: string): string => cell.replace(/[`*]/g, '').trim()
+
+  interface DossierRow {
+    fix: string
+    inboundCourse: number
+    turnDirection: string
+    leg: { unit: string; value: number }
+    confidence: string
+  }
+
+  /**
+   * Hold rows, keyed off the confidence column rather than off a table caption:
+   * the dossier also carries a navaid table, a decode-validation table and a
+   * recommendations table, all of which name fixes in their first column.
+   *
+   * A row that looks like a hold row and will not parse THROWS rather than
+   * being skipped — a skip is fail-open, the same way a truncated source scan
+   * reads as a clean one.
+   */
+  const HOLD_ROWS: readonly DossierRow[] = DOSSIER.split('\n').flatMap((line) => {
+    const cells = line.split('|')
+    if (cells.length !== 10) return []
+    const confidence = plain(cells[7]!)
+    if (!CONFIDENCE.includes(confidence)) return []
+    const course = /^(\d{1,3})°$/.exec(plain(cells[3]!))
+    const leg = /^(\d+)\s*(NM|min)$/.exec(plain(cells[5]!))
+    const turnDirection = plain(cells[4]!)
+    if (!course || !leg || !['left', 'right'].includes(turnDirection)) {
+      throw new Error(`unparseable hold row in docs/bay-area-holds.md: ${line}`)
+    }
+    return [
+      {
+        fix: plain(cells[1]!),
+        inboundCourse: Number(course[1]),
+        turnDirection,
+        leg: { unit: leg[2]!.toLowerCase(), value: Number(leg[1]) },
+        confidence,
+      },
+    ]
+  })
+
+  it('states the researched course, turns and leg for every real fixture', () => {
+    expect(RESEARCHED_HOLDS.length).toBeGreaterThan(0)
+    for (const hold of RESEARCHED_HOLDS) {
+      const rows = HOLD_ROWS.filter((r) => r.fix === hold.fix)
+      // Exactly one: the dossier records two geometries for OAK (one per
+      // procedure), and shipping a fix whose provenance is ambiguous is the
+      // confusion the dossier exists to prevent, so it reds rather than
+      // picking a row.
+      expect(rows, `${hold.fix} in docs/bay-area-holds.md`).toHaveLength(1)
+      const row = rows[0]!
+      expect(
+        {
+          inboundCourse: hold.inboundCourse,
+          turnDirection: hold.turnDirection,
+          leg: hold.leg,
+        },
+        hold.fix,
+      ).toEqual({
+        inboundCourse: row.inboundCourse,
+        turnDirection: row.turnDirection,
+        leg: row.leg,
+      })
+      // A real name whose dossier row says the numbers were made up is the
+      // original defect wearing the guard's own paperwork.
+      expect(row.confidence, hold.fix).not.toBe('invented')
     }
   })
 })
@@ -426,9 +556,10 @@ describe('PUBLISHED_HOLDS geometry agrees with the written bank', () => {
   // the HAIRE defect (docs/content-audit.md): "hold northeast of HAIRE as
   // published" once taught 210°/left against the charted 231°/right.
   //
-  // Until Task 4 appends the real holds there is no overlap, so the check
-  // against the live list below is vacuous. The synthetic cases underneath it
-  // are what keep the guard honest in the meantime.
+  // The overlap is real now — OYOSO, HAIRE and UHHUT are in the pool — so the
+  // check against the live list below bites. The synthetic cases underneath it
+  // stay: they are what keeps the guard honest if the overlap ever empties,
+  // and they pin WHICH field disagreed, which the live check alone cannot.
   type Fixture = (typeof PUBLISHED_HOLDS)[number]
 
   const isRecord = (v: unknown): v is Record<string, unknown> =>
@@ -442,7 +573,7 @@ describe('PUBLISHED_HOLDS geometry agrees with the written bank', () => {
    * nesting is flattened, which is all `leg` needs.
    */
   const geometryFields = (hold: Fixture): ReadonlyArray<readonly [string, unknown]> =>
-    Object.entries(hold as Record<string, unknown>)
+    Object.entries(hold)
       .filter(([key]) => key !== 'fix')
       .flatMap(([key, value]) =>
         isRecord(value)
@@ -492,6 +623,17 @@ describe('PUBLISHED_HOLDS geometry agrees with the written bank', () => {
 
   it('never contradicts a charted hold it shares a name with', () => {
     expect(geometryConflicts(PUBLISHED_HOLDS)).toEqual([])
+  })
+
+  it('actually shares a name with a charted hold, so the check above is not vacuous', () => {
+    // geometryConflicts([]) is [] — the assertion above passes just as happily
+    // over a pool that overlaps CHART_HOLDS nowhere, which is what it did
+    // until the real fixtures landed. Naming the overlap is what makes it a
+    // guard rather than a comment. OYOSO is the case that motivated the whole
+    // invariant: KTCY is this student's home field.
+    const charted = new Set(CHART_HOLDS.map((h) => h.fix))
+    const overlap = PUBLISHED_HOLDS.filter((h) => charted.has(h.fix)).map((h) => h.fix)
+    expect(overlap).toContain('OYOSO')
   })
 
   it('permits a fixture that reuses a charted name with identical geometry', () => {

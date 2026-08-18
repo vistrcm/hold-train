@@ -1132,8 +1132,8 @@ describe('every scenario is answerable from what the pilot is shown', () => {
   })
 
   // The hold line is the one place the drill shows course/turn/leg data outside
-  // the radio call, and PUBLISHED_HOLDS is about to become a MIXED pool —
-  // invented fixtures alongside real Bay Area names. So no blanket per-hold
+  // the radio call, and PUBLISHED_HOLDS is a MIXED pool — invented fixtures
+  // alongside real Bay Area names. So no blanket per-hold
   // claim survives: "fictitious fix" is true of ZORVU and false of OYOSO.
   //
   // What must never appear is a PLATE IDENTITY — a procedure name, a runway, an
@@ -1206,14 +1206,13 @@ describe('every scenario is answerable from what the pilot is shown', () => {
     }
   })
 
-  it('no fixture reuses a real NorCal fix name the student might fly', () => {
-    // Verified against opennav.com: CEDES (Livermore), SUNOL and TRACY are real
-    // waypoints; the remaining fixture names return no waypoint record.
-    const real = ['CEDES', 'SUNOL', 'TRACY', 'JEMKO']
-    for (const h of PUBLISHED_HOLDS) {
-      expect(real, `fixture ${h.fix}`).not.toContain(h.fix)
-    }
-  })
+  // The real-waypoint check that lived here is gone from this file, not from the
+  // suite: it swept all of PUBLISHED_HOLDS, which is now a MIXED pool where a
+  // real name is the feature. It lives in clearance.test.ts scoped to
+  // INVENTED_HOLDS, beside the data it constrains and beside the two guards
+  // that took over the real half (CHART_HOLDS geometry, dossier geometry). One
+  // copy on purpose: two hand-written statements of the same rule drift, and
+  // the half nobody edits waves the defect through.
 
   it('the spoken text still omits course and turns for a charted hold', () => {
     // The clearance itself must stay faithful to ATC phraseology.

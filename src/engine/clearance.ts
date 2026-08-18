@@ -187,34 +187,100 @@ export function clearanceText(fields: ClearanceFields): string {
 
 // --- seeded scenario generation ---------------------------------------------
 
-// Practice fixtures only: invented names for drilling phraseology. Task 8
-// introduces holds derived from current FAA dTPP charts; nothing here claims to
-// match a real chart. Names must stay disjoint from CHART_HOLDS in
-// src/content/questions.ts — a fixture sharing a charted fix's name would
-// teach invented course and turn data for a hold the student actually flies
-// (see the disjointness test in clearance.test.ts).
-//
-// They must also stay disjoint from REAL waypoints, which is the trap the
-// original "plausible NorCal names" wording walked into: CEDES (Livermore),
-// SUNOL and TRACY are all real fixes, and TRACY sits beside KTCY. Verify a new
-// fixture name returns no waypoint record (opennav.com/waypoint/US/<NAME>)
-// before adding it. The rendered line states the geometry and hedges it as
-// practice data — see holdNote in src/modules/entry-drill.ts. It no longer calls
-// the fix fictitious, so that hedge is not a licence to add a name a student
-// might look up: the disjointness rules above are what carry that.
+// Station names for the ad-hoc ATC branch. The VORs are real NorCal navaids and
+// always have been: an ATC-assigned hold at a real station claims nothing
+// published, because the radial, turn direction and leg are drawn per scenario
+// rather than presented as the station's own geometry. That is why this list
+// survived every audit the 5-letter fixtures did not. The NDB names are
+// invented — no NDB remains in the region at all (docs/bay-area-holds.md), so
+// there is no real name to adopt, and the drill still needs an NDB scenario to
+// exercise the bearing-vs-radial distinction.
 const VOR_NAMES = ['Manteca', 'Linden', 'Sacramento', 'Modesto', 'Panoche'] as const
 const NDB_NAMES = ['Amber', 'Delta', 'Cooper'] as const
 
-export const PUBLISHED_HOLDS: ReadonlyArray<{
+interface PracticeHold {
   fix: string
   inboundCourse: number
   turnDirection: TurnDirection
   leg: LegSpec
-}> = [
+}
+
+// The "hold as published" pool is MIXED by design, and the split below is what
+// lets each guard scope itself — chosen over a `real: boolean` per hold, which
+// would add a field, a branch and a distinction the student cannot act on
+// (neither kind may be flown).
+//
+// The old rule was "a fixture name may never be a real waypoint" and it is gone,
+// not weakened. It was a proxy for the invariant that matters: the defect in
+// every audit entry it was patched for (HAIRE, CEDES, WINDY/DRIFT/TIMBR) was
+// inventing facts ABOUT a real place, never naming one — and a name ban checks
+// no geometry at all, while forbidding exactly the realism this drill wants.
+// Three rules replace it, all asserted in clearance.test.ts:
+//
+//   1. A fixture sharing a name with CHART_HOLDS (src/content/questions.ts) must
+//      match it on inboundCourse, turnDirection, leg.unit AND leg.value. Two
+//      screens teaching different holds under one fix name is the app
+//      contradicting itself, which is worse than approximate data and invisible
+//      to any amount of caveating. OYOSO, HAIRE and UHHUT are that overlap.
+//   2. A researched fixture's geometry must match its row in
+//      docs/bay-area-holds.md, the record of where the numbers came from.
+//   3. An invented name must still return no waypoint record
+//      (opennav.com/waypoint/US/<NAME>) before it is added — the original
+//      defect, unchanged, over the half the ban was ever right about.
+//
+// None of this makes the data current. The rendered line hedges it as practice
+// data and names no procedure, amendment or cycle — see holdNote in
+// src/modules/entry-drill.ts.
+export const INVENTED_HOLDS: readonly PracticeHold[] = [
   { fix: 'ZORVU', inboundCourse: 300, turnDirection: 'right', leg: { unit: 'min', value: 1 } },
   { fix: 'QUIBO', inboundCourse: 120, turnDirection: 'left', leg: { unit: 'nm', value: 4 } },
   { fix: 'VAXNU', inboundCourse: 45, turnDirection: 'right', leg: { unit: 'min', value: 1 } },
   { fix: 'BRIXO', inboundCourse: 210, turnDirection: 'left', leg: { unit: 'min', value: 1 } },
+]
+
+/**
+ * Real Bay Area / Central Valley holds. Geometry researched from FAA CIFP cycle
+ * 2608 and cross-checked on the same cycle's d-TPP plates — every entry here is
+ * `researched` confidence in docs/bay-area-holds.md, which is the provenance
+ * record and not current chart data.
+ *
+ * Held back deliberately: WHYEE, IPDEW and ORANG (CIFP record but no plate
+ * witness), and ALTAM (its 1-minute geometry duplicates ZELAT's shape, so it
+ * buys a CHART_HOLDS constraint without buying seed variety).
+ */
+export const RESEARCHED_HOLDS: readonly PracticeHold[] = [
+  // KTCY — Tracy Municipal. OMWAP is the strongest single find: its plate
+  // states the turn direction in words, so it needs no racetrack read off a
+  // drawing.
+  { fix: 'OYOSO', inboundCourse: 116, turnDirection: 'left', leg: { unit: 'nm', value: 4 } },
+  { fix: 'HAIRE', inboundCourse: 231, turnDirection: 'right', leg: { unit: 'nm', value: 4 } },
+  { fix: 'OMWAP', inboundCourse: 255, turnDirection: 'right', leg: { unit: 'nm', value: 4 } },
+  { fix: 'NAPYI', inboundCourse: 297, turnDirection: 'right', leg: { unit: 'nm', value: 4 } },
+  // KLVK — Livermore Municipal
+  { fix: 'UHHUT', inboundCourse: 255, turnDirection: 'right', leg: { unit: 'nm', value: 4 } },
+  // KSQL — San Carlos
+  { fix: 'AMEBY', inboundCourse: 297, turnDirection: 'left', leg: { unit: 'nm', value: 5 } },
+  // KOAK — Oakland International
+  { fix: 'REBAS', inboundCourse: 344, turnDirection: 'right', leg: { unit: 'nm', value: 4 } },
+  { fix: 'DECOT', inboundCourse: 296, turnDirection: 'left', leg: { unit: 'nm', value: 5 } },
+  { fix: 'HAYZE', inboundCourse: 275, turnDirection: 'right', leg: { unit: 'nm', value: 5 } },
+  // KHWD — Hayward Executive
+  { fix: 'JOBUS', inboundCourse: 285, turnDirection: 'right', leg: { unit: 'nm', value: 5 } },
+  // KSCK — Stockton Metropolitan. HAXEK is 113.5° in CIFP and the plates depict
+  // 113°; where the two disagree the chart wins, because the chart is what a
+  // student reads. It is the only such case in the dossier.
+  { fix: 'OXJEF', inboundCourse: 294, turnDirection: 'right', leg: { unit: 'nm', value: 4 } },
+  { fix: 'HAXEK', inboundCourse: 113, turnDirection: 'right', leg: { unit: 'nm', value: 4 } },
+  // KMOD — Modesto City-County. SHELI (148°) and ZELAT's 1-minute leg are the
+  // useful outliers: Bay Area finals point west, so their missed-approach holds
+  // cluster hard in the 270°-300° band.
+  { fix: 'ZELAT', inboundCourse: 288, turnDirection: 'left', leg: { unit: 'min', value: 1 } },
+  { fix: 'SHELI', inboundCourse: 148, turnDirection: 'right', leg: { unit: 'nm', value: 4 } },
+]
+
+export const PUBLISHED_HOLDS: readonly PracticeHold[] = [
+  ...INVENTED_HOLDS,
+  ...RESEARCHED_HOLDS,
 ]
 
 const FIX_KINDS: readonly FixKind[] = ['VOR', 'VOR/DME', 'NDB', 'charted']

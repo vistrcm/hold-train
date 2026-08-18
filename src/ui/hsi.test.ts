@@ -11,9 +11,11 @@ import {
   type HSIProps,
 } from './hsi'
 
-/** The nav state needs an ident. `ZORVU` is already a `PUBLISHED_HOLDS`
+/** The nav state needs an ident. `ZORVU` is already an `INVENTED_HOLDS`
  * fixture, i.e. already checked to be a fictitious waypoint — inventing a
- * second name here would mean repeating that check for no gain. */
+ * second name here would mean repeating that check for no gain. Pick from the
+ * invented half if this ever changes: `PUBLISHED_HOLDS` is a mixed pool and
+ * most of it is real fixes. */
 const FIX = 'ZORVU'
 
 function render(props: HSIProps): HTMLElement {
