@@ -461,15 +461,29 @@ coverage claim is real and not an artifact of the pool being small.
 **Files:**
 - Modify: `src/app/anki-export.test.ts`
 
-- [ ] write a test that a recorded entry miss whose snapshot `holdSpec` names a hold **not
+- [x] write a test that a recorded entry miss whose snapshot `holdSpec` names a hold **not
       present in the current `PUBLISHED_HOLDS`** still exports the correct card, rebuilt
-      from the snapshot's own `heading`/`holdSpec`
-- [ ] make the stale snapshot differ from any live fixture in geometry, not just in name —
+      from the snapshot's own `heading`/`holdSpec` — `exports a miss recorded against a
+      hold the fixture pool no longer carries` in `src/app/anki-export.test.ts`. The
+      retired hold is `CEDES` (a fixture until the real-waypoint audit renamed it out),
+      300°/left, heading 155° → **teardrop**, hand-derived from the mirrored j3 sectors
+      rather than read out of `determineEntry`
+- [x] make the stale snapshot differ from any live fixture in geometry, not just in name —
       `CLAUDE.md` records the case where copying live values into all but one field let
-      five of six rebuilds revert with the suite green
-- [ ] **mutation-test**: break the rebuild to read from the seed instead, confirm the
-      named test reds, revert
-- [ ] run `npm test` and `npm run typecheck` — must pass before task 7
+      five of six rebuilds revert with the suite green. Three anti-vacuity assertions run
+      **before** the card is built: the name is absent from `PUBLISHED_HOLDS`, **no** live
+      fixture shares its `inboundCourse`+`turnDirection` pair, and the snapshot's own seed
+      (4, which still resolves — it draws QUIBO 120°/left, heading 078, a **direct** entry)
+      disagrees on fix, heading *and* answer. `chosen` is set to the seed's own answer, so
+      a seed-derived rebuild clears the choice and drops the `You answered` line outright
+      instead of merely renaming the entry
+- [x] **mutation-test**: break the rebuild to read from the seed instead, confirm the
+      named test reds, revert — **three** mutations, each reds the named test: hold off the
+      seed (`Correct entry: direct.`, second line gone); whole question off the seed (hold,
+      heading and prose); and hold line off the seed with the answer left correct, which
+      reds **only** the new test, i.e. it is the sole guard on the frozen-question half.
+      `src/app/anki-export.ts` reverted, `git diff` empty
+- [x] run `npm test` and `npm run typecheck` — must pass before task 7 (794 tests, clean)
 
 ### Task 7: Re-verify wind-lab isolation against the newly-real lists
 

@@ -8,8 +8,9 @@ import { CORE_DECK, type AnkiCard } from '../content/anki-deck'
 import { ORAL_ITEMS } from '../content/oral'
 import { QUESTIONS } from '../content/questions'
 import { createStore, type Miss, type Store } from './store'
+import { PUBLISHED_HOLDS } from '../engine/clearance'
 import { ENTRIES } from '../engine/entry'
-import { createEntryDrill } from '../modules/entry-drill'
+import { createEntryDrill, generateScenario } from '../modules/entry-drill'
 import { createWrittenTest } from '../modules/written-test'
 import {
   ankiExportScreen,
@@ -520,6 +521,79 @@ describe('missesToCards', () => {
     expect(cards).toHaveLength(2)
     expect(cards[0]!.back).toContain('Correct entry: parallel (also acceptable: teardrop)')
     expect(cards[1]!.back).toContain('Correct entry: direct')
+  })
+
+  // History safety across a FIXTURE-POOL change — the case neither test above
+  // reaches, since both re-derive from a hold the pool still carries. This miss
+  // was recorded against a hold that is GONE: `PUBLISHED_HOLDS` has lost names
+  // before (CEDES was a fixture until the real-waypoint audit renamed it out,
+  // docs/content-audit.md ~298) and has just gained the real Bay Area holds, so
+  // every edit to that pool is a chance to rewrite a card the student already
+  // has. A card whose question silently changes is worse than a dated one: the
+  // student reviews an answer to something they were never asked.
+  //
+  // The seed is what makes this a property rather than a coincidence. It sits in
+  // the snapshot and it still resolves — `generateScenario(4)` draws QUIBO,
+  // 120°/left, heading 078, a DIRECT entry — so a rebuild reaching for the seed
+  // instead of the snapshot would export a different fix at a different heading
+  // with a different answer, and every other assertion in this file would still
+  // pass. Hence the anti-vacuity checks first: the hold must really be retired,
+  // its GEOMETRY must match no live fixture (a name mismatch is not enough —
+  // CLAUDE.md records the rebuild test that copied live values into all but one
+  // field and let five of six rebuilds revert with the suite green), and the
+  // seed's live scenario must really disagree on every field the card renders.
+  it('exports a miss recorded against a hold the fixture pool no longer carries', () => {
+    const SEED = 4
+    // The geometry CEDES carried while it was a fixture, as the legacy
+    // snapshots earlier in this file state it.
+    const RETIRED = { fix: 'CEDES', inboundCourse: 300, turnDirection: 'left' } as const
+    expect(PUBLISHED_HOLDS.map((h) => h.fix)).not.toContain(RETIRED.fix)
+    expect(
+      PUBLISHED_HOLDS.filter(
+        (h) =>
+          h.inboundCourse === RETIRED.inboundCourse && h.turnDirection === RETIRED.turnDirection,
+      ),
+    ).toEqual([])
+
+    const live = generateScenario(SEED)
+    expect(live.holdSpec.fix).not.toBe(RETIRED.fix)
+    expect(live.heading).not.toBe(155)
+    expect(live.result.primary).not.toBe('teardrop')
+
+    const stale: Miss = {
+      drill: 'entry',
+      at: 15,
+      scenario: {
+        seed: SEED,
+        heading: 155,
+        holdSpec: { ...RETIRED, fixKind: 'charted', leg: { unit: 'min', value: 1 } },
+        clearanceText: 'Hold southeast of CEDES as published, expect further clearance at 0710.',
+        holdNote: 'Hold: CEDES — inbound course 300°, left turns, 1 minute legs.',
+        chosen: 'direct',
+        // What the engine of the day wrote at miss time. Deliberately wrong, so
+        // a fall back to the frozen answer is as loud as a read off the seed.
+        expected: 'parallel',
+        alternates: ['direct'],
+      },
+    }
+
+    const c = missesToCards([stale])[0]!
+    // Hand-derived from the AIM's sector geometry, never by calling
+    // determineEntry — an expectation read out of the oracle agrees with any
+    // engine AND with any hold, so it could not tell this rebuild from a read
+    // off the seed. A left pattern mirrors the standard sectors (AIM 5-3-8 j3),
+    // so the teardrop sector spans 110°–180° COUNTER-clockwise of the inbound
+    // course — 190° round to 120° — and 155° sits 35° clear of both boundaries,
+    // so it takes no ±5° alternate. Asserted whole: `chosen` is the seed's own
+    // answer, so a seed-derived rebuild clears the choice and drops the second
+    // line entirely rather than merely renaming the entry.
+    expect(c.back).toBe('Correct entry: teardrop.\nYou answered: direct.')
+    // The question stays the one the student was asked: frozen prose, frozen
+    // heading, the retired fix. Nothing the live pool draws for this seed.
+    expect(c.front).toContain('Hold southeast of CEDES as published')
+    expect(c.front).toContain('Hold: CEDES — inbound course 300°, left turns, 1 minute legs.')
+    expect(c.front).toContain('Your heading: 155° — which entry?')
+    expect(c.front).not.toContain(live.holdSpec.fix)
   })
 
   it('cites the ±5° tolerance exactly on the entry cards that render an alternate', () => {
