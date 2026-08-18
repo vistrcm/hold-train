@@ -456,7 +456,7 @@ interface DossierRow {
  * A markdown table row's raw cells, bounded by the empty outer cells every
  * caller below indexes from; [] for a line that is not a row at all.
  *
- * This is the one path into `holdRows()` and `NAVAID_ROWS` that fails OPEN. A
+ * This is the one path into `holdRows()` and `navaidRows()` that fails OPEN. A
  * line read as "not a row" returns [], so `looksLikeHoldRow` never sees it and
  * the throw below — which exists precisely so a hold row cannot be skipped —
  * never fires. A dropped row silently stops defending its fix while the suite
@@ -795,8 +795,8 @@ describe('PUBLISHED_HOLDS practice fixtures', () => {
   it('no invented fixture lands on a real fix the dossier records', () => {
     // The gap the hand-written list above cannot close, and the one this branch
     // opened: docs/bay-area-holds.md now hands an editor 22 real Bay Area fix
-    // names, only 14 of which shipped — WHYEE, IPDEW and ORANG were held back
-    // for having a CIFP record but no plate witness, ALTAM for duplicating
+    // names, only 13 of which shipped — WHYEE, IPDEW, ORANG and DECOT were held
+    // back for having a CIFP record but no plate witness, ALTAM for duplicating
     // ZELAT's shape, and four more are holds named by a navaid ident rather
     // than a 5-letter fix. Copying any of them into INVENTED_HOLDS with made-up
     // numbers routes around every other guard here:
@@ -934,9 +934,9 @@ describe('VOR_NAMES agrees with docs/bay-area-holds.md', () => {
   /**
    * Navaid rows: eight RAW cells (six of content between the empty outer pair,
    * the same convention `holdRows()` and the dossier's own "format is load-
-   * bearing" note count in) whose first content cell is a three-letter ident.
-   * No other table in the file is that shape, and the header and separator rows
-   * fail the ident test rather than being skipped by position.
+   * bearing" note count in), recognised by a three-letter ident in the first
+   * content cell. The header and separator rows fail the ident test rather than
+   * being skipped by position.
    *
    * Recognition runs through the shared `rawCells`, NOT a bare `split('|')`.
    * Requiring exactly 8 raw cells silently IMPLIES the outer pipes, so this
@@ -949,22 +949,50 @@ describe('VOR_NAMES agrees with docs/bay-area-holds.md', () => {
    * green. The two parsers now share one normaliser rather than agreeing by
    * accident.
    *
-   * Past recognition this parser fails CLOSED — every assertion below needs a
-   * row in order to pass — which is why it may return [] where `holdRows()`
-   * must throw.
+   * The CELL COUNT is not the recognizer, and using it as one left the same
+   * fail-open hole standing behind the normaliser that closed the pipe-less
+   * spelling. Recognition and parsing have to be separate questions here for
+   * the reason `holdRows()` sets out: any edit moving a navaid row off 8 cells
+   * — a `|` typed into the type or status prose, an added column, a reflow —
+   * silently dropped it, and `invents its NDB names rather than reusing a real
+   * station` asserts `not.toContain`, so a dropped row makes it pass. That is
+   * the SAME defect the mutation above records, reached by a different edit:
+   * break the `SCK` row's cell count instead of its pipes, add 'Stockton' to
+   * NDB_NAMES, and the app teaches bearing phraseology at a real VOR, green.
+   *
+   * So the ident shape recognises the row and a recognised row that will not
+   * parse THROWS, exactly as `holdRows()` does. Do not restate this as "the
+   * parser fails closed because every assertion needs a row": that is true only
+   * of the per-station `toHaveLength(1)` above, and the assertion it is false
+   * of is the one no other guard covers.
+   *
+   * A hold AT a navaid wears the same ident shape one table up (`LIN`, `OAK`,
+   * `SAU`, `MOD`), so hold rows are handed back to `holdRows()`, which owns
+   * both their recognition and their throw.
+   *
+   * Memoised and called from inside each test rather than built at describe
+   * scope, for `holdRows()`'s reason: a throw during COLLECTION reports the file
+   * as "no tests" and takes every guard in it down silently.
    */
-  const NAVAID_ROWS: readonly NavaidRow[] = DOSSIER.split('\n').flatMap((line) => {
-    const cells = rawCells(line)
-    if (cells.length !== 8) return []
-    const ident = plain(cells[1]!)
-    if (!/^[A-Z]{3}$/.test(ident)) return []
-    return [{ ident, name: plain(cells[2]!), status: plain(cells[6]!) }]
-  })
+  let navaidRowsCache: readonly NavaidRow[] | undefined
+  const navaidRows = (): readonly NavaidRow[] => {
+    navaidRowsCache ??= DOSSIER.split('\n').flatMap((line) => {
+      const cells = rawCells(line)
+      const ident = plain(cells[1] ?? '')
+      if (!/^[A-Z]{3}$/.test(ident)) return []
+      if (looksLikeHoldRow(cells.map(plainCell))) return []
+      if (cells.length !== 8) {
+        throw new Error(`navaid row with ${cells.length} cells in docs/bay-area-holds.md: ${line}`)
+      }
+      return [{ ident, name: plain(cells[2]!), status: plain(cells[6]!) }]
+    })
+    return navaidRowsCache
+  }
 
   it('names only stations the dossier records as current', () => {
     expect(VOR_NAMES.length).toBeGreaterThan(0)
     for (const name of VOR_NAMES) {
-      const rows = NAVAID_ROWS.filter((r) => r.name === name)
+      const rows = navaidRows().filter((r) => r.name === name)
       expect(rows, `${name} in docs/bay-area-holds.md`).toHaveLength(1)
       const { status } = rows[0]!
       if (RETAINED_DECOMMISSIONED.includes(name)) {
@@ -989,8 +1017,8 @@ describe('VOR_NAMES agrees with docs/bay-area-holds.md', () => {
     // remains in the region, so an NDB name that IS a real station here would
     // be a VOR wearing the wrong kind — bearing-to-the-station phraseology
     // taught at a place that speaks radials.
-    expect(NAVAID_ROWS.length, 'dossier navaid table parsed').toBeGreaterThan(0)
-    const stations = NAVAID_ROWS.map((r) => r.name)
+    expect(navaidRows().length, 'dossier navaid table parsed').toBeGreaterThan(0)
+    const stations = navaidRows().map((r) => r.name)
     for (const name of NDB_NAMES) {
       expect(stations, `${name} is a real station`).not.toContain(name)
     }

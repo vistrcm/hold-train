@@ -18,9 +18,11 @@ invented. This dossier supplied the **real Bay Area names** that shipped on 2026
 entry practice rehearses the airspace the student actually flies, per
 `docs/plans/completed/20260817-real-bay-area-hold-fixtures.md`.
 
-> **Implemented 2026-08-17.** 14 of the 18 researched holds shipped into `RESEARCHED_HOLDS`;
-> `WHYEE`, `IPDEW` and `ORANG` are held back as `CIFP-only` and `ALTAM` for duplicating
-> ZELAT's shape. 11 VOR names were added, `NDB_NAMES` kept invented, Manteca retained
+> **Implemented 2026-08-17.** 13 of the 22 holds recorded below shipped into
+> `RESEARCHED_HOLDS`; `DECOT`, `WHYEE`, `IPDEW` and `ORANG` are held back as `CIFP-only`,
+> `ALTAM` for duplicating ZELAT's shape, and `LIN`/`OAK`/`SAU`/`MOD` because a hold **at a
+> navaid** wears a 3-letter ident where `PUBLISHED_HOLDS` speaks a 5-letter fix name.
+> 11 VOR names were added, `NDB_NAMES` kept invented, Manteca retained
 > knowingly. The ⚠️ sections below are preserved as the reasoning of the day, not as open
 > questions — each records its outcome inline.
 
@@ -107,7 +109,13 @@ plate cross-check rather than a bare CIFP citation.
 ## Confidence legend
 
 - **researched** — CIFP 2608 record **and** corroborated on the cycle-2608 plate (the
-  depicted course, leg length, or the missed-approach sentence naming the turn).
+  depicted course, leg length, or the missed-approach sentence naming the turn). Read the
+  parenthetical as the **test**, not as examples: the corroborated thing must be one of the
+  three fields the app ships. A plate sentence that names only the hold's **altitude** —
+  "…and hold, continue climb-in-hold to 5400" — corroborates nothing `RESEARCHED_HOLDS`
+  carries, because the alt column is provenance-only. A row already cross-verified in
+  `CHART_HOLDS` counts: that entry cites the plate for course, turns and leg, so the reading
+  is recorded once rather than twice.
 - **CIFP-only** — CIFP 2608 record, plate cross-check not obtained. Trustworthy data; one
   fewer independent witness.
 - **approximate** — a real name with geometry rounded, inferred or otherwise not pinned.
@@ -124,7 +132,7 @@ the charted holding altitude, recorded for provenance only — the app does not 
 | fix | role | inbound | turns | leg | alt | confidence | provenance |
 |---|---|---:|:-:|---|---|---|---|
 | `OYOSO` | HILPT, RNAV (GPS) RWY 12 | 116° | left | 4 NM | 3100 | researched | CIFP 2608 `116.4/L/0040`; plate `05815R12` depicts `116°`, `4 NM`, Amdt 2C 11JUN26 |
-| `HAIRE` | missed, RNAV 12 and RNAV 30 | 231° | right | 4 NM | 3200 | researched | CIFP 2608 `231.2/R/0040`; plate `05815R12` missed-approach text "direct HAIRE and hold, continue climb-in-hold to 3200" |
+| `HAIRE` | missed, RNAV 12 and RNAV 30 | 231° | right | 4 NM | 3200 | researched | CIFP 2608 `231.2/R/0040`; plate `05815R12` missed-approach text "direct HAIRE and hold, continue climb-in-hold to 3200" — that sentence names the **altitude only**, so what earns `researched` here is the separate chart verification already recorded in `CHART_HOLDS` (231°/right/4 NM off the same plate, Amdt 2C) |
 | `OMWAP` | HILPT + missed, RNAV (GPS) RWY 26 | 255° | right | 4 NM | 3000 | researched | CIFP 2608 `254.8/R/0040`; plate `05815R26` depicts `075°/255°` and says **"right turn** to 3000 direct OMWAP and hold" |
 | `NAPYI` | HILPT, RNAV (GPS) RWY 30 | 297° | right | 4 NM | 3400 | researched | CIFP 2608 `296.7/R/0040`; plate `05815R30` depicts `297°/117°`, "Holding Pattern" |
 | `LIN` | alternate missed, VOR RWY 26 | 285° | left | 1 min | 3000 | CIFP-only | CIFP 2608 `284.5/L/T010` — a hold **at Linden VOR**, so it belongs to the navaid discussion, not to `PUBLISHED_HOLDS` |
@@ -153,7 +161,7 @@ KSQL has only these two IAPs, so `AMEBY` is the whole field's hold inventory.
 | fix | role | inbound | turns | leg | alt | confidence | provenance |
 |---|---|---:|:-:|---|---|---|---|
 | `REBAS` | missed, RNAV Y/Z RWY 28R | 344° | right | 4 NM | 3000 | researched | CIFP 2608 `343.6/R/0040`; plate `00294RY28R` depicts `344°/164°`, `4 NM`, "track 335° to REBAS and hold" |
-| `DECOT` | missed, RNAV Y/Z RWY 12 | 296° | left | 5 NM | 5400 | researched | CIFP 2608 `295.7/L/0050`; plate `00294RY12` "DECOT and hold, continue climb-in-hold to 5400" |
+| `DECOT` | missed, RNAV Y/Z RWY 12 | 296° | left | 5 NM | 5400 | CIFP-only | CIFP 2608 `295.7/L/0050`; plate `00294RY12` says "DECOT and hold, continue climb-in-hold to 5400" — the **altitude only**, so no shipped field is corroborated and no `CHART_HOLDS` entry carries this fix. **Held back** — downgraded from `researched` 2026-08-18, see `docs/content-audit.md` |
 | `HAYZE` | missed, RNAV RWY 10L and 10R | 275° | right | 5 NM | 5200 | researched | CIFP 2608 `275.0/R/0050`; plate `00294R10L` depicts `5 NM` and "Climbing left turn to 5200 direct HAYZE" (that left turn is the turn **to** the fix, not the hold) |
 | `SAU` | missed, RNAV Y RWY 28L and RWY 30 | 217° | right | 4 NM | 4000 | researched | CIFP 2608 `217.2/R/0040`; plate `00294RY30` depicts `SAU SAUSALITO 217°/037° 4 NM` and "on track 282° to SAU VOR/DME and hold". A hold **at a VOR** |
 
@@ -284,9 +292,12 @@ these now-real clearance lists — nothing here shares a name with them.
 
 ## Recommendations for Tasks 4 and 5
 
-**Shipped 2026-08-17 as written** (minus the four held back, noted below). Retained as the
-record of what was proposed and why; the live geometry is the 8-column table above, which is
-the copy `clearance.test.ts` checks the code against.
+**Shipped 2026-08-17 as written** minus the four held back noted below — and minus `DECOT`,
+withdrawn 2026-08-18 when its row turned out to carry no plate corroboration of any shipped
+field, so **13 shipped, not the 14 proposed here**. Retained as the record of what was
+proposed and why; the live geometry is the 8-column table above, which is the copy
+`clearance.test.ts` checks the code against, and its confidence column is what decides
+what may ship — not this table.
 
 Not binding on the implementer; this is what the research supports.
 
@@ -304,7 +315,8 @@ and a good spread of courses, which is what the drill needs for seed variety:
 | `AMEBY` | 297° | left | 5 NM | | `ZELAT` | 288° | left | 1 min |
 | `SHELI` | 148° | right | 4 NM | | `HAXEK` | 113° | right | 4 NM |
 
-(That is 14 rows; `WHYEE`, `IPDEW` and `ORANG` are held back as CIFP-only, and `ALTAM` is
+(That is 14 rows as proposed, of which 13 shipped — `DECOT` was withdrawn on 2026-08-18,
+see the note above the table. `WHYEE`, `IPDEW` and `ORANG` are held back as CIFP-only, and `ALTAM` is
 held back because its 1-minute geometry duplicates `ZELAT`'s shape while colliding with
 `CHART_HOLDS` — adding it buys a constraint without buying variety. Trim to taste; the
 `PUBLISHED_HOLDS` pool only needs enough members that seeds do not repeat obviously.)

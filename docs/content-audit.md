@@ -2829,3 +2829,82 @@ ident rather than by name, and `Amber` and `Cooper` are unverified by name for e
 reason. Trading a documented exception for an undocumented one is not a fix. Open item for a content
 pass with a by-name station source (FAA NASR would answer it); the guard cannot close it, so the
 scope is now written down instead of overstated.
+
+## 2026-08-18 — a `researched` label the row's own evidence did not meet, and a navaid parser still recognised by cell count
+
+Third review pass of the mixed-pool branch. One content withdrawal and one guard hole, the guard
+mutation-confirmed against the real tree before and after the fix.
+
+**Fixed (content): `DECOT` shipped as `researched` on a plate quotation that corroborates nothing
+the app carries.** The dossier's confidence legend defines `researched` as a CIFP 2608 record **and**
+plate corroboration — "the depicted course, leg length, or the missed-approach sentence naming the
+turn". `DECOT`'s provenance cell read: CIFP 2608 `295.7/L/0050`; plate `00294RY12` "DECOT and hold,
+continue climb-in-hold to 5400". That sentence names the **altitude**, which the dossier's own header
+says is "recorded for provenance only — the app does not use it". So the three fields
+`RESEARCHED_HOLDS` actually ships — course, turn direction, leg — rested on CIFP alone, which is the
+definition of `CIFP-only`, the level `WHYEE`/`IPDEW`/`ORANG` are held back at. `DECOT` is withdrawn
+from `RESEARCHED_HOLDS` (14 shipped fixtures → 13) and its dossier row downgraded.
+
+The geometry is very likely correct — CIFP is authoritative and every shipped course, turn and leg
+is read from it — so this is not the "invented facts about a real place" defect the rest of this
+ledger records. What was wrong is the **label**, and the label is what the guard reads:
+`expect(row.confidence).toBe('researched')` is the gate that deliberately holds back three CIFP-only
+rows sitting in the same file, and it binds only where the label is earned. A gate keyed on a
+hand-written cell is satisfied by writing the cell, so the branch that added the gate also shipped
+the first row that failed its criterion. The legend now says the parenthetical is the **test** and
+not a list of examples: the corroborated thing must be one of the three fields the array carries.
+
+`HAIRE`'s row has the identical shape — its plate sentence also names only an altitude (3200) — and
+is legitimate for a reason the row did not state: `CHART_HOLDS` carries the same hold with the plate
+cited for 231°/right/4 NM, so the reading exists, one file over. `UHHUT` and `ALTAM` say
+"already chart-verified in `CHART_HOLDS`" and `HAIRE` now does too. A correct label whose evidence is
+invisible in the row reads as mislabelled, and the next session's correct move on a mislabelled row
+is to delete the fixture.
+
+**Fixed (guard): `navaidRows()` used the cell count as its recognizer, so any edit off 8 cells
+dropped a row silently.** The prior entry above closed the pipe-less spelling by giving both dossier
+parsers one normaliser — but it closed the *spelling*, not the *mechanism*. `holdRows()` recognises a
+row by its own columns (`looksLikeHoldRow`) and **throws** when a recognised row will not parse; the
+navaid parser had no independent signal, so `if (cells.length !== 8) return []` was still both the
+recognizer and the parse check. Any edit moving a navaid row off eight cells — a `|` typed into the
+type or status prose, an added column, a reflow — dropped it with no red test.
+
+That direction matters because the two assertions over these rows fail opposite ways.
+`names only stations the dossier records as current` asserts `toHaveLength(1)` per shipped station,
+so a dropped row reds. `invents its NDB names rather than reusing a real station` asserts
+`not.toContain`, so a dropped row makes it **pass**. The parser's docblock claimed the opposite —
+"past recognition this parser fails CLOSED — every assertion below needs a row in order to pass" —
+which is true of the first assertion and false of the second, and the second is the one no other
+guard covers. Mutation-confirmed on the same clean witness as last time, the `SCK` "Stockton" row:
+typing one `|` into its status cell (9 cells) with `NDB_NAMES = ['Amber', 'Delta', 'Stockton']`
+passed 67/67 green, teaching bearing phraseology at a real VOR site — the previous entry's defect
+reached by a different edit to the same row. Recognition is now the three-letter ident shape, hold
+rows at a navaid (`LIN`, `OAK`, `SAU`, `MOD`, same ident shape one table up) are handed back to
+`holdRows()`, and a recognised row that will not parse throws. Post-fix the mutation reds both tests
+by name. The parser is also memoised behind a function called inside each test rather than built at
+describe scope, for the reason `holdRows()` already is: a throw during collection reports the file as
+"no tests" and takes every guard in it down silently.
+
+Recurring lesson, third entry running: the fix that closes a defect's **spelling** leaves its
+**mechanism** open. Outer pipes were a spelling; "the cell count is not a recognizer" is the
+mechanism. State the mechanism, then ask whether it is the only one.
+
+**Also fixed: `RESEARCHED_HOLDS`'s docblock enumerated four held-back names and read as closed.**
+The dossier records 22 real fixes and 13 ship; the docblock named `WHYEE`, `IPDEW`, `ORANG` and
+`ALTAM`, leaving `LIN`/`OAK`/`SAU`/`MOD` unexplained. Those four are holds **at a navaid**, so their
+fix is a 3-letter ident where the pool speaks a 5-letter fix name, and promoting one reds
+`every fixture carries geometry the clearance engine can speak` — a guard with no docblock saying
+why. The docblock now gives the three mechanisms (confidence, fix shape, seed value) and marks which
+are asserted and which is the one judgement call.
+
+**Open, not fixed — the HSI nav status line has no horizontal budget.** `VOR_NAMES` gained
+`San Francisco` and `Scaggs Island` (13 characters; the previous longest was `Sacramento` at 10).
+`navStatus` in `src/ui/hsi.ts` centres `nav.fix` at `cx = 120` and end-anchors the distance readout
+at `x = 201`, both at `font-size="11"`; `"10.0 NM"` in the monospace stack occupies roughly x155–201,
+leaving the fix about 70 px, which 13 characters of a proportional sans meet or exceed depending on
+the resolved `system-ui` face. Both review agents raised it independently. Left alone here because
+the fix is a design choice with real alternatives — render the ident (`SFO`) as a G1000 does, which
+means carrying an ident per station and is new data; clamp with `textLength`, which distorts glyphs;
+or shrink the face for long names — and because nothing asserts that budget today, so whichever is
+chosen needs the assertion more than it needs the clamp. Raised with the user rather than decided
+in a review pass.

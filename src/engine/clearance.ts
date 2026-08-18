@@ -287,9 +287,21 @@ export const INVENTED_HOLDS: readonly PracticeHold[] = [
  * `researched` confidence in docs/bay-area-holds.md, which is the provenance
  * record and not current chart data.
  *
- * Held back deliberately: WHYEE, IPDEW and ORANG (CIFP record but no plate
- * witness), and ALTAM (its 1-minute geometry duplicates ZELAT's shape, so it
- * buys a CHART_HOLDS constraint without buying seed variety).
+ * Held back, by mechanism rather than by list — the dossier records 22 real
+ * fixes and 13 ship, so the next name someone reaches for is probably one of
+ * the nine, and a bare enumeration answers only the ones already thought of:
+ *  - CONFIDENCE below `researched` — WHYEE, IPDEW, ORANG and DECOT. All four
+ *    have a CIFP record and no plate witness of a field this array carries;
+ *    DECOT was shipped on 2026-08-17 and withdrawn on 2026-08-18 when its
+ *    plate quotation turned out to name the hold's altitude and nothing else
+ *    (docs/content-audit.md). The dossier's confidence column is the gate, and
+ *    `RESEARCHED_HOLDS agrees with docs/bay-area-holds.md` enforces it.
+ *  - FIX SHAPE — LIN, OAK, SAU and MOD are holds AT a navaid, so their fix is a
+ *    3-letter ident where this pool speaks a 5-letter fix name; promoting one
+ *    reds `every fixture carries geometry the clearance engine can speak`.
+ *  - SEED VALUE — ALTAM alone: its 1-minute geometry duplicates ZELAT's shape,
+ *    so it buys a CHART_HOLDS constraint without buying variety. This is the
+ *    only judgement call of the three; the other two are asserted.
  */
 export const RESEARCHED_HOLDS: readonly PracticeHold[] = [
   // KTCY — Tracy Municipal. OMWAP is the strongest single find: its plate
@@ -305,7 +317,6 @@ export const RESEARCHED_HOLDS: readonly PracticeHold[] = [
   { fix: 'AMEBY', inboundCourse: 297, turnDirection: 'left', leg: { unit: 'nm', value: 5 } },
   // KOAK — Oakland International
   { fix: 'REBAS', inboundCourse: 344, turnDirection: 'right', leg: { unit: 'nm', value: 4 } },
-  { fix: 'DECOT', inboundCourse: 296, turnDirection: 'left', leg: { unit: 'nm', value: 5 } },
   { fix: 'HAYZE', inboundCourse: 275, turnDirection: 'right', leg: { unit: 'nm', value: 5 } },
   // KHWD — Hayward Executive
   { fix: 'JOBUS', inboundCourse: 285, turnDirection: 'right', leg: { unit: 'nm', value: 5 } },
