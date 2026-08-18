@@ -25,12 +25,26 @@ entry practice rehearses the airspace the student actually flies, per
 > questions — each records its outcome inline.
 
 > **This file's format is load-bearing.** `src/engine/clearance.test.ts` imports it with
-> `?raw` and parses two of its tables: hold rows (exactly 10 pipe-cells, keyed off the
-> confidence column, course `\d{1,3}°`, leg `\d+ NM|min`) and the navaid table (exactly 8
-> cells, first cell a 3-letter ident, status matched on the literal phrases `in CIFP 2608`
-> and `DECOMMISSIONED`). Adding a column, reflowing a table or rewording a status cell will
-> red `npm test`, and a hold-shaped row that will not parse **throws** rather than being
-> skipped. Edit the prose freely; change the table shapes deliberately.
+> `?raw` and parses two of its tables. A line carrying no `|` is not a row; every other
+> line is normalised through one `rawCells` helper, which trims it and restores the outer
+> pipes GFM lets a row omit on either side — so leading whitespace and a bare
+> `A | B | C` row parse to the same cell indices as a fully piped one, and a third
+> optional spelling is a change to that one helper rather than a hole in both parsers.
+>
+> A **hold row** is recognised two ways, because each signal is blind to the edit the other
+> catches: a row carrying a confidence-legend cell, **or** a 10-cell row shaped like one
+> (bare `NNN°` course cell, `left`/`right` turns cell) — which is what survives a reworded
+> confidence cell such as `CIFP only`. It then parses to exactly 10 cells, course
+> `\d{1,3}°`, leg `\d+ NM|min`. A **navaid row** is exactly 8 cells, first cell a 3-letter
+> ident, status matched on the literal phrases `in CIFP 2608` and `DECOMMISSIONED`. The
+> recommendations table matches neither (its lines pair two 5-cell halves and carry no
+> confidence cell) and is deliberately not a source of record — it is a derived summary, so
+> parsing it would let this file witness itself.
+>
+> Adding a column, reflowing a table or rewording a status cell will red `npm test`, and a
+> hold-shaped row that will not parse **throws** rather than being skipped, because a skip
+> silently stops defending the fix it names. Edit the prose freely; change the table shapes
+> deliberately.
 
 **The name is the deliverable; the geometry is best-effort.** The app renders no plates and
 names no procedures — it teaches entry geometry, and a stale hold still trains the correct

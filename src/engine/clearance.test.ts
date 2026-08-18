@@ -580,6 +580,37 @@ function holdRows(): readonly DossierRow[] {
 }
 
 /**
+ * The lists whose names are REAL BY DESIGN, each paired with the guard that
+ * checks it from the opposite direction. Anything this module exports and this
+ * table does not name is swept against the dossier, so the DEFAULT for a list
+ * added later is "guarded", not "invisible".
+ *
+ * That default is the whole point of the table. Naming the invented lists
+ * instead is how the sweep first shipped, and a literal grows only when
+ * somebody remembers: appending `export const RNAV_FIX_NAMES = ['WHYEE',
+ * 'IPDEW', 'ORANG']` — three real Bay Area fixes the dossier records and
+ * deliberately holds back — passed 806/806, because a hand-listed set covers
+ * only what existed when it was typed. That is the HAIRE defect once more, on
+ * the branch whose claim is that this class is guarded.
+ */
+const REAL_BY_DESIGN: ReadonlyArray<{ list: string; guardedBy: string }> = [
+  // Real stations, and the ad-hoc branch draws their radial, turns and legs per
+  // scenario, so the name claims only that there is something to tune
+  // (CLAUDE.md rule 4).
+  { list: 'VOR_NAMES', guardedBy: 'names only stations the dossier records as current' },
+  // Real fixes on purpose; guarded from the other side, since every one of them
+  // must MATCH a dossier row rather than avoid one.
+  {
+    list: 'RESEARCHED_HOLDS',
+    guardedBy: 'states the researched course, turns and leg for every real fixture',
+  },
+  // Not a list of its own: it IS the concatenation, so its invented half is
+  // swept through INVENTED_HOLDS. Re-asserted below rather than assumed, the
+  // same way the disjointness check re-asserts it.
+  { list: 'PUBLISHED_HOLDS', guardedBy: 'INVENTED_HOLDS, which it concatenates' },
+]
+
+/**
  * Every name in the app that a screen draws and then invents course, turn
  * direction and legs for. That set spans three modules, which is why it is
  * built here rather than per-list: the invariant "an invented hold may not sit
@@ -587,18 +618,38 @@ function holdRows(): readonly DossierRow[] {
  * their own guard did not stop wind lab's FIXES from shipping WINDY, DRIFT and
  * TIMBR.
  *
- * VOR_NAMES is deliberately absent — those are real stations by design, and the
- * ad-hoc ATC branch draws their radial and legs per scenario, so the name
- * claims only that there is something to tune (CLAUDE.md rule 4).
+ * Derived from the same namespace harvest the disjointness check uses, minus
+ * REAL_BY_DESIGN above — one claim about the module, not a per-list list.
+ *
+ * A FUNCTION, not a module-scope const, for `holdRows`'s reason: the harvest
+ * throws on an element it cannot read a name from, and a throw during
+ * COLLECTION reports the file as "no tests" and takes every guard in it down
+ * silently.
  *
  * Upper-cased because the dossier writes fix idents that way and NDB_NAMES are
  * title case: 'Delta' and a fix 'DELTA' are one place, whatever the notation.
  */
-const INVENTED_FIXTURE_NAMES: ReadonlyArray<{ list: string; name: string }> = [
-  ...INVENTED_HOLDS.map((h) => ({ list: 'INVENTED_HOLDS', name: h.fix.toUpperCase() })),
-  ...NDB_NAMES.map((n) => ({ list: 'NDB_NAMES', name: n.toUpperCase() })),
-  ...WIND_LAB_FIXES.map((f) => ({ list: 'wind-lab FIXES', name: f.toUpperCase() })),
-]
+function inventedFixtureNames(): ReadonlyArray<{ list: string; name: string }> {
+  const lists = clearanceFixtureLists()
+  // An exemption that no longer names a live export is a hole that opens
+  // silently, so a rename reds here rather than quietly excusing nothing — or,
+  // worse, leaving the renamed list excused under its old name.
+  const harvested = lists.map((l) => l.list)
+  for (const { list } of REAL_BY_DESIGN) {
+    expect(harvested, `${list} is exempted from the dossier sweep but no longer exported`).toContain(
+      list,
+    )
+  }
+  // PUBLISHED_HOLDS is excused only because it carries nothing of its own.
+  expect(PUBLISHED_HOLDS).toEqual([...INVENTED_HOLDS, ...RESEARCHED_HOLDS])
+  const exempt = new Set(REAL_BY_DESIGN.map((r) => r.list))
+  return [
+    ...lists
+      .filter(({ list }) => !exempt.has(list))
+      .flatMap(({ list, names }) => names.map((name) => ({ list, name }))),
+    ...WIND_LAB_FIXES.map((f) => ({ list: 'wind-lab FIXES', name: f.toUpperCase() })),
+  ]
+}
 
 /**
  * Every fixture list `clearance.ts` exports, kept PER LIST — wind-lab.test.ts's
@@ -769,7 +820,7 @@ describe('PUBLISHED_HOLDS practice fixtures', () => {
     // parser does, and a second copy of it is a copy that drifts.
     const researched = new Set(holdRows().map((r) => r.fix))
     expect(researched.size, 'dossier hold table parsed').toBeGreaterThan(0)
-    for (const { list, name } of INVENTED_FIXTURE_NAMES) {
+    for (const { list, name } of inventedFixtureNames()) {
       expect([...researched], `invented fixture ${name} (${list}) is a real fix`).not.toContain(name)
     }
   })
@@ -780,10 +831,15 @@ describe('PUBLISHED_HOLDS practice fixtures', () => {
   // silently stop defending a whole pool. One known name per list pins that
   // each is actually reaching the check.
   it('sweeps a name from every invented fixture list it claims to cover', () => {
-    const names = new Set(INVENTED_FIXTURE_NAMES.map((f) => f.name))
+    const names = new Set(inventedFixtureNames().map((f) => f.name))
     for (const known of ['ZORVU', 'AMBER', 'KELVO']) {
       expect(names.has(known), `${known} is not swept`).toBe(true)
     }
+    // No companion assertion that REAL_BY_DESIGN lists are absent from the
+    // sweep: `inventedFixtureNames` filters on that set, so such an expect
+    // cannot fail and would be fake coverage. What CAN go wrong there — an
+    // exemption naming a list this module no longer exports — is asserted
+    // inside the helper, where the harvest to compare against is in hand.
   })
 
   it('no invented fixture reuses a charted name, even with matching geometry', () => {
@@ -1044,8 +1100,21 @@ describe('PUBLISHED_HOLDS geometry agrees with the written bank', () => {
   const geometryConflicts = (fixtures: readonly Fixture[]): string[] => {
     const conflicts: string[] = []
     for (const fixture of fixtures) {
-      const charted = CHART_HOLDS.find((h) => h.fix === fixture.fix)
-      if (!charted) continue
+      const rows = CHART_HOLDS.filter((h) => h.fix === fixture.fix)
+      if (rows.length === 0) continue
+      // Two charted rows under one name means there is no single geometry to
+      // agree with, so the fixture is REPORTED rather than compared against
+      // whichever row happens to be listed first — the sibling dossier check
+      // reds on exactly this ambiguity, and picking a row here would let a
+      // fixture contradict the other row on screen with the suite green. Data
+      // the dossier already records makes it reachable: KOAK's ILS variants
+      // hold at DECOT/REBAS/SAU on 1-minute legs rather than the RNAV DME legs,
+      // and ALTAM is charted as an IAF on KSCK RNAV 11L as well.
+      if (rows.length > 1) {
+        conflicts.push(`${fixture.fix}: CHART_HOLDS carries more than one geometry for this name`)
+        continue
+      }
+      const charted = rows[0]!
       for (const [path, value] of geometryFields(fixture)) {
         const chartedValue = valueAt(charted, path)
         if (value !== chartedValue) {

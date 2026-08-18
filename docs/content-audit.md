@@ -2744,3 +2744,88 @@ agrees with docs/bay-area-holds.md` and the `CHART_HOLDS` check, which compare a
 **Reviewed and not changed:** the HSI nav status line width, already recorded as accepted above — it
 is a content decision (pass the ident, which the dossier carries for every station), not a review
 edit, and nothing on this pass changes that reasoning.
+
+**Fixed: the dossier sweep's own list of invented fixture lists was hand-written.** The sweep `no
+invented fixture lands on a real fix the dossier records` is the guard whose whole point is that the
+witness *grows with the research* rather than with somebody remembering to extend a literal — and its
+`INVENTED_FIXTURE_NAMES` was itself a literal, three lines of `INVENTED_HOLDS` / `NDB_NAMES` /
+wind-lab `FIXES`, sitting twenty lines above a `clearanceFixtureLists()` that harvests the same
+module generically for the disjointness check. So it covered only the lists that existed when it was
+typed. Mutation-confirmed **806/806 green**: appending `export const RNAV_FIX_NAMES = ['WHYEE',
+'IPDEW', 'ORANG']` to `clearance.ts` — three real Bay Area fixes this very dossier records and
+deliberately holds back as `CIFP-only` — shipped clean, because a new list is invisible to a
+hand-list by construction. That is the `HAIRE` defect once more, on the branch whose claim is that
+this class is guarded, and it is the *same* "a scope narrower than the claim reads as coverage" shape
+as the two entries above it.
+
+Now `inventedFixtureNames()` derives from the namespace harvest **minus** an explicit `REAL_BY_DESIGN`
+table, so the default for a list added later is *swept*, not *invisible* — the safe direction. Each
+exemption names the guard that covers it from the other side (`VOR_NAMES` → `names only stations the
+dossier records as current`; `RESEARCHED_HOLDS` → `states the researched course, turns and leg for
+every real fixture`, which requires a dossier row rather than forbidding one; `PUBLISHED_HOLDS` →
+`INVENTED_HOLDS`, whose concatenation identity is re-asserted inside the helper so the exemption
+cannot decay). An exemption naming a list the module no longer exports **throws** — mutation-
+confirmed, a `VOR_NAMEZ` typo reds with that message — because a stale exemption is a hole that opens
+silently. It is a function rather than a module-scope const for `holdRows()`'s reason: the harvest
+throws, and a throw during collection reports the file as "no tests" and takes every guard in it down.
+
+No companion assertion that a `REAL_BY_DESIGN` list is *absent* from the sweep: the helper filters on
+that set, so such an `expect` cannot fail. Per CLAUDE.md an assertion that cannot fail is fake
+coverage — the comment stays, the `expect` does not.
+
+**Fixed: the `CHART_HOLDS` geometry guard resolved a name collision by first match.** `geometryConflicts`
+did `CHART_HOLDS.find((h) => h.fix === fixture.fix)`, so a fixture sharing a name with **two** charted
+rows was compared against whichever was listed first and could contradict the other on screen with the
+suite green — the exact "two screens teaching different geometry under one fix name" defect the guard
+exists for. Its sibling one describe down already does the opposite (`expect(rows, …).toHaveLength(1)`,
+"shipping a fix whose provenance is ambiguous is the confusion the dossier exists to prevent, so it
+reds rather than picking a row"), so the two halves of one rule disagreed on how to handle ambiguity.
+
+Latent rather than live — `CHART_HOLDS` carries no duplicate fix today — but reachable from data this
+dossier already records: the KOAK ILS variants hold at `DECOT`/`REBAS`/`SAU` on 1-minute legs rather
+than the RNAV DME legs, and `ALTAM` is charted as an IAF on KSCK RNAV 11L as well, so a second row
+under a shipped name is an ordinary next edit. Now every matching row is collected and more than one
+is reported as a conflict naming the ambiguity, matching the dossier check's shape. Mutation-confirmed:
+a second `OYOSO` row at 296°/right reds six assertions with `OYOSO: CHART_HOLDS carries more than one
+geometry for this name`.
+
+**Fixed: the dossier's own "format is load-bearing" note described a parser that no longer exists.**
+The note at the top of `docs/bay-area-holds.md` still said hold rows were "keyed off the confidence
+column" and gave exact cell counts for both tables — both superseded by the two-signal recognizer and
+the `rawCells` outer-pipe normalisation recorded in the entries above. That note is what an editor of
+this file actually reads before touching a table, so it was the one place still telling them the
+confidence cell is the trigger (it is now one of two) and that outer pipes are mandatory (they are
+optional). Rewritten to state the mechanism rather than the cell counts, including why the
+recommendations table is deliberately not parsed. No code change; `npm test` stays 806/806.
+
+**Recorded, not changed: `normalizeFix` loosened clearance-copy grading on this branch.** Fix grading
+went from `trim().toLowerCase()` to also collapsing internal whitespace runs. It is justified and
+documented at the function — five `VOR_NAMES` entries are now two words (`Point Reyes`, `Scaggs
+Island`, `San Francisco`, `San Jose`, `El Nido`), so a double space is a plausible typo in a free-text
+field and marking a correctly copied fix wrong is itself negative training — and what is *not*
+normalised away is the space, so `PointReyes` stays wrong. But it is a user-visible grading change and
+it appeared in no ledger entry, so a later session reading this file would find no record that grading
+was loosened. Covered by two tests in `clearance.test.ts`.
+
+**Reviewed and not changed, with the claim corrected: `NDB_NAMES` carries `Delta`, and DELTA is a real
+VORTAC.** Verified 2026-08-18 against `opennav.com/navaid/US/DTA`: **DELTA, VORTAC, Delta UT**. Rule 5
+as CLAUDE.md stated it — "`NDB_NAMES` … none may be a real station" — was therefore an unscoped claim
+with a live counterexample sitting in the shipped pool. What the suite actually asserts is narrower:
+`invents its NDB names rather than reusing a real station` compares each name against the **dossier's
+17-row Bay Area navaid table**, so the assertion is regional and a Utah VORTAC is invisible to it. The
+test's own comment was already scoped correctly ("no NDB remains in the region"); CLAUDE.md was the
+over-claiming half — this repo's recurring failure, where the docblock tells the next session that the
+one edit reaching the defect is already covered.
+
+The name is kept and the claim is scoped, rather than the reverse, on the branch's own logic: the
+ad-hoc ATC branch draws bearing, turns and legs **per scenario**, so `Delta` attributes no geometry to
+Delta UT (rule 4 — the same reason a real `VOR_NAMES` entry is legitimate), and unlike `ZORVU` it
+contradicts nothing else in the app. The residual defect is the *kind* — the app calls a VORTAC an
+NDB — which is real but carries none of the "inventing facts about a real place" harm the other
+entries in this ledger record. Against that, swapping in a replacement would mean shipping a name
+nobody has verified is free, which is the unverified-claim failure this ledger exists to catch: the
+`opennav.com/waypoint/US/<NAME>` check in rule 3 answers **fixes**, station lookup here works by
+ident rather than by name, and `Amber` and `Cooper` are unverified by name for exactly the same
+reason. Trading a documented exception for an undocumented one is not a fix. Open item for a content
+pass with a by-name station source (FAA NASR would answer it); the guard cannot close it, so the
+scope is now written down instead of overstated.
