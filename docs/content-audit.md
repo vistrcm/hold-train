@@ -1355,6 +1355,14 @@ failure this ledger records for the rejoin prose scan.
 
 ## Correction — 2026-08-07 (the entry drill depicted every clearance overhead the fix)
 
+> **Amended 2026-09-16** — the `.entry-lead` footnote this entry added has been **removed**; see
+> "Deliberate reversal — 2026-09-16 (the entry drill's cited footnotes are removed)" at the end of
+> this file. The *picture* this entry fixed is unchanged and still correct: the aircraft is still
+> drawn 6–10 NM short of the fix, for the reason argued below. What is withdrawn is only the
+> decision to justify that distance in prose **on screen**. The two FAA quotations below now live in
+> the docblocks of `CLEARANCE_LEAD_MINUTES` and `SPEED_REDUCTION_MINUTES`. Do not read this entry as
+> authority for restoring the footnote.
+
 Unlike most entries in this ledger, nothing here was a *false statement*. Every fact the drill
 rendered was correct; what was wrong was the **picture** — the only moment it could depict was one
 that is not the moment the decision is made, and the instrument depicting it showed an RMI's
@@ -1569,6 +1577,16 @@ Full plan, with the per-task mutation tables that establish each guard actually 
 
 ## Correction — 2026-08-07 (the CDI-scale citation was never rendered)
 
+> **Amended 2026-09-16 — this entry is the one most likely to mislead, so read the amendment first.**
+> The `.entry-cdi` footnote it adds has been **removed**, and `FULL_SCALE_SOURCE` **deleted**; see
+> "Deliberate reversal — 2026-09-16 (the entry drill's cited footnotes are removed)" at the end of
+> this file. Its reasoning below — that a `source` constant nothing renders satisfies nothing — is
+> **still correct and still binding**, and is exactly why the constant was deleted rather than left
+> exported. What is withdrawn is the premise that the CDI scale is a *taught fact* owing an on-screen
+> citation at all: it is part of the instrument's **depiction**, and AIM 1-1-17 b.4 now sits in the
+> `FULL_SCALE_NM` docblock. Taken alone, this entry reads as an instruction to restore the footnote.
+> It is not.
+
 Amends the `FULL_SCALE_NM` bullet above, which recorded the scale as "a user-visible aviation fact:
 **AIM 1-1-17 b.4**" and stopped there.
 
@@ -1645,6 +1663,13 @@ Amends the `FULL_SCALE_NM` bullet above, which recorded the scale as "a user-vis
   invisible and the assertion could not fail.
 
 ## Correction — 2026-08-07 (terminal CDI scaling was justified by a distance that does not apply)
+
+> **Amended 2026-09-16** — the withdrawal argued here **stands in full**; nothing in it is reversed.
+> What changed is its carrier: it was rendered to the student as the `CDI_ARMING_AIM` quotation in
+> the `.entry-cdi` footnote, and that footnote has been removed (see "Deliberate reversal —
+> 2026-09-16" at the end of this file). The invalid inference must not return in any form — it is
+> restated in the `FULL_SCALE_NM` docblock in `src/ui/hsi.ts`, which is now, with this entry, its
+> only record.
 
 This section **reverses part of the 2026-08-07 "the CDI-scale citation was never rendered" entry**,
 argued in place rather than silently edited past: that entry now carries a struck sentence and an
@@ -2908,3 +2933,65 @@ means carrying an ident per station and is new data; clamp with `textLength`, wh
 or shrink the face for long names — and because nothing asserts that budget today, so whichever is
 chosen needs the assertion more than it needs the clamp. Raised with the user rather than decided
 in a review pass.
+
+## Deliberate reversal — 2026-09-16 (the entry drill's cited footnotes are removed)
+
+**Reverses, in part, three 2026-08-07 entries**: "the entry drill depicted every clearance overhead
+the fix", "the CDI-scale citation was never rendered", and "terminal CDI scaling was justified by a
+distance that does not apply". Each of those is amended in place with a pointer here, per the
+never-edit-past rule.
+
+Nothing recorded in those entries was factually wrong, and nothing here corrects a fact. The
+quotations were verbatim, the citations were at sub-paragraph granularity, and the withdrawal in the
+third entry stands unchanged and unchallenged. **What changed is a judgement about scope: whether an
+instrument owes the student an on-screen citation for its own scale and for the position it
+depicts.** The answer recorded here is that it does not.
+
+- **Removed: `.entry-lead` and `.entry-cdi`, the two always-on footnotes at the foot of the entry
+  drill** (`src/modules/entry-drill.ts`, `src/ui/hsi.ts`, `src/styles.css`). Between them they
+  carried four verbatim FAA quotations — JO 7110.65BB 4-6-1 c.4, AIM 5-3-8 d, AIM 1-1-17 b.4 and
+  b.5(e)(3) — plus two derivation notes, on every page of both drill modes.
+- **Why**: the entry decision in an aircraft is made looking at a panel, not at a page of citations.
+  Neither footnote taught entry technique. Each existed to source a *display* decision: the first
+  why the aircraft is drawn 6–10 NM short of the fix, the second what a dot on the deviation needle
+  is worth. They were the largest block of text on the screen a cockpit-mode student is **timed** on.
+- **The depiction they defended is unchanged.** The HSI keeps its deviation bar, dots, TO/FROM flag,
+  nav status line and distance readout; `generateScenario` keeps the 6–10 NM window; the underlying
+  constants (`CLEARANCE_LEAD_MINUTES`, `SPEED_REDUCTION_MINUTES`, `NOMINAL_GROUNDSPEED_KT`,
+  `MIN_/MAX_DISTANCE_NM`, `FULL_SCALE_NM`) are untouched in value. Only the prose is gone.
+- **The convention is narrowed, not waived** (CLAUDE.md). An instrument's scale, and the aircraft's
+  position within the picture it draws, are part of the **depiction** — the same footing as the
+  `GPS`/`OBS` annunciators, whose non-FAA Garmin justification has always lived in a docblock rather
+  than on screen. A *taught* fact still cites on screen; the written bank, the lessons, oral prep and
+  the drill's own post-grading feedback panel are all unaffected, and `OUTBOUND_TIMING_AIM`/`_NOTE`
+  still render after an answer is graded, which is where a citation answers a question the student
+  just asked.
+- **Provenance moved into source rather than being deleted.** Both FAA sentences behind the window
+  now sit verbatim in the docblocks of `CLEARANCE_LEAD_MINUTES` and `SPEED_REDUCTION_MINUTES`; AIM
+  1-1-17 b.4 and b.5(e)(3) were already in the `FULL_SCALE_NM` docblock and stay. Bare numeric
+  constants with no record of where they came from is the failure mode this guards against — the
+  next session re-derives them, wrongly.
+- **`FULL_SCALE_SOURCE` is deleted, not orphaned.** Its only consumer was `.entry-cdi`. Leaving it
+  exported with nothing rendering it would restore the precise state the 2026-08-07 CDI entry files
+  as a defect ("exported with **no consumer anywhere** — not rendered, not asserted, not
+  referenced").
+- Regression tests:
+  - `renders no cited footnotes below the drill` (`src/modules/entry-drill.test.ts`) — asserts both
+    classes absent **in both modes**, and that the screen renders no `<cite>` outside
+    `.entry-feedback`. The `<cite>` sweep is what survives a rename: re-adding the paragraph under a
+    new class name still reds. The absence is asserted precisely *because* this ledger argues the
+    other way — without it a session reading the 2026-08-07 entries finds a screen those entries
+    call defective and helpfully restores the footnote.
+  - `exports no source constant, because this instrument renders no prose` (`src/ui/hsi.test.ts`) —
+    mutation-confirmed: re-adding `export const FULL_SCALE_SOURCE` reds it. Its scope is stated
+    honestly as that one module and it makes no app-wide claim.
+  - `draws a needle pegged across the window and centred on the course`
+    (`src/modules/entry-drill.test.ts`) — kept and retitled. It never depended on the prose it was
+    once named for: re-tuning `FULL_SCALE_NM` to en route ±5 NM still draws a materially different
+    aircraft from one module away, and this is what notices.
+
+**Found while doing this, not fixed here** (scope): `DME_SOURCE` and `dmeOutboundEnd`
+(`src/engine/wind.ts`) have **no UI consumer at all** — computed, shape-checked in `wind.test.ts`,
+rendered by no screen — while README advertises "DME/ATD leg endpoints" as a wind-lab feature. That
+is the same orphaned-citation shape as the 2026-08-07 `FULL_SCALE_SOURCE` defect, still open, and
+the reason the new `hsi.test.ts` guard does not claim app-wide coverage.

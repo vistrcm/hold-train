@@ -1396,3 +1396,37 @@ describe('overlay geometry (drawn arcs, not just their data attributes)', () => 
     expect(inner).toBeLessThan(tickOuter)
   })
 })
+
+describe('citation constants', () => {
+  // ⚠️ This module exports NO citation constant, deliberately, and that is what
+  // is asserted here.
+  //
+  // `FULL_SCALE_SOURCE = 'AIM 1-1-17 b.4'` lived here until 2026-09-14. It first
+  // shipped with no consumer anywhere — not rendered, not asserted, not
+  // referenced — which docs/content-audit.md (2026-08-07) files as a defect: a
+  // `source` constant satisfies the CLAUDE.md convention only once something
+  // RENDERS it. The fix then wired it into a footnote on the entry drill, and
+  // that footnote was removed on the date above, because an instrument's scale
+  // is part of the depiction rather than a fact the drill teaches — the same
+  // footing as the GPS/OBS annunciators, whose Garmin justification has always
+  // lived in a docblock.
+  //
+  // So the provenance of `FULL_SCALE_NM` now sits in its docblock and in the
+  // ledger, and re-exporting a `*_SOURCE` from an instrument that draws no prose
+  // puts it straight back in the state the ledger calls a defect: it has nowhere
+  // to render. Scanned as source text because the claim is about what the module
+  // EXPORTS; a value scan would miss a re-added constant nothing imports, which
+  // is precisely the orphan case.
+  //
+  // Scope is this module, honestly: it does NOT claim the app has no orphaned
+  // citations. `DME_SOURCE` in src/engine/wind.ts is one today — exported,
+  // shape-checked in wind.test.ts, rendered by no screen, with README
+  // advertising the DME/ATD leg endpoints it belongs to. That is a separate open
+  // defect, not covered here.
+  it('exports no source constant, because this instrument renders no prose', async () => {
+    const source = (await import('./hsi.ts?raw')).default
+    expect(source.length, 'the ?raw import resolved empty').toBeGreaterThan(1000)
+    expect(source).toMatch(/export const FULL_SCALE_NM/)
+    expect(source.match(/^export const \w*_SOURCE\b/gm) ?? []).toEqual([])
+  })
+})

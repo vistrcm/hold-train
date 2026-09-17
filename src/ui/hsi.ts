@@ -78,8 +78,15 @@ export interface HSIProps {
 
 /**
  * Full-scale course deviation, in NM. This is what a dot means, and a student
- * will read the needle quantitatively, so it is a user-visible aviation fact
- * under the CLAUDE.md citation convention.
+ * will read the needle quantitatively.
+ *
+ * ⚠️ Its provenance is recorded HERE and rendered nowhere. The drill screen used
+ * to carry it as a cited footnote (`.entry-cdi`); that was removed 2026-09-14 —
+ * see docs/content-audit.md. An instrument's scale is part of the DEPICTION, not
+ * a fact the drill teaches, and carries its source in the docblock the way the
+ * `navStatus` GPS/OBS annunciators do. So this comment is the only record of
+ * where the 1 comes from: keep the quotations below verbatim, and do not delete
+ * them as commentary.
  *
  * 1.0 NM is GPS **terminal**-mode CDI sensitivity, verified against
  * faa.gov/air_traffic/publications/atpubs/aim_html/chap1_section_1.html. AIM
@@ -105,20 +112,12 @@ export interface HSIProps {
  * sit hundreds of miles from any airport on en route ±5 NM. So the window in
  * src/modules/entry-drill.ts neither justifies this constant nor bounds it, and
  * re-tuning it is not a reason to revisit this value. See docs/content-audit.md,
- * 2026-08-07; the withdrawal is rendered to the student by `CDI_ARMING_AIM`.
+ * 2026-08-07 — where the withdrawal now lives in full. It was also rendered to
+ * the student until 2026-09-14, as the second quotation in the `.entry-cdi`
+ * footnote; with that footnote gone the ledger entry is the sole carrier, which
+ * is why the argument is restated above rather than merely cross-referenced.
  */
 export const FULL_SCALE_NM = 1
-
-/**
- * Where `FULL_SCALE_NM` comes from; the mode assumption above is not cited.
- *
- * A citation only satisfies the CLAUDE.md convention once it is *rendered*, and
- * this instrument draws no prose of its own — so the drill screen carries it,
- * beside the needle it explains: `CDI_SCALE_AIM`/`CDI_SCALE_NOTE` in
- * src/modules/entry-drill.ts, quotation and derivation split the way
- * `OUTBOUND_TIMING_AIM`/`_NOTE` are.
- */
-export const FULL_SCALE_SOURCE = 'AIM 1-1-17 b.4'
 
 /** Deviation dots per side: one at half scale, one at full scale. */
 export const DEVIATION_DOTS = 2
