@@ -10,20 +10,13 @@ import {
 } from '../engine/entry'
 import { normalizeDeg } from '../engine/geometry'
 import {
-  CDI_ARMING_AIM,
-  CDI_ARMING_SOURCE,
-  CDI_SCALE_AIM,
-  CDI_SCALE_NOTE,
-  CLEARANCE_LEAD_ATC,
   CLEARANCE_LEAD_MINUTES,
-  CLEARANCE_LEAD_SOURCE,
   COCKPIT_TARGET_SECONDS,
   createEntryDrill,
   entryDrillScreen,
   flyItText,
   generateScenario,
   gradeEntryAnswer,
-  LEAD_DISTANCE_NOTE,
   MAX_DISTANCE_NM,
   MIN_DISTANCE_NM,
   NOMINAL_GROUNDSPEED_KT,
@@ -31,19 +24,10 @@ import {
   OUTBOUND_TIMING_NOTE,
   OUTBOUND_TIMING_SOURCE,
   renderEntryDrill,
-  SPEED_REDUCTION_AIM,
   SPEED_REDUCTION_MINUTES,
-  SPEED_REDUCTION_SOURCE,
 } from './entry-drill'
 import { courseText, distanceText } from '../format'
-import {
-  DEVIATION_DOTS,
-  FULL_SCALE_NM,
-  FULL_SCALE_SOURCE,
-  LAYOUT,
-  PX_PER_NM,
-  renderHSI,
-} from '../ui/hsi'
+import { DEVIATION_DOTS, FULL_SCALE_NM, LAYOUT, PX_PER_NM, renderHSI } from '../ui/hsi'
 
 /** First seed whose generated clearance is a charted "as published" hold. */
 const CHARTED_SEED = 4
@@ -196,9 +180,9 @@ describe('scenario distance to the fix', () => {
     // justified here as "well inside the 30 NM at which a GPS arms terminal CDI
     // scaling (AIM 1-1-17 b.5(e))" — a comparison between distance to a holding
     // fix and distance to an airport reference point, which is not a comparison
-    // at all. That inference is withdrawn (see `CDI_ARMING_AIM`); do not restore
-    // it by reading 30 as an airspace or avionics threshold. Any bound that
-    // catches 360–600 NM would do.
+    // at all. That inference is withdrawn (docs/content-audit.md, 2026-08-07);
+    // do not restore it by reading 30 as an airspace or avionics threshold. Any
+    // bound that catches 360–600 NM would do.
     expect(MIN_DISTANCE_NM).toBeGreaterThan(1)
     expect(MAX_DISTANCE_NM).toBeLessThan(30)
     expect(NOMINAL_GROUNDSPEED_KT).toBeGreaterThan(0)
@@ -227,20 +211,6 @@ describe('scenario distance to the fix', () => {
     }
   })
 
-  it('cites both timings at sub-paragraph granularity', () => {
-    expect(CLEARANCE_LEAD_SOURCE).toBe('FAA JO 7110.65BB 4-6-1 c.4')
-    expect(SPEED_REDUCTION_SOURCE).toBe('AIM 5-3-8 d')
-  })
-
-  // The quoted sentences are verbatim FAA text, so they are NOT templated from
-  // the constants — a quotation with an interpolation in it is not a quotation.
-  // The agreement is asserted instead: retune either constant and the sentence
-  // rendered beside the distance stops supporting the number it explains, which
-  // is the failure mode of a source quoted next to a value it no longer governs.
-  it('quotes timings that still say what the generator’s constants claim', () => {
-    expect(CLEARANCE_LEAD_ATC).toContain(`at least ${CLEARANCE_LEAD_MINUTES} minutes`)
-    expect(SPEED_REDUCTION_AIM).toContain(`${SPEED_REDUCTION_MINUTES} minutes or less`)
-  })
 })
 
 describe('gradeEntryAnswer', () => {
@@ -925,137 +895,53 @@ describe('renderEntryDrill screen', () => {
     }
   })
 
-  it('quotes both timings verbatim with their sources, derivation kept outside', () => {
-    const { el } = setup('cockpit')
-    const lead = el.querySelector('.entry-lead')!
-    // Each quoted span CLOSES on the FAA sentence — asserted with the quotation
-    // marks, not merely with `toContain`. The two constants not containing each
-    // other (below) is a weaker claim than it looks: the template could still
-    // set the closing mark after the derivation and present the assumption as
-    // quoted text, with every plain `toContain` still passing.
-    expect(lead.textContent).toContain(`“${CLEARANCE_LEAD_ATC}”`)
-    expect(lead.textContent).toContain(`“${SPEED_REDUCTION_AIM}”`)
-    expect(lead.textContent).toContain(LEAD_DISTANCE_NOTE)
-    expect([...lead.querySelectorAll('cite')].map((c) => c.textContent)).toEqual([
-      CLEARANCE_LEAD_SOURCE,
-      SPEED_REDUCTION_SOURCE,
-    ])
-    // The miles are a derivation from an assumed groundspeed, and the FAA says
-    // nothing about groundspeed here. Folding it into either cited span would
-    // present the assumption as the citation — the failure the outbound-timing
-    // split above exists to prevent, repeated for the distance.
-    expect(CLEARANCE_LEAD_ATC).not.toContain(LEAD_DISTANCE_NOTE)
-    expect(SPEED_REDUCTION_AIM).not.toContain(LEAD_DISTANCE_NOTE)
-    expect(LEAD_DISTANCE_NOTE).toContain(`${NOMINAL_GROUNDSPEED_KT} kt`)
-    expect(LEAD_DISTANCE_NOTE.toLowerCase()).toContain('assumption')
-    expect(CLEARANCE_LEAD_ATC).not.toMatch(/kt|groundspeed/i)
-    expect(SPEED_REDUCTION_AIM).not.toMatch(/kt|groundspeed/i)
-  })
-
-  // The scale is the one aviation fact on this screen a student reads off the
-  // instrument rather than out of the prose: two dots a side means each is worth
-  // half of FULL_SCALE_NM. That makes it a user-visible fact under the citation
-  // convention, and a `source` constant nothing renders satisfies none of it —
-  // `FULL_SCALE_SOURCE` had no consumer at all before this.
-  it('cites the CDI scale beside the needle, with the mode caveat outside the quote', () => {
-    const { el } = setup('cockpit')
-    const cdi = el.querySelector('.entry-cdi')!
-    expect(cdi.textContent).toContain(`“${CDI_SCALE_AIM}”`)
-    expect(cdi.textContent).toContain(`“${CDI_ARMING_AIM}”`)
-    expect(cdi.textContent).toContain(CDI_SCALE_NOTE)
-    expect([...cdi.querySelectorAll('cite')].map((c) => c.textContent)).toEqual([
-      FULL_SCALE_SOURCE,
-      CDI_ARMING_SOURCE,
-    ])
-
-    // ⚠️ Sub-paragraph granularity is the convention, and the arming sentence is
-    // one level deeper than the citation used to claim. Walking the `<ol>`
-    // nesting of the fetched AIM page puts "…'arm' annunciation 30 NM straight
-    // line distance…" at path [2, 5, 5, 3] over levels one→four = b.5(e)(3);
-    // `b.5(e)` alone is the ~10-item list "Procedures for Accomplishing GPS
-    // Approaches", so a student following the `<cite>` landed on the list. This
-    // pins the DEPTH rather than the string: flattening it back to the container
-    // is the regression, and it is exactly what the shape check catches.
-    expect(CDI_ARMING_SOURCE, 'cite the sub-item, not the list containing it').toMatch(
-      /^AIM 1-1-17 b\.5\(e\)\(\d+\)$/,
-    )
-
-    // The AIM sentences cite the VALUE and the arming CONDITIONS. Terminal mode
-    // for a hold is this drill's assumption — the AIM is talking about departures
-    // and DPs — so it stays outside both quoted spans, exactly as
-    // LEAD_DISTANCE_NOTE does for the groundspeed and OUTBOUND_TIMING_NOTE does
-    // for the per-entry split.
-    expect(CDI_SCALE_AIM).not.toContain(CDI_SCALE_NOTE)
-    expect(CDI_ARMING_AIM).not.toContain(CDI_SCALE_NOTE)
-    expect(CDI_SCALE_AIM).not.toMatch(/hold|assum/i)
-    expect(CDI_ARMING_AIM).not.toMatch(/hold|assum/i)
-    expect(CDI_SCALE_NOTE.toLowerCase()).toContain('assumption')
-  })
-
-  // The withdrawn inference (docs/content-audit.md, 2026-08-07). The screen used
-  // to justify terminal scaling by "the 6–10 NM window sits well inside the 30 NM
-  // at which terminal scaling arms" — comparing distance to a HOLDING FIX against
-  // b.5(e)'s distance to an AIRPORT/HELIPORT REFERENCE POINT, with the approach
-  // loaded and armed. Neither condition follows from the drill's distance, so the
-  // claim was false and uncited, and a student reads it off the screen.
+  // ⚠️ The ABSENCE is the invariant, and it needs asserting precisely because
+  // the ledger argues the other way. Three 2026-08-07 entries record these two
+  // footnotes being ADDED, one of them titled "the CDI-scale citation was never
+  // rendered" — so a session reading the ledger without this test finds a
+  // screen whose state that ledger calls a defect, and helpfully restores it.
   //
-  // This guards the *shape* of the correction, not just the deleted words: the
-  // 30 NM may only appear tied to its reference point, and the drill's own window
-  // may not be offered as the reason the mode is honest.
+  // What changed is not the facts, which were right, but whether an instrument
+  // owes the student a citation for its own scale and the position it depicts.
+  // It does not: those are the depiction, on the same footing as the GPS/OBS
+  // annunciators CLAUDE.md already exempts. Provenance lives in the docblocks
+  // of the constants and in docs/content-audit.md. An entry decision in the
+  // cockpit is made looking at a panel, not at a page of citations, and this is
+  // the screen a cockpit-mode student is timed on.
   //
-  // Scanned off the RENDERED paragraph, not off the two constants it was built
-  // from: the screen composes `.entry-cdi` from five strings, so a scan of two
-  // of them lets the withdrawn claim back in through a sixth — a scope narrower
-  // than the claim, which is the failure mode CLAUDE.md records for the prose
-  // and README globs. What a student reads is the unit under test.
-  it('does not offer the drill’s distance as a reason for terminal scaling', () => {
-    const { el } = setup('cockpit')
-    const prose = el.querySelector('.entry-cdi')!.textContent ?? ''
-    expect(prose.length, 'the CDI footnote rendered empty').toBeGreaterThan(200)
-    expect(prose).not.toMatch(/sits well inside/i)
-    // Every mention of the threshold carries what it is measured from.
-    for (const m of prose.matchAll(/30 NM/gi)) {
-      const after = prose.slice(m.index!, m.index! + 120)
-      expect(after).toMatch(/airport(\/heliport)? reference point/i)
+  // Both modes, because the footnote was mode-independent: a re-add that only
+  // shows in learn mode must fail here too. The `<cite>` sweep is the half that
+  // survives a rename — restoring the paragraph under any new class name still
+  // reds this — and it is scoped OUTSIDE `.entry-feedback`, which legitimately
+  // cites AIM 5-3-8 j4(b) after grading. That is teaching content answering the
+  // question just asked, not an always-on footnote, and it stays.
+  it('renders no cited footnotes below the drill', () => {
+    for (const mode of ['learn', 'cockpit'] as const) {
+      const { el } = setup(mode)
+      expect(el.querySelector('.entry-lead'), `${mode} mode`).toBeNull()
+      expect(el.querySelector('.entry-cdi'), `${mode} mode`).toBeNull()
+
+      const cites = [...el.querySelectorAll('cite')].filter((c) => !c.closest('.entry-feedback'))
+      expect(cites.map((c) => c.textContent), `${mode} mode`).toEqual([])
     }
-    // The quotation is the only place the arming conditions are asserted, and it
-    // is verbatim: the note may restate them but must not be the sole carrier.
-    expect(CDI_ARMING_AIM).toMatch(/airport\/heliport reference point/)
-    expect(CDI_ARMING_AIM).toMatch(/loaded in the navigation system/)
-    expect(CDI_ARMING_AIM).toMatch(/Without arming/)
   })
 
-  // The quotation carries a number, so it can fall out of step with the constant
-  // it is cited for — the same drift `quotes timings that still say what the
-  // generator’s constants claim` guards on the lead-time side.
+  // The scale and the window have to keep depicting one coherent aircraft, and
+  // that is a claim about the DRAWN needle rather than about any number.
   //
-  // Which side of that drift each line catches matters here. `CDI_SCALE_AIM` is
-  // a fixed literal, so re-reading `FULL_SCALE_NM` against it binds. But
-  // `CDI_SCALE_NOTE` is BUILT from these constants, so the three lines that once
-  // re-read `FULL_SCALE_NM`, `FULL_SCALE_NM / DEVIATION_DOTS` and the window
-  // against it restated the template and could not fail — the ledger credited
-  // them with catching a `DEVIATION_DOTS` re-tune, which no expression built
-  // from `DEVIATION_DOTS` can do. Hand-written literals instead, so re-tuning
-  // any of the four constants reds this test and forces the prose to be
-  // re-derived deliberately (it also catches a re-tune that renders a raw float:
-  // at 110 kt the window interpolates as "5.5–9.166666666666666 NM").
-  it('quotes a scale the instrument still draws on', () => {
-    expect(CDI_SCALE_AIM).toContain(`±${FULL_SCALE_NM} NM`)
-    expect(CDI_SCALE_NOTE).toContain('±1 NM')
-    expect(CDI_SCALE_NOTE).toContain('2 dots a side')
-    expect(CDI_SCALE_NOTE).toContain('0.5 NM')
-    expect(CDI_SCALE_NOTE).toContain('6–10 NM')
-  })
-
-  // "Expect it pegged across this drill's 6–10 NM window: unless you are nearly
-  // on the inbound course or its reciprocal, it is" is a claim about the DRAWN
-  // needle, and the test above only string-matches numbers. Re-tune
-  // `FULL_SCALE_NM` to the en route ±5 NM the withdrawn docblock once
-  // contemplated and the needle is essentially never pegged in this window while
-  // the screen goes on telling the student to expect it — negative training with
-  // the suite green. Asserted against the rendered bar, and both ways round, so
-  // it also fails a clamp that pegs everything and never lets go.
-  it('draws the pegged needle its own prose tells the student to expect', () => {
+  // It used to be stated as prose on the screen ("Expect it pegged across this
+  // drill's 6–10 NM window: unless you are nearly on the inbound course or its
+  // reciprocal, it is"), and this test guarded the picture against the sentence.
+  // The sentence went with the footnotes on 2026-09-14; the invariant did not,
+  // because it never depended on the prose. Re-tune `FULL_SCALE_NM` to the en
+  // route ±5 NM the withdrawn docblock once contemplated and the needle is
+  // essentially never pegged across this window — a materially different picture
+  // of the same moment, reached by editing one constant in another module, with
+  // nothing else in the suite noticing.
+  //
+  // Asserted against the rendered bar, and both ways round, so it also fails a
+  // clamp that pegs everything and never lets go.
+  it('draws a needle pegged across the window and centred on the course', () => {
     const course = 90
     const full = FULL_SCALE_NM * PX_PER_NM
     const deflection = (heading: number, distanceNm: number): number => {
@@ -1063,10 +949,12 @@ describe('renderEntryDrill screen', () => {
       renderHSI(el, { heading, course, nav: { fix: PUBLISHED_HOLDS[0]!.fix, distanceNm } })
       return Math.abs(Number(el.querySelector('.hsi-cdi-bar')!.getAttribute('x1')) - LAYOUT.cx)
     }
-    // "nearly on the course or its reciprocal" is asin(full scale / distance),
-    // widest at the near edge of the window. The note claims a narrow band.
+    // The off-peg band — "nearly on the course or its reciprocal" — is
+    // asin(full scale / distance), widest at the near edge of the window. It has
+    // to stay narrow for the loop below to be testing the general case rather
+    // than a handful of headings that happen to miss it.
     const band = (Math.asin(FULL_SCALE_NM / MIN_DISTANCE_NM) * 180) / Math.PI
-    expect(band, 'the note promises a pegged needle, not a lively one').toBeLessThan(15)
+    expect(band, 'a pegged needle, not a lively one').toBeLessThan(15)
 
     for (const distanceNm of [MIN_DISTANCE_NM, MAX_DISTANCE_NM]) {
       // every heading well clear of 090 and 270 pegs, either side

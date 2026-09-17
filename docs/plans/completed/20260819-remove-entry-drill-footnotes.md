@@ -1,5 +1,7 @@
 # Remove the cited footnotes from the entry drill
 
+**Status: complete** (2026-09-16). 802/802 tests, typecheck and build green. One finding raised and deliberately left open: `DME_SOURCE`/`dmeOutboundEnd` in `src/engine/wind.ts` have no UI consumer while README advertises the feature — logged in `docs/content-audit.md`, out of scope here.
+
 ## Overview
 
 The entry drill screen renders two static paragraphs at the foot of every page, in both learn and
@@ -194,15 +196,15 @@ appears in learn mode must fail too.
 **Files:**
 - Modify: `src/modules/entry-drill.test.ts`
 
-- [ ] delete the six prose-pinning `it()` blocks listed in Technical Details, and drop the nine
+- [x] delete the six prose-pinning `it()` blocks listed in Technical Details, and drop the nine
       now-unused constant imports plus `FULL_SCALE_SOURCE` from the import list
-- [ ] write `renders no cited footnotes below the drill` — asserts `.entry-lead` and `.entry-cdi`
+- [x] write `renders no cited footnotes below the drill` — asserts `.entry-lead` and `.entry-cdi`
       are both `null`, in **both** `learn` and `cockpit` mode
-- [ ] extend it to assert the screen renders no `<cite>` element outside `.entry-feedback`, so a
+- [x] extend it to assert the screen renders no `<cite>` element outside `.entry-feedback`, so a
       re-added footnote under any new class name also fails
-- [ ] add a comment recording *why* absence is asserted — the 2026-08-07 ledger entries make the
+- [x] add a comment recording *why* absence is asserted — the 2026-08-07 ledger entries make the
       footnote's absence look like a defect, and this is what stops it being "fixed" back in
-- [ ] run tests — suite must be RED here (the `<p>` blocks still render); confirm the failure names
+- [x] run tests — suite must be RED here (the `<p>` blocks still render); confirm the failure names
       the absence guard, not a compile error, before proceeding
 
 ### Task 2: Remove both footnote blocks and their constants
@@ -210,16 +212,16 @@ appears in learn mode must fail too.
 **Files:**
 - Modify: `src/modules/entry-drill.ts`
 
-- [ ] delete the `<p class="entry-lead">` and `<p class="entry-cdi">` blocks from the `innerHTML`
+- [x] delete the `<p class="entry-lead">` and `<p class="entry-cdi">` blocks from the `innerHTML`
       template (~lines 499–503)
-- [ ] delete the nine prose constants listed in Technical Details, with their docblocks
-- [ ] fold the citations into the docblocks of the constants that survive: `CLEARANCE_LEAD_MINUTES`
+- [x] delete the nine prose constants listed in Technical Details, with their docblocks
+- [x] fold the citations into the docblocks of the constants that survive: `CLEARANCE_LEAD_MINUTES`
       keeps `FAA JO 7110.65BB 4-6-1 c.4` and the verbatim sentence, `SPEED_REDUCTION_MINUTES` keeps
       `AIM 5-3-8 d` and its sentence, and both note the citation no longer renders on screen
-- [ ] remove `FULL_SCALE_SOURCE` from the `src/ui/hsi.ts` import list (`noUnusedLocals` will
+- [x] remove `FULL_SCALE_SOURCE` from the `src/ui/hsi.ts` import list (`noUnusedLocals` will
       otherwise fail typecheck while the suite stays green)
-- [ ] verify `NOMINAL_GROUNDSPEED_KT`'s "never cited as one" warning survives the edit intact
-- [ ] run tests and `npm run typecheck` — the Task 1 guard must now pass
+- [x] verify `NOMINAL_GROUNDSPEED_KT`'s "never cited as one" warning survives the edit intact
+- [x] run tests and `npm run typecheck` — the Task 1 guard must now pass
 
 ### Task 3: Retire `FULL_SCALE_SOURCE` from the instrument
 
@@ -227,45 +229,45 @@ appears in learn mode must fail too.
 - Modify: `src/ui/hsi.ts`
 - Modify: `src/ui/hsi.test.ts` (only if it references the constant)
 
-- [ ] delete the `FULL_SCALE_SOURCE` export and its docblock
-- [ ] fold `AIM 1-1-17 b.4` into the `FULL_SCALE_NM` docblock as the value's provenance, stating
+- [x] delete the `FULL_SCALE_SOURCE` export and its docblock
+- [x] fold `AIM 1-1-17 b.4` into the `FULL_SCALE_NM` docblock as the value's provenance, stating
       plainly that it is recorded here and not rendered
-- [ ] rewrite the `FULL_SCALE_NM` docblock's closing line — it currently ends "the withdrawal is
+- [x] rewrite the `FULL_SCALE_NM` docblock's closing line — it currently ends "the withdrawal is
       rendered to the student by `CDI_ARMING_AIM`", which becomes false; the withdrawal survives in
       `docs/content-audit.md` and must be cited there instead
-- [ ] grep for `FULL_SCALE_SOURCE` across `src/` and confirm zero hits remain
-- [ ] write/adjust a test asserting `hsi.ts` exports no unconsumed `*_SOURCE` constant, so the
+- [x] grep for `FULL_SCALE_SOURCE` across `src/` and confirm zero hits remain
+- [x] write/adjust a test asserting `hsi.ts` exports no unconsumed `*_SOURCE` constant, so the
       orphaned-export defect cannot recur
-- [ ] run tests and typecheck — must pass before task 4
+- [x] run tests and typecheck — must pass before task 4
 
 ### Task 4: Remove the footnote styles
 
 **Files:**
 - Modify: `src/styles.css`
 
-- [ ] delete the `.entry-lead` rule, the `.entry-lead, .entry-cdi` rule, and the explanatory
+- [x] delete the `.entry-lead` rule, the `.entry-lead, .entry-cdi` rule, and the explanatory
       comment above them
-- [ ] confirm `.entry-stats` still reads correctly as the last element on the screen now that the
+- [x] confirm `.entry-stats` still reads correctly as the last element on the screen now that the
       bordered block below it is gone
-- [ ] run `styles.test.ts` — every `var(--x)` must still resolve and no colour may have moved out
+- [x] run `styles.test.ts` — every `var(--x)` must still resolve and no colour may have moved out
       of `:root`
-- [ ] confirm the answer-group invariants still pass (`separates the answer group from the
+- [x] confirm the answer-group invariants still pass (`separates the answer group from the
       instrument above it`, and the `label.previousElementSibling` pin in `entry-drill.test.ts`)
-- [ ] run tests — must pass before task 5
+- [x] run tests — must pass before task 5
 
 ### Task 5: Retitle the pegged-needle invariant
 
 **Files:**
 - Modify: `src/modules/entry-drill.test.ts`
 
-- [ ] rename `draws the pegged needle its own prose tells the student to expect` — the prose is
+- [x] rename `draws the pegged needle its own prose tells the student to expect` — the prose is
       gone, but the invariant is not; it now guards the drawn picture against a re-tuned
       `FULL_SCALE_NM` on its own terms
-- [ ] rewrite its leading comment, which currently quotes `CDI_SCALE_NOTE` verbatim as the claim
+- [x] rewrite its leading comment, which currently quotes `CDI_SCALE_NOTE` verbatim as the claim
       under test; restate the claim as a property of the drawing
-- [ ] keep both halves of the assertion (pegged off-course, centred on-course) — the second is what
+- [x] keep both halves of the assertion (pegged off-course, centred on-course) — the second is what
       distinguishes real geometry from a clamp that pegs everything
-- [ ] run tests — must pass before task 6
+- [x] run tests — must pass before task 6
 
 ### Task 6: Record the reversal in CLAUDE.md, the ledger and README
 
@@ -274,40 +276,40 @@ appears in learn mode must fail too.
 - Modify: `docs/content-audit.md`
 - Modify: `README.md`
 
-- [ ] add a dated entry to `docs/content-audit.md` stating what was removed and why, naming the
+- [x] add a dated entry to `docs/content-audit.md` stating what was removed and why, naming the
       three 2026-08-07 entries it reverses, and recording that the *facts* were never wrong — the
       judgement that changed is whether an instrument depiction owes the student a citation
-- [ ] amend those three 2026-08-07 entries in place with a pointer to the new entry (the
+- [x] amend those three 2026-08-07 entries in place with a pointer to the new entry (the
       2026-08-03 protected-airspace correction is the model — never silently edit past)
-- [ ] narrow the CLAUDE.md citation-convention paragraph: an instrument's scale and the aircraft's
+- [x] narrow the CLAUDE.md citation-convention paragraph: an instrument's scale and the aircraft's
       position within it are part of the **depiction**, exempt on the same footing as the
       `GPS`/`OBS` annunciators, with provenance in the docblock and ledger
-- [ ] delete the `FULL_SCALE_NM`/`FULL_SCALE_SOURCE` worked example from that paragraph — it is
+- [x] delete the `FULL_SCALE_NM`/`FULL_SCALE_SOURCE` worked example from that paragraph — it is
       now an example of the opposite rule and would mislead the next session outright
-- [ ] rewrite the README "Entry determination" bullet — it currently advertises both footnotes,
+- [x] rewrite the README "Entry determination" bullet — it currently advertises both footnotes,
       including "The screen states what the needle is worth … quoting AIM 1-1-17 b.4"
-- [ ] run tests — `dashboard.test.ts` diffs README's route table, so confirm that table is untouched
+- [x] run tests — `dashboard.test.ts` diffs README's route table, so confirm that table is untouched
 
 ### Task 7: Verify acceptance criteria
 
-- [ ] `.entry-lead` and `.entry-cdi` render nowhere, in either mode
-- [ ] the HSI is unchanged: needle, dots, TO/FROM flag, nav status line and distance readout all
+- [x] `.entry-lead` and `.entry-cdi` render nowhere, in either mode
+- [x] the HSI is unchanged: needle, dots, TO/FROM flag, nav status line and distance readout all
       still render, and the scenario line still names the distance
-- [ ] the 6–10 NM window is unchanged — `MIN_DISTANCE_NM` is 6, `MAX_DISTANCE_NM` is 10
-- [ ] `determineEntry` output is unchanged for a seed sweep; no answer key moved
-- [ ] the feedback panel still renders `OUTBOUND_TIMING_AIM`/`_NOTE` after grading
-- [ ] no `*_SOURCE` constant is left exported without a consumer
-- [ ] run full test suite: `npm test`
-- [ ] run `npm run typecheck`
-- [ ] run `npm run build` to confirm the production build is clean
+- [x] the 6–10 NM window is unchanged — `MIN_DISTANCE_NM` is 6, `MAX_DISTANCE_NM` is 10
+- [x] `determineEntry` output is unchanged for a seed sweep; no answer key moved
+- [x] the feedback panel still renders `OUTBOUND_TIMING_AIM`/`_NOTE` after grading
+- [x] no `*_SOURCE` constant is left exported without a consumer
+- [x] run full test suite: `npm test`
+- [x] run `npm run typecheck`
+- [x] run `npm run build` to confirm the production build is clean
 
 ### Task 8: [Final] Update documentation
 
-- [ ] re-read the CLAUDE.md carve-out as a stranger would — confirm it states the *mechanism*
+- [x] re-read the CLAUDE.md carve-out as a stranger would — confirm it states the *mechanism*
       (depiction vs taught fact), not an enumeration of the two exempt cases
-- [ ] confirm no docblock anywhere still references a deleted identifier (grep the nine names plus
+- [x] confirm no docblock anywhere still references a deleted identifier (grep the nine names plus
       `FULL_SCALE_SOURCE`)
-- [ ] move this plan to `docs/plans/completed/`
+- [x] move this plan to `docs/plans/completed/`
 
 ## Post-Completion
 

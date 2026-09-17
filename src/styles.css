@@ -212,22 +212,6 @@ button {
   font-size: var(--fs-sm);
 }
 
-/* The cited footnotes: why the fix is still ahead when the entry is decided and
-   where the miles on the panel come from (.entry-lead), then what a dot on the
-   needle is worth (.entry-cdi). Both static, so they sit at the foot rather than
-   between the picture and the answer buttons a cockpit-mode student is timed on.
-   Only the first carries the rule, so the pair reads as one block, not two. */
-.entry-lead {
-  border-top: 1px solid var(--border);
-  padding-top: 0.6rem;
-}
-
-.entry-lead,
-.entry-cdi {
-  font-size: var(--fs-sm);
-  color: var(--text-dim);
-}
-
 /* Written test */
 .written-modes {
   display: flex;
